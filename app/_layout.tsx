@@ -173,15 +173,14 @@ const splashStyles = StyleSheet.create({
 // ─── Root Layout Inner ─────────────────────────────────────────────────────
 function RootLayoutInner() {
   const { isDark, colors } = useTheme();
-  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    SplashScreen.hideAsync();
+    // Small delay so the native splash (centered emblem) stays visible until the
+    // first screen is ready, then hand off cleanly. The previous JS splash overlay
+    // was removed — it rendered mis-centered on this device.
+    const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 350);
     ensureNotificationsScheduled();
-  }, []);
-
-  const handleSplashFinish = useCallback(() => {
-    setShowSplash(false);
+    return () => clearTimeout(t);
   }, []);
 
   return (
@@ -222,7 +221,6 @@ function RootLayoutInner() {
         <Stack.Screen name="changelog" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
-      {showSplash && <AnimatedSplash onFinish={handleSplashFinish} />}
     </>
   );
 }

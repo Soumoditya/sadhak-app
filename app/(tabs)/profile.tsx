@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { db, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
 import { sendTestNotification } from '../../services/notifications';
+import { uploadToCloudinary } from '../../services/cloudinary';
 import { APP_VERSION, PLAY_STORE_URL, PLAY_STORE_MARKET_URL } from '../../constants/appInfo';
 import { useLayoutInsets } from '../../constants/layout';
 
@@ -78,12 +79,20 @@ export default function ProfileScreen() {
       if (result.canceled || !result.assets?.[0]) return;
       setUploadingPfp(true);
       const uri = result.assets[0].uri;
-      // Save local URI directly — works on-device and avoids Cloudinary issues
-      await updateProfile({ profilePicUrl: uri });
-      dialog.alert('✅ Updated!', 'Profile picture updated successfully.');
-    } catch (e) {
+      // Upload to Cloudinary so the photo persists across reinstall / cache clear.
+      // (A local file URI dies when the app cache is cleared — that was the bug.)
+      const up = await uploadToCloudinary(uri, 'sadhak/avatars', 'image');
+      await updateProfile({ profilePicUrl: up.secure_url });
+      dialog.alert('Updated', 'Your profile picture has been updated.', undefined, { tone: 'success' });
+    } catch (e: any) {
       console.error(e);
-      dialog.alert('Error', 'Could not update photo.');
+      const msg = String(e?.message || e).toLowerCase();
+      dialog.alert(
+        'Upload failed',
+        msg.includes('preset') || msg.includes('401') || msg.includes('cloud')
+          ? 'The image server rejected the upload. Check the Cloudinary "Sadhak" unsigned preset.'
+          : 'Could not upload your photo. Please check your connection and try again.',
+      );
     } finally {
       setUploadingPfp(false);
     }

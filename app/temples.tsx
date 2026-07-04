@@ -55,9 +55,23 @@ export default function TemplesScreen() {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
-          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          lat = loc.coords.latitude;
-          lon = loc.coords.longitude;
+          // Fast path: last known position (instant). Falls back to a fresh fix
+          // with a hard timeout so the screen can never hang on a slow GPS lock.
+          const last = await Location.getLastKnownPositionAsync();
+          if (last) {
+            lat = last.coords.latitude;
+            lon = last.coords.longitude;
+          }
+          const fresh = await Promise.race([
+            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+          ]);
+          if (fresh) {
+            lat = fresh.coords.latitude;
+            lon = fresh.coords.longitude;
+          } else if (!last) {
+            setLocationError(true);
+          }
         } else {
           setLocationError(true);
         }
@@ -69,11 +83,17 @@ export default function TemplesScreen() {
       setUserLon(lon);
 
       const radiusMeters = searchRadius * 1000;
+      // Broadened so smaller towns aren't empty: Hindu-tagged worship places AND
+      // temple buildings AND (as a fallback) any place_of_worship nearby.
       const overpassQuery = `
-        [out:json][timeout:30];
+        [out:json][timeout:25];
         (
           node["amenity"="place_of_worship"]["religion"="hindu"](around:${radiusMeters},${lat},${lon});
           way["amenity"="place_of_worship"]["religion"="hindu"](around:${radiusMeters},${lat},${lon});
+          node["building"="hindu_temple"](around:${radiusMeters},${lat},${lon});
+          way["building"="hindu_temple"](around:${radiusMeters},${lat},${lon});
+          node["amenity"="place_of_worship"](around:${radiusMeters},${lat},${lon});
+          way["amenity"="place_of_worship"](around:${radiusMeters},${lat},${lon});
         );
         out center body;
       `;
@@ -87,7 +107,14 @@ export default function TemplesScreen() {
       if (!res.ok) throw new Error('API error');
       const data = await res.json();
 
-      const templeList: Temple[] = (data.elements || []).slice(0, 80).map((el: any, idx: number) => {
+      const seen = new Set<string>();
+      const uniqueElements = (data.elements || []).filter((el: any) => {
+        const key = `${el.type}${el.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      const templeList: Temple[] = uniqueElements.slice(0, 80).map((el: any, idx: number) => {
         const tlat = el.lat || el.center?.lat;
         const tlon = el.lon || el.center?.lon;
         const dist = tlat && tlon ? getDistance(lat, lon, tlat, tlon) : null;
