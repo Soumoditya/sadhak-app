@@ -13,14 +13,18 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// Configure notification handler
+// Configure notification handler.
+// SDK 53+ splits the old `shouldShowAlert` into `shouldShowBanner` +
+// `shouldShowList`; both are required or foreground notifications won't render.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldShowAlert: true, // back-compat for older runtimes
     shouldPlaySound: true,
     shouldSetBadge: true,
     priority: Notifications.AndroidNotificationPriority.HIGH,
-  }),
+  }) as any,
 });
 
 // ─── 200+ UNIQUE NOTIFICATION MESSAGES ───────────────────────────────
