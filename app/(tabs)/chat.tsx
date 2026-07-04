@@ -204,6 +204,29 @@ export default function ChatScreen() {
         </View>
       </LinearGradient>
 
+      {/* Explore Feed banner → Instagram-style community feed */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => router.push('/feed')}
+        style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 16, overflow: 'hidden' }}
+      >
+        <LinearGradient
+          colors={['#D94F00', '#F07830']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}
+        >
+          <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+            <MaterialCommunityIcons name="compass-outline" size={24} color="#FFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>Explore Feed</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, marginTop: 1 }}>See posts, share, and discover Sadhaks</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#FFF" />
+        </LinearGradient>
+      </TouchableOpacity>
+
       {/* Search */}
       <View style={[st.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Ionicons name="search" size={18} color={colors.textTertiary} />
