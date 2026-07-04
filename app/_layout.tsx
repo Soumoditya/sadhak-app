@@ -61,30 +61,56 @@ function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
     transform: [{ scale: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.12] }) }],
   };
 
-  const EMBLEM = SCREEN_W * 0.5;
+  const EMBLEM = Math.min(SCREEN_W * 0.46, 200);
+  const GLOW = EMBLEM * 1.9;
 
   return (
     <Animated.View style={[splashStyles.overlay, { opacity: overlayOpacity }]} pointerEvents="none">
-      {/* Pulsing saffron halo */}
-      <Animated.View style={[splashStyles.glow, glowStyle]} />
-
-      {/* Thin ring accent */}
-      <Animated.View
-        style={[
-          splashStyles.ring,
-          { width: EMBLEM + 34, height: EMBLEM + 34, borderRadius: (EMBLEM + 34) / 2, opacity: ringOpacity, transform: [{ scale: ringScale }] },
-        ]}
-      />
-
-      {/* Circular emblem */}
-      <Animated.Image
-        source={require('../assets/images/icon.png')}
-        style={[
-          { width: EMBLEM, height: EMBLEM, borderRadius: EMBLEM / 2, marginBottom: 28 },
-          { opacity: logoOpacity, transform: [{ scale: logoScale }] },
-        ]}
-        resizeMode="cover"
-      />
+      {/* Emblem box — halos are centered inside it deterministically (no % math) */}
+      <View style={{ width: EMBLEM, height: EMBLEM, alignItems: 'center', justifyContent: 'center', marginBottom: 30 }}>
+        {/* Pulsing saffron halo */}
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              top: (EMBLEM - GLOW) / 2,
+              left: (EMBLEM - GLOW) / 2,
+              width: GLOW,
+              height: GLOW,
+              borderRadius: GLOW / 2,
+              backgroundColor: 'rgba(217, 79, 0, 0.16)',
+            },
+            glowStyle,
+          ]}
+        />
+        {/* Thin ring accent */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: -17,
+            left: -17,
+            width: EMBLEM + 34,
+            height: EMBLEM + 34,
+            borderRadius: (EMBLEM + 34) / 2,
+            borderWidth: 1,
+            borderColor: 'rgba(240, 120, 48, 0.35)',
+            opacity: ringOpacity,
+            transform: [{ scale: ringScale }],
+          }}
+        />
+        {/* Circular emblem */}
+        <Animated.Image
+          source={require('../assets/images/icon.png')}
+          style={{
+            width: EMBLEM,
+            height: EMBLEM,
+            borderRadius: EMBLEM / 2,
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
+          }}
+          resizeMode="cover"
+        />
+      </View>
 
       {/* Wordmark */}
       <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textSlide }], alignItems: 'center' }}>

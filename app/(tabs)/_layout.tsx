@@ -67,7 +67,7 @@ export default function TabLayout() {
           bottom: tabBarBottom,
           left: Spacing.lg,
           right: Spacing.lg,
-          backgroundColor: isDark ? 'rgba(23, 28, 36, 0.92)' : 'rgba(255, 255, 255, 0.92)',
+          backgroundColor: isDark ? 'rgba(20, 25, 33, 0.985)' : 'rgba(255, 255, 255, 0.985)',
           borderRadius: BorderRadius.xxl,
           borderTopWidth: 0,
           borderWidth: 1,

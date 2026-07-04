@@ -1,0 +1,33 @@
+{
+  "//": "Realtime Database security rules for Sadhak. Deploy in Firebase Console -> Realtime Database -> Rules -> paste -> Publish. This is what makes chat send/receive work (default RTDB is locked deny-all).",
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "messages": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "$msgId": {
+          ".validate": "newData.hasChildren(['senderId', 'timestamp'])",
+          "senderId": { ".validate": "newData.val() === auth.uid" },
+          "text": { ".validate": "newData.isString() && newData.val().length <= 5000" }
+        }
+      }
+    },
+
+    "typing": {
+      "$roomId": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      }
+    },
+
+    "rooms": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

@@ -32,6 +32,10 @@ export interface DailyGroomingAdvice {
   overallStatus: GroomingStatus;
   summary: string;
   summaryHi: string;
+  /** Guidance tailored to the user's gender + marital status. */
+  personalNotes: string[];
+  /** Short label describing who this advice is personalized for, e.g. "Married man". */
+  audienceLabel: string;
 }
 
 // Day-based grooming restrictions
@@ -211,6 +215,12 @@ export function getDailyGroomingAdvice(
   const dayRules = DAY_RULES[dayOfWeek];
   const rules: GroomingRule[] = [];
 
+  // Personalize advice by gender + marital status.
+  const personalNotes = getGenderSpecificRules(gender, marriageStatus);
+  const audienceLabel = `${
+    marriageStatus === 'married' ? 'Married' : marriageStatus === 'widowed' ? 'Widowed' : 'Unmarried'
+  } ${gender === 'female' ? 'woman' : 'man'}`;
+
   // Check special occasions first (highest priority)
   if (isSpecialOccasion && SPECIAL_RESTRICTIONS[isSpecialOccasion]) {
     const special = SPECIAL_RESTRICTIONS[isSpecialOccasion];
@@ -233,6 +243,8 @@ export function getDailyGroomingAdvice(
       overallStatus: 'forbidden',
       summary: special.reason,
       summaryHi: special.reasonHi,
+      personalNotes,
+      audienceLabel,
     };
   }
 
@@ -310,6 +322,8 @@ export function getDailyGroomingAdvice(
     overallStatus,
     summary,
     summaryHi,
+    personalNotes,
+    audienceLabel,
   };
 }
 

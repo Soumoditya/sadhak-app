@@ -314,15 +314,46 @@ export default function HomeScreen() {
                 <Text style={[s.groomingSummary, { color: groomingColor }]}>{grooming.summary}</Text>
               </View>
             </View>
-            {grooming.rules.slice(0, 3).map((rule, idx) => (
-              <View key={idx} style={s.groomingRule}>
-                <MaterialCommunityIcons
-                  name={rule.type === 'haircut' ? 'content-cut' : rule.type === 'shaving' ? 'razor-double-edge' : 'hand-back-right-outline'}
-                  size={14} color={getGroomingStatusColor(rule.status)}
-                />
-                <Text style={[s.groomingRuleText, { color: colors.textSecondary }]} numberOfLines={1}>{rule.reason}</Text>
+            {/* Per-activity status chips (clear, non-repetitive) */}
+            <View style={s.groomingChips}>
+              {grooming.rules.slice(0, 3).map((rule, idx) => {
+                const label = rule.type === 'haircut' ? 'Haircut' : rule.type === 'shaving' ? 'Shaving' : 'Nails';
+                const word = rule.status === 'allowed' ? 'OK' : rule.status === 'avoid' ? 'Caution' : 'Avoid';
+                const c = getGroomingStatusColor(rule.status);
+                return (
+                  <View key={idx} style={[s.groomingChip, { backgroundColor: c + '14', borderColor: c + '33' }]}>
+                    <MaterialCommunityIcons
+                      name={rule.type === 'haircut' ? 'content-cut' : rule.type === 'shaving' ? 'razor-double-edge' : 'hand-back-right-outline'}
+                      size={13} color={c}
+                    />
+                    <Text style={[s.groomingChipLabel, { color: colors.text }]}>{label}</Text>
+                    <Text style={[s.groomingChipWord, { color: c }]}>{word}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Reason shown once */}
+            {!!grooming.rules[0]?.reason && (
+              <Text style={[s.groomingReason, { color: colors.textSecondary }]} numberOfLines={2}>
+                {grooming.rules[0].reason}
+              </Text>
+            )}
+
+            {/* Gender + marital-status personalization */}
+            {grooming.personalNotes.length > 0 && (
+              <View style={[s.groomingPersonal, { borderTopColor: colors.divider }]}>
+                <View style={s.groomingPersonalHead}>
+                  <MaterialCommunityIcons name="account-heart-outline" size={13} color={colors.primary} />
+                  <Text style={[s.groomingPersonalLabel, { color: colors.primary }]}>
+                    For you · {grooming.audienceLabel}
+                  </Text>
+                </View>
+                {grooming.personalNotes.map((note, i) => (
+                  <Text key={i} style={[s.groomingPersonalText, { color: colors.textSecondary }]}>• {note}</Text>
+                ))}
               </View>
-            ))}
+            )}
           </View>
         </Section>
 
@@ -452,6 +483,15 @@ const s = StyleSheet.create({
   groomingSummary: { fontSize: 13, fontWeight: '600' },
   groomingRule: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   groomingRuleText: { flex: 1, fontSize: 12, lineHeight: 16 },
+  groomingChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  groomingChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  groomingChipLabel: { fontSize: 12, fontWeight: '600' },
+  groomingChipWord: { fontSize: 11, fontWeight: '700' },
+  groomingReason: { fontSize: 12, lineHeight: 17, marginTop: 10 },
+  groomingPersonal: { marginTop: 12, paddingTop: 10, borderTopWidth: 1 },
+  groomingPersonalHead: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
+  groomingPersonalLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  groomingPersonalText: { fontSize: 12, lineHeight: 17, marginTop: 2 },
 
   // Guidance
   guidanceCard: { borderRadius: 16, padding: 16, borderWidth: 1 },

@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDialog } from '../contexts/DialogContext';
 import { rtdb, ref, push, set, onValue, off, rtServerTimestamp, limitToLast, rtQuery, orderByChild } from '../config/firebase';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -42,6 +43,7 @@ export default function ChatRoomScreen() {
   const { roomId, roomName, roomType } = useLocalSearchParams<{ roomId: string; roomName: string; roomType: string }>();
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -156,17 +158,32 @@ export default function ChatRoomScreen() {
       };
     }
 
-    const newMsgRef = push(ref(rtdb, `messages/${roomId}`));
-    await set(newMsgRef, msgData);
-
+    // Optimistically clear the input so typing feels instant.
+    const pending = { ...msgData };
     setInputText('');
     setReplyingTo(null);
 
-    // Clear typing indicator
-    set(ref(rtdb, `typing/${roomId}/${user.uid}`), { isTyping: false, timestamp: Date.now() });
+    try {
+      const newMsgRef = push(ref(rtdb, `messages/${roomId}`));
+      await set(newMsgRef, pending);
 
-    // Scroll to bottom
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
+      // Clear typing indicator
+      set(ref(rtdb, `typing/${roomId}/${user.uid}`), { isTyping: false, timestamp: Date.now() });
+
+      // Scroll to bottom
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
+    } catch (e: any) {
+      // Restore the text so the user doesn't lose it, and surface the real reason
+      // (most commonly: Realtime Database security rules are not deployed).
+      setInputText(pending.text);
+      const permission = String(e?.message || e).toLowerCase().includes('permission');
+      dialog.alert(
+        'Message not sent',
+        permission
+          ? 'The chat database is rejecting writes. The Realtime Database security rules need to be published in Firebase.'
+          : 'Could not send your message. Please check your connection and try again.',
+      );
+    }
   };
 
   // Send GIF
