@@ -15,7 +15,16 @@
  * - Abhijit Muhurta
  * - Paksha (Lunar fortnight)
  * - Hindu month
+ *
+ * Accuracy: the five elements + masa come from `mhah-panchang` (sidereal /
+ * Drik ganita with ayanamsha); sun/moon times from `suncalc`. Muhurta and
+ * Rahu/Yama/Gulika windows are derived from the accurate sunrise/sunset.
  */
+
+import { MhahPanchang } from 'mhah-panchang';
+import * as SunCalc from 'suncalc';
+
+const mhah = new MhahPanchang();
 
 export interface PanchangData {
   date: Date;
@@ -202,6 +211,18 @@ const HINDU_MONTHS = [
   { en: 'Pausha', hi: 'पौष' },
   { en: 'Magha', hi: 'माघ' },
   { en: 'Phalguna', hi: 'फाल्गुन' },
+];
+
+// Adhik Maas (Purushottam Maas) — the intercalary lunar month. Its dates are
+// published years in advance; this curated table is authoritative (verified
+// against Drik Panchang) and replaces mhah-panchang's unreliable leap flag.
+// Bounds are inclusive epoch-ms (IST day boundaries). Extend as new years are
+// confirmed (next Adhik Maas after 2026 is in 2029).
+const ADHIK_MAAS_PERIODS: { start: number; end: number; monthEn: string }[] = [
+  // Adhik Shravana 2023: 18 Jul – 16 Aug 2023
+  { start: Date.UTC(2023, 6, 17, 18, 30), end: Date.UTC(2023, 7, 16, 18, 30), monthEn: 'Shravana' },
+  // Adhik Jyeshtha 2026: 17 May – 15 Jun 2026
+  { start: Date.UTC(2026, 4, 16, 18, 30), end: Date.UTC(2026, 5, 15, 18, 30), monthEn: 'Jyeshtha' },
 ];
 
 /**
@@ -415,49 +436,60 @@ export function calculatePanchang(
   lat: number = 28.6139, // Default: New Delhi
   lon: number = 77.209
 ): PanchangData {
-  const jd = dateToJD(date);
-  const sunLon = sunLongitude(jd);
-  const moonLon = moonLongitude(jd);
+  // ── Accurate sun times (suncalc), anchored to local noon of the given day ──
+  const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+  const sunTimes = SunCalc.getTimes(noon, lat, lon);
+  const toHHMM = (d: Date): string =>
+    `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const validDate = (d?: Date | null): d is Date => !!d && !isNaN(d.getTime());
+  const sunrise = validDate(sunTimes.sunrise) ? toHHMM(sunTimes.sunrise) : '06:00';
+  const sunset = validDate(sunTimes.sunset) ? toHHMM(sunTimes.sunset) : '18:00';
+  const moonTimes = SunCalc.getMoonTimes(noon, lat, lon);
+  const moonrise = validDate(moonTimes.rise) ? toHHMM(moonTimes.rise) : '--:--';
 
-  // Tithi calculation
-  let diff = moonLon - sunLon;
-  if (diff < 0) diff += 360;
-  const tithiNum = Math.floor(diff / 12); // 0-29
+  // ── Five elements + masa from mhah-panchang (sidereal, with ayanamsha),
+  //    evaluated at sunrise — the traditional reference moment for the day. ──
+  const anchor = validDate(sunTimes.sunrise) ? sunTimes.sunrise : noon;
+  const elems: any = mhah.calculate(anchor);
+  const cal: any = mhah.calendar(anchor, lat, lon);
+  const clamp = (n: number, max: number) => (n < 0 ? 0 : n > max ? max : Math.floor(n));
+
+  const tithiNum = clamp(elems?.Tithi?.ino ?? 0, 29); // 0-29
   const tithiData = TITHI_NAMES[tithiNum];
-  const paksha = tithiNum < 15 ? 'shukla' : 'krishna';
+  const paksha: 'shukla' | 'krishna' = tithiNum < 15 ? 'shukla' : 'krishna';
+  const tithiEnd = validDate(elems?.Tithi?.end && new Date(elems.Tithi.end)) ? toHHMM(new Date(elems.Tithi.end)) : '--:--';
 
-  // Nakshatra calculation
-  const nakNum = Math.floor(moonLon / (360 / 27)); // 0-26
+  const nakNum = clamp(elems?.Nakshatra?.ino ?? 0, 26); // 0-26
   const nakData = NAKSHATRA_NAMES[nakNum];
+  const nakEnd = validDate(elems?.Nakshatra?.end && new Date(elems.Nakshatra.end)) ? toHHMM(new Date(elems.Nakshatra.end)) : '--:--';
 
-  // Yoga calculation
-  let yogaAngle = sunLon + moonLon;
-  if (yogaAngle >= 360) yogaAngle -= 360;
-  const yogaNum = Math.floor(yogaAngle / (360 / 27));
-  const yogaData = YOGA_NAMES[yogaNum % 27];
+  const yogaNum = clamp(elems?.Yoga?.ino ?? 0, 26);
+  const yogaData = YOGA_NAMES[yogaNum];
 
-  // Karana calculation (half of tithi)
-  const karanaNum = Math.floor(diff / 6) % 11;
+  const karanaNum = clamp(elems?.Karna?.ino ?? 0, 10);
   const karanaData = KARANA_NAMES[karanaNum];
 
   // Vara (day of week)
   const dayOfWeek = date.getDay();
   const varaData = VARA_NAMES[dayOfWeek];
 
-  // Hindu month (approximate based on Sun's position)
-  const hinduMonthNum = Math.floor(((sunLon + 360 - 23.5) % 360) / 30);
-  const hinduMonth = HINDU_MONTHS[hinduMonthNum % 12];
+  // Hindu (amanta) lunar month. mhah's masa index is offset by one vs our table.
+  // NOTE: mhah's isLeapMonth flag is unreliable (it mislabels regular months as
+  // Adhik). Adhik Maas is rare and its dates are published years in advance, so
+  // we use a curated table (ADHIK_MAAS_PERIODS) instead of the library flag.
+  const masaIno = clamp(cal?.Masa?.ino ?? 0, 11);
+  const monthBase = HINDU_MONTHS[(masaIno + 1) % 12];
+  const isLeapMonth = ADHIK_MAAS_PERIODS.some(
+    (p) => anchor.getTime() >= p.start && anchor.getTime() <= p.end,
+  );
+  const hinduMonth = {
+    en: (isLeapMonth ? 'Adhik ' : '') + monthBase.en,
+    hi: (isLeapMonth ? 'अधिक ' : '') + monthBase.hi,
+  };
 
-  // Sunrise/Sunset
-  const { sunrise, sunset } = calculateSunriseSunset(date, lat, lon);
-
-  // Rahu Kaal
+  // Rahu / muhurta windows derived from the accurate sun times
   const rahuKaal = calculateRahuKaal(dayOfWeek, sunrise, sunset);
-
-  // Brahma Muhurta
   const brahmaMuhurta = calculateBrahmaMuhurta(sunrise);
-
-  // Abhijit Muhurta
   const abhijitMuhurta = calculateAbhijitMuhurta(sunrise, sunset);
 
   // Yamaghanta (approximate)
@@ -490,14 +522,14 @@ export function calculatePanchang(
       number: tithiNum + 1,
       paksha,
       pakshaHi: paksha === 'shukla' ? 'शुक्ल पक्ष' : 'कृष्ण पक्ष',
-      endTime: '--:--',
+      endTime: tithiEnd,
     },
     nakshatra: {
       name: nakData.en,
       nameHi: nakData.hi,
       number: nakNum + 1,
       lord: nakData.lord,
-      endTime: '--:--',
+      endTime: nakEnd,
     },
     yoga: {
       name: yogaData.en,
@@ -521,7 +553,7 @@ export function calculatePanchang(
     },
     sunrise,
     sunset,
-    moonrise: '--:--', // Simplified - would need more complex calculation
+    moonrise,
     rahuKaal,
     brahmaMuhurta,
     abhijitMuhurta,
