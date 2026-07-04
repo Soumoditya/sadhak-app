@@ -13,11 +13,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { db, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
 import { sendTestNotification } from '../../services/notifications';
 import { APP_VERSION, PLAY_STORE_URL, PLAY_STORE_MARKET_URL } from '../../constants/appInfo';
+import { useLayoutInsets } from '../../constants/layout';
 
 export default function ProfileScreen() {
   const { profile, isGuest, isAdmin, logout, updateProfile, user, deleteAccount } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
   const router = useRouter();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -167,9 +169,9 @@ export default function ProfileScreen() {
   const selectedLangInfo = SUPPORTED_LANGUAGES.find(l => l.code === language);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: tabContentPadding }} showsVerticalScrollIndicator={false}>
       {/* ─── Profile Card ──── */}
-      <Animated.View style={[styles.profileCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
+      <Animated.View style={[styles.profileCard, { marginTop: headerPaddingTop }, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
         <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.surface] : ['#D94F00', '#F07830']} style={styles.profileGradient}>
           <TouchableOpacity style={styles.pfpContainer} onPress={pickAndUploadPfp} activeOpacity={0.8}>
             {uploadingPfp ? (

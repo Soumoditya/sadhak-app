@@ -11,6 +11,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { calculatePanchang, type PanchangData } from '../../services/panchang';
 import { getDailyGroomingAdvice, getGroomingStatusColor, type DailyGroomingAdvice } from '../../services/groomingRules';
+import { useLayoutInsets } from '../../constants/layout';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -105,6 +106,7 @@ export default function HomeScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
 
   const today = new Date();
   const panchang = useMemo(() => {
@@ -153,13 +155,13 @@ export default function HomeScreen() {
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabContentPadding }}>
 
         {/* ═══ 1. Header — Namaste + Name ═══ */}
         <LinearGradient
           colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830', '#F5A623']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={s.header}
+          style={[s.header, { paddingTop: headerPaddingTop }]}
         >
           <View style={s.headerTop}>
             <View style={s.headerLeft}>

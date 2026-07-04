@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { calculatePanchang } from '../../services/panchang';
 import { getDailyGroomingAdvice, getGroomingStatusColor } from '../../services/groomingRules';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLayoutInsets } from '../../constants/layout';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const CELL_SIZE = (SCREEN_W - 40) / 7; // Better use of horizontal space
@@ -23,6 +24,7 @@ export default function CalendarScreen() {
   const { profile, user } = useAuth();
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [noteModal, setNoteModal] = useState(false);
@@ -133,11 +135,11 @@ export default function CalendarScreen() {
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabContentPadding }}>
         {/* ─── Header ──── */}
         <LinearGradient
           colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-          style={st.header}
+          style={[st.header, { paddingTop: headerPaddingTop }]}
         >
           <Text style={st.headerTitle}>{t('cal.title')}</Text>
           <Text style={st.headerSub}>

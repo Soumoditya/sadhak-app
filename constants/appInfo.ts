@@ -7,15 +7,13 @@ export const APP_VERSION = Constants.expoConfig?.version || '1.0.0';
 export const BUILD_NUMBER = Constants.expoConfig?.android?.versionCode?.toString() || '1';
 
 export const DEVELOPER_NAME = 'Sadhak Team';
-export const SUPPORT_EMAIL = 'support@sadhak.app';
+export const SUPPORT_EMAIL = 'soumodityapramanik@gmail.com';
 export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.sadhak.app';
 export const PLAY_STORE_MARKET_URL = 'market://details?id=com.sadhak.app';
 
-export const SOCIAL_LINKS = {
-  instagram: 'https://instagram.com/sadhak.app',
-  twitter: 'https://twitter.com/sadhak_app',
-  website: 'https://sadhak.app',
-};
+// No active social media accounts yet. Add real links here once they exist,
+// then the About screen will render buttons for any non-empty entry.
+export const SOCIAL_LINKS: { instagram?: string; twitter?: string; website?: string } = {};
 
 export interface ChangelogEntry {
   version: string;

@@ -5,6 +5,7 @@ import {
   Animated, Alert, Vibration,
 } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -41,6 +42,7 @@ export default function ChatRoomScreen() {
   const { roomId, roomName, roomType } = useLocalSearchParams<{ roomId: string; roomName: string; roomType: string }>();
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [showGiphy, setShowGiphy] = useState(false);
@@ -415,7 +417,7 @@ export default function ChatRoomScreen() {
         )}
 
         {/* Input Bar */}
-        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderColor: colors.border, paddingBottom: 8 + insets.bottom }]}>
           <TouchableOpacity style={styles.attachBtn} onPress={sendImage}>
             <MaterialCommunityIcons name="image-outline" size={24} color={colors.textTertiary} />
           </TouchableOpacity>

@@ -10,6 +10,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, rtdb, collection, getDocs, addDoc, doc, setDoc, serverTimestamp, ref, onValue, off } from '../../config/firebase';
+import { useLayoutInsets } from '../../constants/layout';
 
 type ChatTab = 'rooms' | 'private' | 'groups' | 'broadcast';
 
@@ -50,6 +51,7 @@ export default function ChatScreen() {
   const { user, profile, isAdmin } = useAuth();
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
   const [activeTab, setActiveTab] = useState<ChatTab>('rooms');
   const [rooms, setRooms] = useState<ChatRoom[]>(DEFAULT_ROOMS);
   const [groups, setGroups] = useState<ChatRoom[]>([]);
@@ -186,7 +188,7 @@ export default function ChatScreen() {
       {/* Header */}
       <LinearGradient
         colors={isDark ? [colors.surfaceElevated, colors.background] : ['#1B7A42', '#2D9D5E']}
-        style={st.header}
+        style={[st.header, { paddingTop: headerPaddingTop }]}
       >
         <View style={st.headerContent}>
           <View>
@@ -235,7 +237,7 @@ export default function ChatScreen() {
         data={getCurrentList()}
         renderItem={renderChatItem}
         keyExtractor={item => item.id}
-        contentContainerStyle={st.chatList}
+        contentContainerStyle={[st.chatList, { paddingBottom: tabContentPadding }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={st.emptyState}>

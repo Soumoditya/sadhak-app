@@ -78,24 +78,26 @@ export default function AboutScreen() {
           ))}
         </View>
 
-        {/* Social */}
+        {/* Social — only shown once real accounts exist */}
+        {(SOCIAL_LINKS.website || SOCIAL_LINKS.instagram || SOCIAL_LINKS.twitter) && (
         <View style={styles.socialRow}>
           {SOCIAL_LINKS.website && (
-            <TouchableOpacity onPress={() => Linking.openURL(SOCIAL_LINKS.website)} style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <TouchableOpacity onPress={() => Linking.openURL(SOCIAL_LINKS.website!)} style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <MaterialCommunityIcons name="web" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
           {SOCIAL_LINKS.instagram && (
-            <TouchableOpacity onPress={() => Linking.openURL(SOCIAL_LINKS.instagram)} style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <TouchableOpacity onPress={() => Linking.openURL(SOCIAL_LINKS.instagram!)} style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <MaterialCommunityIcons name="instagram" size={22} color="#E4405F" />
             </TouchableOpacity>
           )}
           {SOCIAL_LINKS.twitter && (
-            <TouchableOpacity onPress={() => Linking.openURL(SOCIAL_LINKS.twitter)} style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <TouchableOpacity onPress={() => Linking.openURL(SOCIAL_LINKS.twitter!)} style={[styles.socialBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <MaterialCommunityIcons name="twitter" size={22} color="#1DA1F2" />
             </TouchableOpacity>
           )}
         </View>
+        )}
 
         {/* Footer */}
         <Text style={[styles.footer, { color: colors.textTertiary }]}>{t('about.madeIn')}</Text>

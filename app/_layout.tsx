@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Animated, StyleSheet, Image, Dimensions, Text } from 'react-native';
+import { View, Animated, StyleSheet, Image, Dimensions, Text, Easing } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { LanguageProvider } from '../contexts/LanguageContext';
@@ -14,88 +15,81 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ─── Animated Splash Overlay ───────────────────────────────────────────────
 function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
-  const logoScale = useRef(new Animated.Value(0.7)).current;
+  const logoScale = useRef(new Animated.Value(0.82)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
+  const ringScale = useRef(new Animated.Value(0.6)).current;
+  const ringOpacity = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
-  const textSlide = useRef(new Animated.Value(20)).current;
+  const textSlide = useRef(new Animated.Value(16)).current;
   const overlayOpacity = useRef(new Animated.Value(1)).current;
-  const glowOpacity = useRef(new Animated.Value(0)).current;
+  const glowPulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Phase 1: Logo fade in + scale
+    // Gentle continuous glow pulse behind the emblem.
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowPulse, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(glowPulse, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    ).start();
+
     Animated.sequence([
+      // Phase 1: emblem + halo ring bloom in
       Animated.parallel([
-        Animated.spring(logoScale, {
-          toValue: 1,
-          friction: 8,
-          tension: 60,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowOpacity, {
-          toValue: 0.6,
-          duration: 800,
-          useNativeDriver: true,
-        }),
+        Animated.spring(logoScale, { toValue: 1, friction: 7, tension: 55, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 550, useNativeDriver: true }),
+        Animated.timing(ringOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.spring(ringScale, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }),
       ]),
-      // Phase 2: Text slides in
+      // Phase 2: wordmark rises
       Animated.parallel([
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.spring(textSlide, {
-          toValue: 0,
-          friction: 8,
-          tension: 80,
-          useNativeDriver: true,
-        }),
+        Animated.timing(textOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(textSlide, { toValue: 0, friction: 8, tension: 80, useNativeDriver: true }),
       ]),
-      // Phase 3: Hold
-      Animated.delay(400),
-      // Phase 4: Fade out the whole overlay
-      Animated.timing(overlayOpacity, {
-        toValue: 0,
-        duration: 350,
-        useNativeDriver: true,
-      }),
+      // Phase 3: hold
+      Animated.delay(500),
+      // Phase 4: fade the whole overlay out
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 380, useNativeDriver: true }),
     ]).start(() => {
       onFinish();
     });
   }, []);
 
+  const glowStyle = {
+    opacity: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.28, 0.55] }),
+    transform: [{ scale: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.12] }) }],
+  };
+
+  const EMBLEM = SCREEN_W * 0.5;
+
   return (
     <Animated.View style={[splashStyles.overlay, { opacity: overlayOpacity }]} pointerEvents="none">
-      {/* Subtle radial glow behind logo */}
-      <Animated.View style={[splashStyles.glow, { opacity: glowOpacity }]} />
+      {/* Pulsing saffron halo */}
+      <Animated.View style={[splashStyles.glow, glowStyle]} />
 
-      {/* App Icon */}
-      <Animated.Image
-        source={require('../assets/images/splash-artwork.png')}
+      {/* Thin ring accent */}
+      <Animated.View
         style={[
-          splashStyles.logo,
-          {
-            opacity: logoOpacity,
-            transform: [{ scale: logoScale }],
-          },
+          splashStyles.ring,
+          { width: EMBLEM + 34, height: EMBLEM + 34, borderRadius: (EMBLEM + 34) / 2, opacity: ringOpacity, transform: [{ scale: ringScale }] },
         ]}
-        resizeMode="contain"
       />
 
-      {/* App Name */}
-      <Animated.View
-        style={{
-          opacity: textOpacity,
-          transform: [{ translateY: textSlide }],
-        }}
-      >
+      {/* Circular emblem */}
+      <Animated.Image
+        source={require('../assets/images/icon.png')}
+        style={[
+          { width: EMBLEM, height: EMBLEM, borderRadius: EMBLEM / 2, marginBottom: 28 },
+          { opacity: logoOpacity, transform: [{ scale: logoScale }] },
+        ]}
+        resizeMode="cover"
+      />
+
+      {/* Wordmark */}
+      <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textSlide }], alignItems: 'center' }}>
         <Text style={splashStyles.appName}>S A D H A K</Text>
-        <Text style={splashStyles.tagline}>Your Spiritual Companion</Text>
+        <View style={splashStyles.divider} />
+        <Text style={splashStyles.tagline}>YOUR SPIRITUAL COMPANION</Text>
       </Animated.View>
     </Animated.View>
   );
@@ -111,30 +105,41 @@ const splashStyles = StyleSheet.create({
   },
   glow: {
     position: 'absolute',
-    width: SCREEN_W * 0.8,
-    height: SCREEN_W * 0.8,
-    borderRadius: SCREEN_W * 0.4,
-    backgroundColor: 'rgba(217, 79, 0, 0.12)',
+    top: '50%',
+    marginTop: -SCREEN_W * 0.55,
+    width: SCREEN_W * 0.9,
+    height: SCREEN_W * 0.9,
+    borderRadius: SCREEN_W * 0.45,
+    backgroundColor: 'rgba(217, 79, 0, 0.18)',
   },
-  logo: {
-    width: SCREEN_W * 0.55,
-    height: SCREEN_W * 0.75,
-    marginBottom: 24,
+  ring: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -(SCREEN_W * 0.5 + 34) / 2 - 28,
+    borderWidth: 1,
+    borderColor: 'rgba(240, 120, 48, 0.35)',
   },
   appName: {
-    fontSize: 28,
-    fontWeight: '300',
-    color: '#F1F0EE',
-    letterSpacing: 8,
+    fontSize: 30,
+    fontWeight: '400',
+    color: '#F5F3F0',
+    letterSpacing: 10,
     textAlign: 'center',
+    paddingLeft: 10, // optical balance for the wide letter-spacing
+  },
+  divider: {
+    width: 42,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#D94F00',
+    marginVertical: 12,
   },
   tagline: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: 'rgba(241, 240, 238, 0.5)',
-    letterSpacing: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(241, 240, 238, 0.55)',
+    letterSpacing: 3,
     textAlign: 'center',
-    marginTop: 8,
   },
 });
 
@@ -196,12 +201,14 @@ function RootLayoutInner() {
 // ─── Root Export ────────────────────────────────────────────────────────────
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <RootLayoutInner />
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <RootLayoutInner />
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

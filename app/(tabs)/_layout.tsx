@@ -1,10 +1,11 @@
 import { Tabs, Redirect } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, Platform, Animated, Pressable } from 'react-native';
+import { View, StyleSheet, Animated, Pressable } from 'react-native';
 import { useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { BorderRadius, Shadows, Spacing } from '../../constants/theme';
+import { useLayoutInsets, TAB_BAR_HEIGHT } from '../../constants/layout';
 
 // ─── Animated Tab Button ───────────────────────────────────────────────────
 function TabButton({ children, onPress, accessibilityState, colors }: any) {
@@ -52,6 +53,7 @@ function TabButton({ children, onPress, accessibilityState, colors }: any) {
 export default function TabLayout() {
   const { isAuthenticated, isLoading } = useAuth();
   const { colors, isDark } = useTheme();
+  const { tabBarBottom } = useLayoutInsets();
 
   if (isLoading) return null;
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
@@ -62,7 +64,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: {
           position: 'absolute',
-          bottom: Platform.OS === 'ios' ? 24 : 16,
+          bottom: tabBarBottom,
           left: Spacing.lg,
           right: Spacing.lg,
           backgroundColor: isDark ? 'rgba(23, 28, 36, 0.92)' : 'rgba(255, 255, 255, 0.92)',
@@ -70,7 +72,7 @@ export default function TabLayout() {
           borderTopWidth: 0,
           borderWidth: 1,
           borderColor: isDark ? 'rgba(42, 49, 64, 0.6)' : 'rgba(0,0,0,0.06)',
-          height: 64,
+          height: TAB_BAR_HEIGHT,
           paddingBottom: 0,
           paddingTop: 0,
           ...Shadows.xl,

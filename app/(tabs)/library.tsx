@@ -13,6 +13,7 @@ import { uploadToCloudinary } from '../../services/cloudinary';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { useLayoutInsets } from '../../constants/layout';
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: 'bookshelf', color: '#D94F00' },
@@ -48,6 +49,7 @@ export default function LibraryScreen() {
   const { user, isAdmin } = useAuth();
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [books, setBooks] = useState<LibraryItem[]>([]);
@@ -231,7 +233,7 @@ export default function LibraryScreen() {
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#B33D00']} style={st.header}>
+      <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#B33D00']} style={[st.header, { paddingTop: headerPaddingTop }]}>
         <View style={st.headerRow}>
           <View>
             <Text style={st.headerTitle}>Sacred Library</Text>
@@ -294,7 +296,7 @@ export default function LibraryScreen() {
           keyExtractor={item => item.id}
           numColumns={viewMode === 'grid' ? 2 : 1}
           key={viewMode}
-          contentContainerStyle={viewMode === 'grid' ? st.gridList : st.booksList}
+          contentContainerStyle={[viewMode === 'grid' ? st.gridList : st.booksList, { paddingBottom: tabContentPadding }]}
           columnWrapperStyle={viewMode === 'grid' ? { gap: 10 } : undefined}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
