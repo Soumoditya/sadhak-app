@@ -7,6 +7,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDialog } from "../contexts/DialogContext";
 import { useLanguage } from '../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
@@ -26,6 +27,7 @@ type TabType = 'temples' | 'bhandara';
 export default function TemplesScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const { t } = useLanguage();
   const [temples, setTemples] = useState<Temple[]>([]);
   const [loading, setLoading] = useState(false);
@@ -104,7 +106,7 @@ export default function TemplesScreen() {
       setTemples(templeList);
     } catch (error) {
       console.error('Error:', error);
-      Alert.alert('Connection Error', 'Could not fetch nearby temples. Please check your internet connection.', [
+      dialog.alert('Connection Error', 'Could not fetch nearby temples. Please check your internet connection.', [
         { text: 'Retry', onPress: () => fetchNearbyTemples() },
         { text: 'Cancel' },
       ]);

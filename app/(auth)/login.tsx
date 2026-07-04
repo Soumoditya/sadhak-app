@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useDialog } from "../../contexts/DialogContext";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, FontSize, Shadows } from '../../constants/theme';
 
@@ -15,6 +16,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 export default function LoginScreen() {
   const { signInWithEmail, signInAsGuest } = useAuth();
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -38,7 +40,7 @@ export default function LoginScreen() {
 
   const handleEmailLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter email and password');
+      dialog.alert('Error', 'Please enter email and password');
       return;
     }
     try {
@@ -50,7 +52,7 @@ export default function LoginScreen() {
         : error.code === 'auth/wrong-password' ? 'Incorrect password'
         : error.code === 'auth/invalid-email' ? 'Invalid email format'
         : 'Login failed. Please try again.';
-      Alert.alert('Login Failed', msg);
+      dialog.alert('Login Failed', msg);
     } finally {
       setLoading(false);
     }
@@ -62,7 +64,7 @@ export default function LoginScreen() {
       await signInAsGuest();
       router.replace('/(tabs)');
     } catch (error) {
-      Alert.alert('Error', 'Could not sign in as guest. Please try again.');
+      dialog.alert('Error', 'Could not sign in as guest. Please try again.');
     } finally {
       setGuestLoading(false);
     }

@@ -6,6 +6,7 @@ import {
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDialog } from "../contexts/DialogContext";
 import { useLanguage } from '../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -86,6 +87,7 @@ function useUndoRedo(initial: string) {
 export default function NotesScreen() {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const { t } = useLanguage();
   const [notes, setNotes] = useState<Note[]>([]);
   const [showEditor, setShowEditor] = useState(false);
@@ -159,7 +161,7 @@ export default function NotesScreen() {
 
   const saveNote = async () => {
     if (!title.trim() && !content.trim() && checklist.length === 0) {
-      Alert.alert('Error', 'Note is empty');
+      dialog.alert('Error', 'Note is empty');
       return;
     }
     try {
@@ -178,7 +180,7 @@ export default function NotesScreen() {
       }
       setShowEditor(false);
       fetchNotes();
-    } catch (e) { Alert.alert('Error', 'Could not save note'); }
+    } catch (e) { dialog.alert('Error', 'Could not save note'); }
   };
 
   const moveNote = async (noteId: string, folder: string) => {
@@ -194,7 +196,7 @@ export default function NotesScreen() {
 
   const deleteNote = (note: Note) => {
     if ((note.folder || '') === 'Trash') {
-      Alert.alert('Permanently Delete', 'This note will be permanently deleted.', [
+      dialog.alert('Permanently Delete', 'This note will be permanently deleted.', [
         { text: 'Cancel' },
         { text: 'Delete Forever', style: 'destructive', onPress: async () => {
           await deleteDoc(doc(db, `users/${user!.uid}/notes`, note.id));
@@ -203,13 +205,13 @@ export default function NotesScreen() {
       ]);
     } else {
       moveNote(note.id, 'Trash');
-      Alert.alert('Moved to Trash', 'Note moved to Trash. You can restore it later.');
+      dialog.alert('Moved to Trash', 'Note moved to Trash. You can restore it later.');
     }
   };
 
   const restoreNote = (note: Note) => {
     moveNote(note.id, 'Personal');
-    Alert.alert('Restored', 'Note restored to Personal folder.');
+    dialog.alert('Restored', 'Note restored to Personal folder.');
   };
 
   const archiveNote = (note: Note) => {
@@ -294,7 +296,7 @@ export default function NotesScreen() {
             actions.push({ text: 'Delete', style: 'destructive', onPress: () => deleteNote(note) });
           }
           actions.push({ text: 'Cancel', style: 'cancel' });
-          Alert.alert('Note Options', note.title || 'Untitled', actions);
+          dialog.alert('Note Options', note.title || 'Untitled', actions);
         }}
         activeOpacity={0.7}
       >

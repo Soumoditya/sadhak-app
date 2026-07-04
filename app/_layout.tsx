@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { LanguageProvider } from '../contexts/LanguageContext';
+import { DialogProvider } from '../contexts/DialogContext';
 import * as SplashScreen from 'expo-splash-screen';
 import { ensureNotificationsScheduled } from '../services/notifications';
 
@@ -203,11 +204,13 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <LanguageProvider>
-          <AuthProvider>
-            <RootLayoutInner />
-          </AuthProvider>
-        </LanguageProvider>
+        <DialogProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <RootLayoutInner />
+            </AuthProvider>
+          </LanguageProvider>
+        </DialogProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

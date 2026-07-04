@@ -7,11 +7,13 @@ import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useDialog } from "../../contexts/DialogContext";
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function SignupScreen() {
   const { signUpWithEmail } = useAuth();
   const { colors } = useTheme();
+  const dialog = useDialog();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,15 +23,15 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill all fields');
+      dialog.alert('Error', 'Please fill all fields');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      dialog.alert('Error', 'Passwords do not match');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      dialog.alert('Error', 'Password must be at least 6 characters');
       return;
     }
     try {
@@ -41,7 +43,7 @@ export default function SignupScreen() {
         : error.code === 'auth/invalid-email' ? 'Invalid email format'
         : error.code === 'auth/weak-password' ? 'Password too weak'
         : 'Sign up failed. Please try again.';
-      Alert.alert('Sign Up Failed', msg);
+      dialog.alert('Sign Up Failed', msg);
     } finally {
       setLoading(false);
     }

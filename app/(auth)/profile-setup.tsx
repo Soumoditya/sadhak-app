@@ -6,12 +6,14 @@ import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useDialog } from "../../contexts/DialogContext";
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 
 export default function ProfileSetupScreen() {
   const { updateProfile } = useAuth();
   const { colors } = useTheme();
+  const dialog = useDialog();
   const [gender, setGender] = useState<'male' | 'female' | null>(null);
   const [marriageStatus, setMarriageStatus] = useState<'married' | 'unmarried' | 'widowed' | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,7 +25,7 @@ export default function ProfileSetupScreen() {
       setLocationLoading(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location permission is needed for accurate festival timings.');
+        dialog.alert('Permission Denied', 'Location permission is needed for accurate festival timings.');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({});
@@ -39,7 +41,7 @@ export default function ProfileSetupScreen() {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
     } catch (error) {
-      Alert.alert('Error', 'Could not get your location. You can set it later.');
+      dialog.alert('Error', 'Could not get your location. You can set it later.');
     } finally {
       setLocationLoading(false);
     }
@@ -47,7 +49,7 @@ export default function ProfileSetupScreen() {
 
   const handleComplete = async () => {
     if (!gender || !marriageStatus) {
-      Alert.alert('Required', 'Please select your gender and marriage status for personalized guidance.');
+      dialog.alert('Required', 'Please select your gender and marriage status for personalized guidance.');
       return;
     }
     try {
@@ -55,7 +57,7 @@ export default function ProfileSetupScreen() {
       await updateProfile({ gender, marriageStatus, location });
       router.replace('/(tabs)');
     } catch (error) {
-      Alert.alert('Error', 'Could not save profile. Please try again.');
+      dialog.alert('Error', 'Could not save profile. Please try again.');
     } finally {
       setLoading(false);
     }

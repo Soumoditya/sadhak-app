@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useDialog } from "../../contexts/DialogContext";
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, rtdb, collection, getDocs, addDoc, doc, setDoc, serverTimestamp, ref, onValue, off } from '../../config/firebase';
@@ -50,6 +51,7 @@ function formatTime(timestamp?: number): string {
 export default function ChatScreen() {
   const { user, profile, isAdmin } = useAuth();
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const { t } = useLanguage();
   const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
   const [activeTab, setActiveTab] = useState<ChatTab>('rooms');
@@ -103,7 +105,7 @@ export default function ChatScreen() {
   };
 
   const createGroup = async () => {
-    if (!newGroupName.trim()) { Alert.alert('Error', 'Please enter a name'); return; }
+    if (!newGroupName.trim()) { dialog.alert('Error', 'Please enter a name'); return; }
     try {
       await addDoc(collection(db, 'chat_groups'), {
         name: newGroupName.trim(), description: newGroupDesc.trim(),
@@ -113,8 +115,8 @@ export default function ChatScreen() {
       setCreateGroupModal(false);
       setNewGroupName(''); setNewGroupDesc('');
       fetchGroups();
-      Alert.alert('Created!', `${newGroupType === 'broadcast' ? 'Channel' : 'Group'} created successfully.`);
-    } catch (error) { Alert.alert('Error', 'Could not create group'); }
+      dialog.alert('Created!', `${newGroupType === 'broadcast' ? 'Channel' : 'Group'} created successfully.`);
+    } catch (error) { dialog.alert('Error', 'Could not create group'); }
   };
 
   const openRoom = (room: ChatRoom) => {

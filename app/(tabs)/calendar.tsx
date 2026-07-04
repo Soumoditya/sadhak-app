@@ -6,6 +6,7 @@ import {
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useDialog } from "../../contexts/DialogContext";
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { calculatePanchang } from '../../services/panchang';
@@ -23,6 +24,7 @@ const NOTES_KEY = 'sadhak_calendar_notes';
 export default function CalendarScreen() {
   const { profile, user } = useAuth();
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const { t } = useLanguage();
   const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -119,7 +121,7 @@ export default function CalendarScreen() {
 
   const deleteNote = () => {
     const key = getDateKey(selectedDate);
-    Alert.alert('Delete Note', 'Remove this note?', [
+    dialog.alert('Delete Note', 'Remove this note?', [
       { text: 'Cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => {
         const updated = { ...notes };
@@ -319,15 +321,15 @@ export default function CalendarScreen() {
                 const Notifications = require('expo-notifications');
                 const targetDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 6, 0, 0);
                 if (targetDate.getTime() <= Date.now()) {
-                  Alert.alert('📅 Reminder', 'Cannot set reminder for past dates.');
+                  dialog.alert('📅 Reminder', 'Cannot set reminder for past dates.');
                   return;
                 }
                 await Notifications.scheduleNotificationAsync({
                   content: { title: '🙏 Sadhak Reminder', body: `Don't forget your spiritual activities for ${selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`, sound: true },
                   trigger: { date: targetDate },
                 });
-                Alert.alert('✅ Reminder Set', `You'll be reminded on ${selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })} at 6:00 AM`);
-              } catch (e) { Alert.alert('Error', 'Could not set reminder.'); }
+                dialog.alert('✅ Reminder Set', `You'll be reminded on ${selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })} at 6:00 AM`);
+              } catch (e) { dialog.alert('Error', 'Could not set reminder.'); }
             }}>
               <MaterialCommunityIcons name="bell-plus-outline" size={18} color="#7C3AED" />
               <Text style={[st.actionBtnText, { color: '#7C3AED' }]}>Reminder</Text>

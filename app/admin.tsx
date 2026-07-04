@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList, Alert, 
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDialog } from "../contexts/DialogContext";
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, collection, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, setDoc, serverTimestamp } from '../config/firebase';
 
@@ -23,6 +24,7 @@ interface Submission {
 export default function AdminScreen() {
   const { isAdmin, profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalUsers: 0, totalBooks: 0, pendingReviews: 0 });
@@ -79,16 +81,16 @@ export default function AdminScreen() {
         reviewedBy: profile?.uid,
         reviewedAt: serverTimestamp(),
       });
-      Alert.alert('Approved', `"${sub.title}" is now published in the library.`);
+      dialog.alert('Approved', `"${sub.title}" is now published in the library.`);
       fetchSubmissions();
       fetchStats();
     } catch (e) {
-      Alert.alert('Error', 'Could not approve submission.');
+      dialog.alert('Error', 'Could not approve submission.');
     }
   };
 
   const rejectSubmission = async (sub: Submission) => {
-    Alert.alert('Reject', `Reject "${sub.title}"?`, [
+    dialog.alert('Reject', `Reject "${sub.title}"?`, [
       { text: 'Cancel' },
       {
         text: 'Reject', style: 'destructive', onPress: async () => {
@@ -98,10 +100,10 @@ export default function AdminScreen() {
               reviewedBy: profile?.uid,
               reviewedAt: serverTimestamp(),
             });
-            Alert.alert('Rejected', 'Submission has been rejected.');
+            dialog.alert('Rejected', 'Submission has been rejected.');
             fetchSubmissions();
             fetchStats();
-          } catch (e) { Alert.alert('Error', 'Could not reject submission.'); }
+          } catch (e) { dialog.alert('Error', 'Could not reject submission.'); }
         },
       },
     ]);

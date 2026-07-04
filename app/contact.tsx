@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert, Linking, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDialog } from "../contexts/DialogContext";
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { router } from 'expo-router';
@@ -13,6 +14,7 @@ type FormType = 'bug' | 'feature' | null;
 
 export default function ContactScreen() {
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const { t } = useLanguage();
   const { user, profile } = useAuth();
   const [activeForm, setActiveForm] = useState<FormType>(null);
@@ -22,7 +24,7 @@ export default function ContactScreen() {
 
   const handleSubmit = async () => {
     if (!title.trim() || !description.trim()) {
-      Alert.alert('Error', 'Please fill in both title and description');
+      dialog.alert('Error', 'Please fill in both title and description');
       return;
     }
     setSubmitting(true);
@@ -39,12 +41,12 @@ export default function ContactScreen() {
         createdAt: serverTimestamp(),
         status: 'new',
       });
-      Alert.alert('🙏 Thank You!', t('contact.thankYou'));
+      dialog.alert('🙏 Thank You!', t('contact.thankYou'));
       setTitle('');
       setDescription('');
       setActiveForm(null);
     } catch (error) {
-      Alert.alert('Error', 'Could not submit. Please try again.');
+      dialog.alert('Error', 'Could not submit. Please try again.');
     } finally {
       setSubmitting(false);
     }

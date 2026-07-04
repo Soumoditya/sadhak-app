@@ -6,6 +6,7 @@ import {
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useDialog } from "../../contexts/DialogContext";
 import { useLanguage, SUPPORTED_LANGUAGES, type LanguageCode } from '../../contexts/LanguageContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +19,7 @@ import { useLayoutInsets } from '../../constants/layout';
 export default function ProfileScreen() {
   const { profile, isGuest, isAdmin, logout, updateProfile, user, deleteAccount } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
+  const dialog = useDialog();
   const { language, setLanguage, t } = useLanguage();
   const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
   const router = useRouter();
@@ -64,7 +66,7 @@ export default function ProfileScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please allow photo library access.');
+        dialog.alert('Permission needed', 'Please allow photo library access.');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -78,10 +80,10 @@ export default function ProfileScreen() {
       const uri = result.assets[0].uri;
       // Save local URI directly — works on-device and avoids Cloudinary issues
       await updateProfile({ profilePicUrl: uri });
-      Alert.alert('✅ Updated!', 'Profile picture updated successfully.');
+      dialog.alert('✅ Updated!', 'Profile picture updated successfully.');
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not update photo.');
+      dialog.alert('Error', 'Could not update photo.');
     } finally {
       setUploadingPfp(false);
     }
@@ -109,9 +111,9 @@ export default function ProfileScreen() {
       await updateProfile({ username: newUsername });
       await setDoc(doc(db, 'usernames', newUsername), { uid: user?.uid, username: newUsername, createdAt: new Date().toISOString() });
       setShowUsernameModal(false);
-      Alert.alert('Done!', `Username set to @${newUsername}`);
+      dialog.alert('Done!', `Username set to @${newUsername}`);
     } catch (e) {
-      Alert.alert('Error', 'Could not update username');
+      dialog.alert('Error', 'Could not update username');
     } finally { setCheckingUsername(false); }
   };
 
@@ -120,8 +122,8 @@ export default function ProfileScreen() {
     try {
       await updateProfile({ displayName: editName.trim() || 'Sadhak', bio: editBio.trim() });
       setShowEditProfileModal(false);
-      Alert.alert('✅ Saved!', 'Profile updated.');
-    } catch (e) { Alert.alert('Error', 'Could not update profile'); }
+      dialog.alert('✅ Saved!', 'Profile updated.');
+    } catch (e) { dialog.alert('Error', 'Could not update profile'); }
   };
 
   // ─── SETTINGS ────────────────────────────────────────
@@ -131,17 +133,17 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert(t('settings.logout'), 'Are you sure?', [
+    dialog.alert(t('settings.logout'), 'Are you sure?', [
       { text: t('common.cancel') },
       { text: t('settings.logout'), style: 'destructive', onPress: logout },
     ]);
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert('⚠️ Delete Account', 'This will permanently delete your account and all data. This action cannot be undone.', [
+    dialog.alert('⚠️ Delete Account', 'This will permanently delete your account and all data. This action cannot be undone.', [
       { text: t('common.cancel') },
       { text: 'Delete Forever', style: 'destructive', onPress: () => {
-        Alert.alert('Final Confirmation', 'Are you absolutely sure?', [
+        dialog.alert('Final Confirmation', 'Are you absolutely sure?', [
           { text: t('common.cancel') },
           { text: 'Yes, Delete', style: 'destructive', onPress: deleteAccount },
         ]);
@@ -283,7 +285,7 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           style={[styles.testNotifBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-          onPress={() => { sendTestNotification(); Alert.alert('Sent!', 'Check your notification tray.'); }}
+          onPress={() => { sendTestNotification(); dialog.alert('Sent!', 'Check your notification tray.'); }}
         >
           <MaterialCommunityIcons name="bell-badge-outline" size={20} color={colors.primary} />
           <Text style={[styles.testNotifText, { color: colors.primary }]}>Send Test Notification</Text>

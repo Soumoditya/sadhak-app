@@ -6,6 +6,7 @@ import {
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useDialog } from "../../contexts/DialogContext";
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, serverTimestamp } from '../../config/firebase';
@@ -48,6 +49,7 @@ interface LibraryItem {
 export default function LibraryScreen() {
   const { user, isAdmin } = useAuth();
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const { t } = useLanguage();
   const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -93,18 +95,18 @@ export default function LibraryScreen() {
         uploadedBy: item.uploadedBy, uploadedAt: serverTimestamp(), downloadCount: 0,
       });
       await deleteDoc(doc(db, 'library_submissions', item.id));
-      Alert.alert('Approved', `"${item.title}" published to library.`);
+      dialog.alert('Approved', `"${item.title}" published to library.`);
       fetchBooks();
       fetchSubmissions();
-    } catch (e) { Alert.alert('Error', 'Could not approve.'); }
+    } catch (e) { dialog.alert('Error', 'Could not approve.'); }
   };
 
   const rejectSubmission = async (item: LibraryItem) => {
-    Alert.alert('Reject Submission', `Reject "${item.title}"?`, [
+    dialog.alert('Reject Submission', `Reject "${item.title}"?`, [
       { text: 'Cancel' },
       { text: 'Reject', style: 'destructive', onPress: async () => {
         await deleteDoc(doc(db, 'library_submissions', item.id));
-        Alert.alert('Rejected', 'Submission removed.');
+        dialog.alert('Rejected', 'Submission removed.');
         fetchSubmissions();
       }},
     ]);
@@ -126,12 +128,12 @@ export default function LibraryScreen() {
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
       if (!result.canceled && result.assets?.[0]) setSelectedFile(result.assets[0]);
-    } catch (error) { Alert.alert('Error', 'Could not pick document'); }
+    } catch (error) { dialog.alert('Error', 'Could not pick document'); }
   };
 
   const handleUpload = async () => {
     if (!selectedFile || !uploadData.title.trim()) {
-      Alert.alert('Error', 'Please select a PDF and enter a title');
+      dialog.alert('Error', 'Please select a PDF and enter a title');
       return;
     }
     try {
@@ -145,13 +147,13 @@ export default function LibraryScreen() {
         fileSize: cloudResult.bytes, uploadedBy: user?.uid, uploadedAt: serverTimestamp(),
         downloadCount: 0, ...(isAdmin ? {} : { status: 'pending_review' }),
       });
-      Alert.alert('Success', isAdmin ? 'PDF published to library!' : 'PDF submitted for review.');
+      dialog.alert('Success', isAdmin ? 'PDF published to library!' : 'PDF submitted for review.');
       setUploadModal(false);
       setSelectedFile(null);
       setUploadData({ title: '', author: '', category: 'other', description: '' });
       if (isAdmin) fetchBooks();
     } catch (error) {
-      Alert.alert('Upload Failed', 'Check your connection and try again.');
+      dialog.alert('Upload Failed', 'Check your connection and try again.');
     } finally { setUploading(false); }
   };
 
@@ -168,7 +170,7 @@ export default function LibraryScreen() {
         // Increment download count
         try { await updateDoc(doc(db, 'library', book.id), { downloadCount: (book.downloadCount || 0) + 1 }); } catch (e) {}
       }
-    } catch (error) { Alert.alert('Error', 'Download failed'); }
+    } catch (error) { dialog.alert('Error', 'Download failed'); }
     finally { setDownloadingId(null); }
   };
 
