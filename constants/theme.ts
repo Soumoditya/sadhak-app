@@ -1,0 +1,365 @@
+// ─── Sadhak Design System — Theme Tokens ───────────────────────────────────
+// 2026 Premium Design Language
+// Hindu temple aesthetics — saffron, vermillion, gold, deep maroon, ivory
+
+export const Colors = {
+  light: {
+    // ── Primary ──
+    primary: '#D94F00',        // Rich saffron-orange
+    primaryLight: '#F07830',
+    primaryDark: '#B33D00',
+    primaryMuted: '#D94F0018', // For tinted backgrounds
+    primaryGradientStart: '#D94F00',
+    primaryGradientEnd: '#F59A3F',
+
+    // ── Secondary ──
+    secondary: '#8B1A1A',      // Deep temple maroon
+    secondaryLight: '#A83232',
+    secondaryDark: '#6B0F1A',
+
+    // ── Accent ──
+    gold: '#C49A2C',
+    goldLight: '#E8C34A',
+    goldMuted: '#C49A2C14',
+    vermillion: '#D93025',
+    tulsiGreen: '#1B7A42',
+    gangesBlue: '#1565C0',
+    saffron: '#F5A623',
+
+    // ── Surfaces ──
+    background: '#FDFAF5',     // Warm ivory
+    surface: '#FFFFFF',
+    surfaceElevated: '#FFFFFF',
+    surfaceSecondary: '#F7F3ED', // Subtle warm gray
+    card: '#FFFFFF',
+    cardBorder: '#EDE6DB',
+
+    // ── Text ──
+    text: '#1C1917',           // Rich near-black
+    textSecondary: '#57534E',
+    textTertiary: '#A8A29E',
+    textOnPrimary: '#FFFFFF',
+    textOnDark: '#FFFFFF',
+    textMuted: '#D6D3D1',
+
+    // ── Status ──
+    success: '#16A34A',
+    successBg: '#16A34A12',
+    warning: '#EA580C',
+    warningBg: '#EA580C12',
+    error: '#DC2626',
+    errorBg: '#DC262612',
+    info: '#2563EB',
+    infoBg: '#2563EB12',
+
+    // ── Calendar ──
+    festival: '#D93025',
+    ekadashi: '#7C3AED',
+    purnima: '#E8C34A',
+    amavasya: '#44403C',
+    groomingOk: '#16A34A',
+    groomingAvoid: '#DC2626',
+    personalNote: '#2563EB',
+
+    // ── UI Chrome ──
+    border: '#E7E0D8',
+    divider: '#F0EBE3',
+    tabIconDefault: '#A8A29E',
+    tabIconSelected: '#D94F00',
+    ripple: 'rgba(217, 79, 0, 0.10)',
+    overlay: 'rgba(28, 25, 23, 0.50)',
+    overlayHeavy: 'rgba(28, 25, 23, 0.72)',
+    shadow: 'rgba(28, 25, 23, 0.08)',
+    shimmer: '#F0EBE3',
+    shimmerHighlight: '#FAF7F2',
+
+    // ── Glassmorphism ──
+    glass: 'rgba(255, 255, 255, 0.78)',
+    glassBorder: 'rgba(255, 255, 255, 0.45)',
+  },
+
+  dark: {
+    // ── Primary ──
+    primary: '#F07830',        // Brighter saffron for dark bg
+    primaryLight: '#FFB074',
+    primaryDark: '#D94F00',
+    primaryMuted: '#F0783018',
+    primaryGradientStart: '#D94F00',
+    primaryGradientEnd: '#F07830',
+
+    // ── Secondary ──
+    secondary: '#E8899A',
+    secondaryLight: '#F0A0B0',
+    secondaryDark: '#C06070',
+
+    // ── Accent ──
+    gold: '#E8C34A',
+    goldLight: '#F5D678',
+    goldMuted: '#E8C34A14',
+    vermillion: '#FF7B72',
+    tulsiGreen: '#4ADE80',
+    gangesBlue: '#60A5FA',
+    saffron: '#FBB848',
+
+    // ── Surfaces ──
+    background: '#0F1218',     // Deep ink
+    surface: '#171C24',        // Card surface
+    surfaceElevated: '#1E242E', // Elevated card
+    surfaceSecondary: '#141920',
+    card: '#1E242E',
+    cardBorder: '#2A3140',
+
+    // ── Text ──
+    text: '#F1F0EE',           // Warm white
+    textSecondary: '#9CA3AF',
+    textTertiary: '#5C6370',
+    textOnPrimary: '#0F1218',
+    textOnDark: '#F1F0EE',
+    textMuted: '#374151',
+
+    // ── Status ──
+    success: '#4ADE80',
+    successBg: '#4ADE8015',
+    warning: '#FB923C',
+    warningBg: '#FB923C15',
+    error: '#F87171',
+    errorBg: '#F8717115',
+    info: '#60A5FA',
+    infoBg: '#60A5FA15',
+
+    // ── Calendar ──
+    festival: '#FF7B72',
+    ekadashi: '#A78BFA',
+    purnima: '#E8C34A',
+    amavasya: '#78909C',
+    groomingOk: '#4ADE80',
+    groomingAvoid: '#F87171',
+    personalNote: '#60A5FA',
+
+    // ── UI Chrome ──
+    border: '#2A3140',
+    divider: '#1E242E',
+    tabIconDefault: '#5C6370',
+    tabIconSelected: '#F07830',
+    ripple: 'rgba(240, 120, 48, 0.12)',
+    overlay: 'rgba(0, 0, 0, 0.60)',
+    overlayHeavy: 'rgba(0, 0, 0, 0.82)',
+    shadow: 'rgba(0, 0, 0, 0.40)',
+    shimmer: '#1E242E',
+    shimmerHighlight: '#2A3140',
+
+    // ── Glassmorphism ──
+    glass: 'rgba(23, 28, 36, 0.82)',
+    glassBorder: 'rgba(42, 49, 64, 0.60)',
+  },
+};
+
+// ─── Spacing — strict 4px grid ─────────────────────────────────────────────
+export const Spacing = {
+  xxs: 2,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+  huge: 40,
+  massive: 48,
+  giant: 64,
+};
+
+// ─── Border Radius ─────────────────────────────────────────────────────────
+export const BorderRadius = {
+  xs: 6,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  pill: 999,
+};
+
+// ─── Typography ────────────────────────────────────────────────────────────
+export const FontSize = {
+  caption: 11,
+  footnote: 12,
+  subheadline: 13,
+  body: 15,
+  callout: 16,
+  headline: 17,
+  title3: 20,
+  title2: 22,
+  title1: 26,
+  largeTitle: 32,
+  display: 38,
+};
+
+export const LineHeight = {
+  tight: 1.2,
+  normal: 1.4,
+  relaxed: 1.6,
+  loose: 1.8,
+};
+
+export const LetterSpacing = {
+  tight: -0.5,
+  normal: 0,
+  wide: 0.3,
+  wider: 0.6,
+  widest: 1.2,
+  caps: 1.5,
+};
+
+export const FontFamily = {
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semiBold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+  devanagari: 'NotoSansDevanagari_400Regular',
+  devanagariBold: 'NotoSansDevanagari_700Bold',
+};
+
+// ─── Shadows (layered for depth) ───────────────────────────────────────────
+export const Shadows = {
+  none: {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  },
+  xs: {
+    shadowColor: '#1C1917',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  sm: {
+    shadowColor: '#1C1917',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#1C1917',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: '#1C1917',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  xl: {
+    shadowColor: '#1C1917',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+};
+
+// ─── Animation Constants ───────────────────────────────────────────────────
+export const Animation = {
+  duration: {
+    instant: 100,
+    fast: 150,
+    normal: 250,
+    slow: 350,
+    slower: 500,
+    entrance: 600,
+  },
+  spring: {
+    snappy: { friction: 8, tension: 140 },
+    gentle: { friction: 10, tension: 80 },
+    bouncy: { friction: 6, tension: 120 },
+  },
+  scale: {
+    pressed: 0.97,
+    pressedSm: 0.98,
+    pressedLg: 0.95,
+  },
+};
+
+// ─── Icon Sizes ────────────────────────────────────────────────────────────
+export const IconSize = {
+  xs: 14,
+  sm: 16,
+  md: 20,
+  lg: 24,
+  xl: 28,
+  xxl: 32,
+  hero: 48,
+};
+
+// ─── Hindu Calendar Data ───────────────────────────────────────────────────
+export const HINDU_DAYS = {
+  0: { en: 'Sunday', hi: 'रविवार', deity: 'Surya' },
+  1: { en: 'Monday', hi: 'सोमवार', deity: 'Chandra/Shiva' },
+  2: { en: 'Tuesday', hi: 'मंगलवार', deity: 'Hanuman/Mangal' },
+  3: { en: 'Wednesday', hi: 'बुधवार', deity: 'Budha/Vishnu' },
+  4: { en: 'Thursday', hi: 'गुरुवार', deity: 'Brihaspati/Vishnu' },
+  5: { en: 'Friday', hi: 'शुक्रवार', deity: 'Shukra/Lakshmi' },
+  6: { en: 'Saturday', hi: 'शनिवार', deity: 'Shani' },
+};
+
+export const HINDU_MONTHS = [
+  { en: 'Chaitra', hi: 'चैत्र' },
+  { en: 'Vaishakha', hi: 'वैशाख' },
+  { en: 'Jyeshtha', hi: 'ज्येष्ठ' },
+  { en: 'Ashadha', hi: 'आषाढ़' },
+  { en: 'Shravana', hi: 'श्रावण' },
+  { en: 'Bhadrapada', hi: 'भाद्रपद' },
+  { en: 'Ashvina', hi: 'आश्विन' },
+  { en: 'Kartika', hi: 'कार्तिक' },
+  { en: 'Margashirsha', hi: 'मार्गशीर्ष' },
+  { en: 'Pausha', hi: 'पौष' },
+  { en: 'Magha', hi: 'माघ' },
+  { en: 'Phalguna', hi: 'फाल्गुन' },
+];
+
+export const TITHIS = [
+  'Pratipada', 'Dwitiya', 'Tritiya', 'Chaturthi', 'Panchami',
+  'Shashthi', 'Saptami', 'Ashtami', 'Navami', 'Dashami',
+  'Ekadashi', 'Dwadashi', 'Trayodashi', 'Chaturdashi', 'Purnima/Amavasya',
+];
+
+export const NAKSHATRAS = [
+  { en: 'Ashwini', hi: 'अश्विनी' },
+  { en: 'Bharani', hi: 'भरणी' },
+  { en: 'Krittika', hi: 'कृत्तिका' },
+  { en: 'Rohini', hi: 'रोहिणी' },
+  { en: 'Mrigashira', hi: 'मृगशिरा' },
+  { en: 'Ardra', hi: 'आर्द्रा' },
+  { en: 'Punarvasu', hi: 'पुनर्वसु' },
+  { en: 'Pushya', hi: 'पुष्य' },
+  { en: 'Ashlesha', hi: 'आश्लेषा' },
+  { en: 'Magha', hi: 'मघा' },
+  { en: 'Purva Phalguni', hi: 'पूर्वाफाल्गुनी' },
+  { en: 'Uttara Phalguni', hi: 'उत्तराफाल्गुनी' },
+  { en: 'Hasta', hi: 'हस्त' },
+  { en: 'Chitra', hi: 'चित्रा' },
+  { en: 'Swati', hi: 'स्वाति' },
+  { en: 'Vishakha', hi: 'विशाखा' },
+  { en: 'Anuradha', hi: 'अनुराधा' },
+  { en: 'Jyeshtha', hi: 'ज्येष्ठा' },
+  { en: 'Mula', hi: 'मूल' },
+  { en: 'Purva Ashadha', hi: 'पूर्वाषाढ़ा' },
+  { en: 'Uttara Ashadha', hi: 'उत्तराषाढ़ा' },
+  { en: 'Shravana', hi: 'श्रवण' },
+  { en: 'Dhanishta', hi: 'धनिष्ठा' },
+  { en: 'Shatabhisha', hi: 'शतभिषा' },
+  { en: 'Purva Bhadrapada', hi: 'पूर्वाभाद्रपद' },
+  { en: 'Uttara Bhadrapada', hi: 'उत्तराभाद्रपद' },
+  { en: 'Revati', hi: 'रेवती' },
+];
+
+export const APP_NAME = 'Sadhak';
+export const APP_TAGLINE = 'Your Spiritual Companion';
