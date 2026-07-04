@@ -51,13 +51,19 @@ export async function uploadToCloudinary(
   formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
   formData.append('folder', folder);
 
+  // Route PDFs/other docs to the raw endpoint, images to auto (Cloudinary picks).
+  const uploadUrl =
+    resourceType === 'raw' || mimeType === 'application/pdf'
+      ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/raw/upload`
+      : CLOUDINARY_CONFIG.uploadUrl;
+
   try {
-    const response = await fetch(CLOUDINARY_CONFIG.uploadUrl, {
+    // IMPORTANT: do NOT set Content-Type manually. React Native's fetch must add
+    // the multipart boundary itself; hardcoding 'multipart/form-data' omits the
+    // boundary and Cloudinary rejects the body (this was why uploads failed).
+    const response = await fetch(uploadUrl, {
       method: 'POST',
       body: formData,
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
     });
 
     if (!response.ok) {

@@ -11,6 +11,9 @@ import { useDialog } from "../contexts/DialogContext";
 import { useLanguage } from '../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
+import { useLayoutInsets } from '../constants/layout';
+import TempleMap, { type TempleMapHandle, type MapPin } from '../components/TempleMap';
+import { useRef } from 'react';
 
 interface Temple {
   id: string;
@@ -38,6 +41,10 @@ export default function TemplesScreen() {
   const [userLon, setUserLon] = useState(0);
   const [locationError, setLocationError] = useState(false);
   const [searchRadius, setSearchRadius] = useState(10); // km
+  const { headerPaddingTop, backBtnTop, bottomInset } = useLayoutInsets();
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+  const [selected, setSelected] = useState<Temple | null>(null);
+  const mapRef = useRef<TempleMapHandle>(null);
 
   useEffect(() => {
     fetchNearbyTemples();
@@ -174,6 +181,14 @@ export default function TemplesScreen() {
     return matchSearch;
   });
 
+  const mapPins: MapPin[] = filtered
+    .filter(t => t.lat && t.lon)
+    .map(t => ({ id: t.id, name: t.name, lat: t.lat, lon: t.lon, kind: t.type }));
+
+  const onSelectPin = useCallback((id: string) => {
+    setSelected(temples.find(t => t.id === id) || null);
+  }, [temples]);
+
   const distanceFormatted = (d?: number) => {
     if (!d) return '';
     if (d < 1) return `${Math.round(d * 1000)}m`;
@@ -185,7 +200,7 @@ export default function TemplesScreen() {
       {/* Header */}
       <LinearGradient
         colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-        style={st.header}
+        style={[st.header, { paddingTop: headerPaddingTop }]}
       >
         <View style={st.headerRow}>
           <TouchableOpacity onPress={() => router.back()} style={st.backBtn}>
@@ -193,9 +208,12 @@ export default function TemplesScreen() {
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={st.headerTitle}>Nearby Temples</Text>
-            <Text style={st.headerSub}>{temples.length} temples within {searchRadius}km</Text>
+            <Text style={st.headerSub}>{temples.length} found within {searchRadius}km</Text>
           </View>
-          <TouchableOpacity onPress={() => fetchNearbyTemples()} style={st.refreshBtn}>
+          <TouchableOpacity onPress={() => setViewMode(viewMode === 'map' ? 'list' : 'map')} style={st.refreshBtn}>
+            <MaterialCommunityIcons name={viewMode === 'map' ? 'format-list-bulleted' : 'map-outline'} size={20} color="#FFF" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => fetchNearbyTemples()} style={[st.refreshBtn, { marginLeft: 8 }]}>
             <MaterialCommunityIcons name="refresh" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
@@ -234,6 +252,60 @@ export default function TemplesScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[st.loadingText, { color: colors.textSecondary }]}>Finding nearby temples...</Text>
           <Text style={[st.loadingSubtext, { color: colors.textTertiary }]}>Searching within {searchRadius}km radius</Text>
+        </View>
+      ) : viewMode === 'map' ? (
+        <View style={{ flex: 1 }}>
+          {userLat !== 0 ? (
+            <TempleMap ref={mapRef} userLat={userLat} userLon={userLon} pins={mapPins} isDark={isDark} onSelect={onSelectPin} />
+          ) : (
+            <View style={st.loadingContainer}>
+              <MaterialCommunityIcons name="map-marker-off-outline" size={40} color={colors.textTertiary} />
+              <Text style={[st.loadingText, { color: colors.textSecondary }]}>Enable location to see the map</Text>
+            </View>
+          )}
+
+          {/* Recenter */}
+          <TouchableOpacity
+            style={[st.recenterFab, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={() => mapRef.current?.recenter()}
+          >
+            <MaterialCommunityIcons name="crosshairs-gps" size={22} color={colors.primary} />
+          </TouchableOpacity>
+
+          {filtered.length === 0 && userLat !== 0 && (
+            <View style={[st.mapBanner, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center' }}>
+                No temples mapped nearby yet. Try a larger radius above.
+              </Text>
+            </View>
+          )}
+
+          {/* Selected temple detail */}
+          {selected && (
+            <View style={[st.selectedCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder, paddingBottom: 14 + bottomInset }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                <View style={[st.templeIcon, { backgroundColor: colors.primary + '12' }]}>
+                  <MaterialCommunityIcons name="temple-hindu" size={24} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.templeName, { color: colors.text }]} numberOfLines={2}>{selected.name}</Text>
+                  {!!selected.address && <Text style={[st.templeAddr, { color: colors.textSecondary }]} numberOfLines={1}>{selected.address}</Text>}
+                  {selected.distance != null && (
+                    <Text style={{ color: colors.tulsiGreen, fontSize: 12, fontWeight: '600', marginTop: 2 }}>
+                      {distanceFormatted(selected.distance)} away
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity onPress={() => setSelected(null)} hitSlop={10}>
+                  <Ionicons name="close" size={22} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={[st.directionsBtn, { backgroundColor: colors.primary }]} onPress={() => openInMaps(selected)}>
+                <MaterialCommunityIcons name="directions" size={18} color="#FFF" />
+                <Text style={{ color: '#FFF', fontWeight: '700' }}>Directions</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       ) : (
         <ScrollView
@@ -313,6 +385,10 @@ const st = StyleSheet.create({
   radiusText: { fontSize: 12, fontWeight: '600' },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
+  recenterFab: { position: 'absolute', right: 16, top: 16, width: 46, height: 46, borderRadius: 14, borderWidth: 1, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  mapBanner: { position: 'absolute', top: 16, left: 16, right: 74, padding: 12, borderRadius: 12, borderWidth: 1 },
+  selectedCard: { position: 'absolute', left: 12, right: 12, bottom: 12, padding: 14, borderRadius: 18, borderWidth: 1, gap: 12, elevation: 8, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+  directionsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12 },
   loadingText: { fontSize: 15, fontWeight: '600' },
   loadingSubtext: { fontSize: 12 },
 

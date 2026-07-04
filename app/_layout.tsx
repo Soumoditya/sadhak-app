@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Animated, StyleSheet, Image, Dimensions, Text, Easing } from 'react-native';
+import { View, Animated, StyleSheet, Image, Dimensions, Text, Easing, Modal } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
@@ -65,6 +65,7 @@ function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
   const GLOW = EMBLEM * 1.9;
 
   return (
+    <Modal visible transparent={false} animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
     <Animated.View style={[splashStyles.overlay, { opacity: overlayOpacity }]} pointerEvents="none">
       {/* Emblem box — halos are centered inside it deterministically (no % math) */}
       <View style={{ width: EMBLEM, height: EMBLEM, alignItems: 'center', justifyContent: 'center', marginBottom: 30 }}>
@@ -119,14 +120,14 @@ function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
         <Text style={splashStyles.tagline}>YOUR SPIRITUAL COMPANION</Text>
       </Animated.View>
     </Animated.View>
+    </Modal>
   );
 }
 
 const splashStyles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     backgroundColor: '#0B0E13',
-    zIndex: 9999,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -173,12 +174,12 @@ const splashStyles = StyleSheet.create({
 // ─── Root Layout Inner ─────────────────────────────────────────────────────
 function RootLayoutInner() {
   const { isDark, colors } = useTheme();
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    // Small delay so the native splash (centered emblem) stays visible until the
-    // first screen is ready, then hand off cleanly. The previous JS splash overlay
-    // was removed — it rendered mis-centered on this device.
-    const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 350);
+    // Hand off quickly from the native splash to our animated Modal splash, which
+    // covers the blank gap and is guaranteed full-screen/centered (Modal).
+    const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 120);
     ensureNotificationsScheduled();
     return () => clearTimeout(t);
   }, []);
@@ -221,6 +222,7 @@ function RootLayoutInner() {
         <Stack.Screen name="changelog" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
+      {showSplash && <AnimatedSplash onFinish={() => setShowSplash(false)} />}
     </>
   );
 }
