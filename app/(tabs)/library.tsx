@@ -4,6 +4,7 @@ import {
   FlatList, Modal, Alert, ActivityIndicator, Linking, Platform, Dimensions,
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from "../../contexts/DialogContext";
@@ -12,7 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, serverTimestamp } from '../../config/firebase';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+// SDK 56: documentDirectory/downloadAsync live in the legacy API entry point.
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useLayoutInsets } from '../../constants/layout';
 
@@ -152,12 +154,16 @@ export default function LibraryScreen() {
       setSelectedFile(null);
       setUploadData({ title: '', author: '', category: 'other', description: '' });
       if (isAdmin) fetchBooks();
-    } catch (error) {
-      dialog.alert('Upload Failed', 'Check your connection and try again.');
+    } catch (error: any) {
+      // Show the REAL reason (Cloudinary message / network detail) so failures
+      // are debuggable from a screenshot instead of a generic guess.
+      dialog.alert('Upload Failed', String(error?.message || error).slice(0, 300));
     } finally { setUploading(false); }
   };
 
-  const openPDF = (url: string) => Linking.openURL(url);
+  // Read inside the app (pdf.js reader) instead of kicking users to an external app.
+  const openPDF = (url: string, title?: string) =>
+    router.push({ pathname: '/reader', params: { url, title: title || '' } });
 
   const downloadPDF = async (book: LibraryItem) => {
     try {
@@ -187,7 +193,7 @@ export default function LibraryScreen() {
 
     if (viewMode === 'grid') {
       return (
-        <TouchableOpacity style={[st.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl)} activeOpacity={0.7}>
+        <TouchableOpacity style={[st.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} activeOpacity={0.7}>
           <View style={[st.gridIcon, { backgroundColor: cat.color + '12' }]}>
             <MaterialCommunityIcons name={cat.icon as any} size={32} color={cat.color} />
           </View>
@@ -205,7 +211,7 @@ export default function LibraryScreen() {
     }
 
     return (
-      <TouchableOpacity style={[st.bookCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl)} activeOpacity={0.7}>
+      <TouchableOpacity style={[st.bookCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} activeOpacity={0.7}>
         <View style={[st.bookIcon, { backgroundColor: cat.color + '12' }]}>
           <MaterialCommunityIcons name={cat.icon as any} size={28} color={cat.color} />
         </View>

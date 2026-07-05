@@ -11,6 +11,7 @@ import { useLanguage, SUPPORTED_LANGUAGES, type LanguageCode } from '../../conte
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { db, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
 import { sendTestNotification } from '../../services/notifications';
 import { uploadToCloudinary } from '../../services/cloudinary';
@@ -78,21 +79,21 @@ export default function ProfileScreen() {
       });
       if (result.canceled || !result.assets?.[0]) return;
       setUploadingPfp(true);
-      const uri = result.assets[0].uri;
+      // Shrink to avatar size first — a multi-MB camera photo dies on weak
+      // connections; a 512px JPEG (~100-200KB) uploads reliably.
+      const small = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 512 } }],
+        { compress: 0.75, format: ImageManipulator.SaveFormat.JPEG },
+      );
       // Upload to Cloudinary so the photo persists across reinstall / cache clear.
-      // (A local file URI dies when the app cache is cleared — that was the bug.)
-      const up = await uploadToCloudinary(uri, 'sadhak/avatars', 'image');
+      const up = await uploadToCloudinary(small.uri, 'sadhak/avatars', 'image');
       await updateProfile({ profilePicUrl: up.secure_url });
       dialog.alert('Updated', 'Your profile picture has been updated.', undefined, { tone: 'success' });
     } catch (e: any) {
       console.error(e);
-      const msg = String(e?.message || e).toLowerCase();
-      dialog.alert(
-        'Upload failed',
-        msg.includes('preset') || msg.includes('401') || msg.includes('cloud')
-          ? 'The image server rejected the upload. Check the Cloudinary "Sadhak" unsigned preset.'
-          : 'Could not upload your photo. Please check your connection and try again.',
-      );
+      // Show the REAL reason so failures are debuggable from a screenshot.
+      dialog.alert('Upload failed', String(e?.message || e).slice(0, 300));
     } finally {
       setUploadingPfp(false);
     }
