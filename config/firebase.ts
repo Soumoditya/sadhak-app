@@ -56,7 +56,9 @@ const firebaseConfig = {
   messagingSenderId: '779861206772',
   appId: '1:779861206772:web:00821148295be84fb120a1',
   measurementId: 'G-7NWJREWJ1S',
-  databaseURL: 'https://sadhak-app-default-rtdb.firebaseio.com',
+  // IMPORTANT: this database lives in asia-southeast1 — the old .firebaseio.com
+  // URL points at a non-existent US database, which is why chat writes never landed.
+  databaseURL: 'https://sadhak-app-default-rtdb.asia-southeast1.firebasedatabase.app',
 };
 
 // Initialize Firebase
