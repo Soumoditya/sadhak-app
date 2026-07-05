@@ -218,11 +218,16 @@ export default function HomeScreen() {
                 key={idx}
                 style={[s.quickCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                 onPress={() => router.push(action.route as any)}
-                activeOpacity={0.7}
+                activeOpacity={0.85}
               >
-                <View style={[s.quickIcon, { backgroundColor: action.color + '12' }]}>
-                  <MaterialCommunityIcons name={action.icon as any} size={24} color={action.color} />
-                </View>
+                <LinearGradient
+                  colors={[action.color, action.color + 'BB']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[s.quickIcon, { shadowColor: action.color }]}
+                >
+                  <MaterialCommunityIcons name={action.icon as any} size={24} color="#FFF" />
+                </LinearGradient>
                 <Text style={[s.quickLabel, { color: colors.text }]}>{action.label}</Text>
               </TouchableOpacity>
             ))}
@@ -446,9 +451,9 @@ const s = StyleSheet.create({
 
   // Quick Actions
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: QUICK_GAP },
-  quickCard: { width: QUICK_W, alignItems: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
-  quickIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  quickLabel: { fontSize: 11, fontWeight: '600' },
+  quickCard: { width: QUICK_W, alignItems: 'center', paddingVertical: 18, borderRadius: 18, borderWidth: 1 },
+  quickIcon: { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 9, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 4 },
+  quickLabel: { fontSize: 11.5, fontWeight: '600', letterSpacing: 0.2 },
 
   // Panchang
   panchangCard: { borderRadius: 16, padding: 16, borderWidth: 1 },
