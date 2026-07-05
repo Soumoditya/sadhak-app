@@ -11,9 +11,11 @@ export const SUPPORT_EMAIL = 'soumodityapramanik@gmail.com';
 export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.sadhak.app';
 export const PLAY_STORE_MARKET_URL = 'market://details?id=com.sadhak.app';
 
-// No active social media accounts yet. Add real links here once they exist,
-// then the About screen will render buttons for any non-empty entry.
-export const SOCIAL_LINKS: { instagram?: string; twitter?: string; website?: string } = {};
+// Official website is live. Social accounts can be added here later.
+export const SOCIAL_LINKS: { instagram?: string; twitter?: string; website?: string } = {
+  website: 'https://sadhak-app.vercel.app',
+};
+export const WEBSITE_URL = 'https://sadhak-app.vercel.app';
 
 export interface ChangelogEntry {
   version: string;

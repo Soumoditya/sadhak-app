@@ -138,6 +138,13 @@ export default function TemplesScreen() {
         const key = `${el.type}${el.id}`;
         if (seen.has(key)) return false;
         seen.add(key);
+        // Hindu-only: keep Hindu-tagged places and untagged local temples,
+        // but exclude places explicitly of another religion (mosque/church/etc).
+        const rel = (el.tags?.religion || '').toLowerCase();
+        if (rel && rel !== 'hindu') return false;
+        const name = (el.tags?.name || '').toLowerCase();
+        const nonHinduHint = /masjid|mosque|church|gurudwara|gurdwara|dargah|jain|buddh|monaster/.test(name);
+        if (nonHinduHint) return false;
         return true;
       });
       const templeList: Temple[] = uniqueElements.slice(0, 80).map((el: any, idx: number) => {
@@ -146,7 +153,7 @@ export default function TemplesScreen() {
         const dist = tlat && tlon ? getDistance(lat, lon, tlat, tlon) : null;
         return {
           id: String(el.id || idx),
-          name: el.tags?.name || el.tags?.['name:en'] || el.tags?.['name:hi'] || 'Hindu Temple',
+          name: el.tags?.name || el.tags?.['name:en'] || el.tags?.['name:hi'] || 'Temple',
           address: el.tags?.['addr:full'] || el.tags?.['addr:street'] || el.tags?.['addr:city'] || el.tags?.['addr:district'] || '',
           lat: tlat || 0,
           lon: tlon || 0,
