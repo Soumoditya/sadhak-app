@@ -49,6 +49,9 @@ export async function uploadToCloudinary(
     name: fileName,
   } as any);
   formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+  // This Cloudinary account requires the api_key present even for the unsigned
+  // preset — verified by direct API test. Without it: {"error":"Unknown API key"}.
+  formData.append('api_key', CLOUDINARY_CONFIG.apiKey);
   formData.append('folder', folder);
 
   // Route PDFs/other docs to the raw endpoint, images to auto (Cloudinary picks).

@@ -105,14 +105,33 @@ export default function TemplesScreen() {
         out center body;
       `;
 
-      const res = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        body: `data=${encodeURIComponent(overpassQuery)}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      });
-
-      if (!res.ok) throw new Error('API error');
-      const data = await res.json();
+      // Try several Overpass mirrors — the main de instance often returns 406/429.
+      const mirrors = [
+        'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass-api.de/api/interpreter',
+        'https://overpass.openstreetmap.ru/api/interpreter',
+      ];
+      let data: any = null;
+      let lastErr: any = null;
+      for (const url of mirrors) {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            body: `data=${encodeURIComponent(overpassQuery)}`,
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              Accept: 'application/json',
+            },
+          });
+          if (!res.ok) { lastErr = new Error(`HTTP ${res.status}`); continue; }
+          data = await res.json();
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      if (!data) throw lastErr || new Error('All Overpass mirrors failed');
 
       const seen = new Set<string>();
       const uniqueElements = (data.elements || []).filter((el: any) => {
@@ -235,7 +254,7 @@ export default function TemplesScreen() {
       </View>
 
       {/* Radius selector */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.radiusRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.radiusScroll} contentContainerStyle={st.radiusRow}>
         {[5, 10, 20, 50].map(r => (
           <TouchableOpacity key={r}
             style={[st.radiusChip, { backgroundColor: searchRadius === r ? colors.primary : colors.surface, borderColor: searchRadius === r ? colors.primary : colors.border }]}
@@ -380,8 +399,9 @@ const st = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, paddingHorizontal: 14, height: 42, borderRadius: 12, borderWidth: 1, gap: 8 },
   searchInput: { flex: 1, fontSize: 14 },
 
-  radiusRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 6 },
-  radiusChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
+  radiusScroll: { flexGrow: 0, maxHeight: 52 },
+  radiusRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  radiusChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, height: 34, borderRadius: 17, borderWidth: 1 },
   radiusText: { fontSize: 12, fontWeight: '600' },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
