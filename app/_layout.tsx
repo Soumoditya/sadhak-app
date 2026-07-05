@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { View, Animated, StyleSheet, Image, Dimensions, Text, Easing, Modal } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -181,7 +182,18 @@ function RootLayoutInner() {
     // covers the blank gap and is guaranteed full-screen/centered (Modal).
     const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 120);
     ensureNotificationsScheduled();
-    return () => clearTimeout(t);
+
+    // Deep-link: tapping a reminder/notification opens the relevant screen.
+    const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+      const route = resp?.notification?.request?.content?.data?.route as string | undefined;
+      if (route) {
+        try { router.push(route as any); } catch {}
+      }
+    });
+    return () => {
+      clearTimeout(t);
+      sub.remove();
+    };
   }, []);
 
   return (

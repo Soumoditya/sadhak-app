@@ -319,16 +319,30 @@ export default function CalendarScreen() {
             <TouchableOpacity style={[st.actionBtn, { backgroundColor: '#7C3AED12' }]} onPress={async () => {
               try {
                 const Notifications = require('expo-notifications');
-                const targetDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 6, 0, 0);
-                if (targetDate.getTime() <= Date.now()) {
-                  dialog.alert('📅 Reminder', 'Cannot set reminder for past dates.');
+                // Ensure notification permission (Android 13+ / iOS).
+                let perm = await Notifications.getPermissionsAsync();
+                if (!perm.granted) perm = await Notifications.requestPermissionsAsync();
+                if (!perm.granted) {
+                  dialog.alert('Notifications off', 'Please allow notifications so reminders can reach you.', undefined, { tone: 'warning' });
                   return;
                 }
+                const targetDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 6, 0, 0);
+                if (targetDate.getTime() <= Date.now()) {
+                  dialog.alert('Reminder', 'Cannot set a reminder for a past date.', undefined, { tone: 'warning' });
+                  return;
+                }
+                const dateLabel = selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
                 await Notifications.scheduleNotificationAsync({
-                  content: { title: '🙏 Sadhak Reminder', body: `Don't forget your spiritual activities for ${selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`, sound: true },
-                  trigger: { date: targetDate },
+                  content: {
+                    title: '🙏 Sadhak Reminder',
+                    body: `Don't forget your spiritual activities for ${dateLabel}`,
+                    sound: true,
+                    data: { route: '/(tabs)/calendar' },
+                  },
+                  // SDK 56 requires the typed DATE trigger — the old { date } object never fires.
+                  trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: targetDate, channelId: 'sadhak-spiritual' },
                 });
-                dialog.alert('✅ Reminder Set', `You'll be reminded on ${selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })} at 6:00 AM`);
+                dialog.alert('Reminder set', `You'll be reminded on ${dateLabel} at 6:00 AM.`, undefined, { tone: 'success' });
               } catch (e) { dialog.alert('Error', 'Could not set reminder.'); }
             }}>
               <MaterialCommunityIcons name="bell-plus-outline" size={18} color="#7C3AED" />
