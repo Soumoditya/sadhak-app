@@ -131,6 +131,8 @@ export default function HomeScreen() {
     { icon: 'counter', label: t('feat.japa'), route: '/japa', color: '#1565C0' },
     { icon: 'music-note', label: t('feat.aarti'), route: '/aarti', color: '#EA580C' },
     { icon: 'note-edit-outline', label: t('feat.notes'), route: '/notes', color: '#37474F' },
+    { icon: 'creation', label: 'Sadhak AI', route: '/ask', color: '#B8860B' },
+    { icon: 'compass-outline', label: 'Explore Feed', route: '/feed', color: '#8B1A1A' },
   ];
 
   // Staggered entrance animations

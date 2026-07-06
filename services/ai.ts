@@ -1,0 +1,70 @@
+// Sadhak AI — Gemini-powered spiritual companion.
+// NOTE: the key ships in the client for now (fine for testing / small scale on
+// the free tier). Before large-scale Play Store distribution, move this behind
+// a tiny proxy (Firebase Function / Vercel edge) so the key can be rotated.
+const GEMINI_KEY = 'AQ.Ab8RN6IQgVdmLPZZtxZNASMXW0B_rYl7rTMDANduDP597WmiCA';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
+
+const SYSTEM_PROMPT = `You are "Sadhak AI", the in-app spiritual companion of Sadhak — a Hindu daily-practice app (Panchang, calendar, temples, aarti, japa, sacred library).
+
+Your role:
+- Answer questions about Sanatana Dharma: scriptures (Vedas, Upanishads, Gita, Puranas, Ramayana, Mahabharata), deities, festivals, vrat/fasting, puja vidhi, mantras, japa, temple traditions, samskaras, and daily practice.
+- Ground answers in authentic sources. When you cite, name the scripture (e.g., "Bhagavad Gita 2.47"). If traditions differ by region/sampradaya, say so briefly rather than presenting one view as universal.
+- Be warm, humble and practical — like a knowledgeable friend, not a preacher. No lecturing.
+- Answer in the user's language (Hindi, English, Bengali, or Hinglish — mirror them).
+- Keep answers focused: usually 2-6 short paragraphs or a tight list. No fluff.
+
+Boundaries:
+- For medical, legal, financial or mental-health matters: give the dharmic perspective if relevant, but clearly advise consulting a qualified professional.
+- Do not make astrological predictions about a person's future; you may explain jyotish concepts.
+- Never invent scripture quotes. If unsure, say what is commonly taught and note the uncertainty.
+- Politely decline disrespectful or hateful requests about any community or faith.`;
+
+export interface AiMessage {
+  role: 'user' | 'model';
+  text: string;
+}
+
+export async function askSadhakAI(history: AiMessage[], userName?: string): Promise<string> {
+  const contents = history.slice(-12).map((m) => ({
+    role: m.role,
+    parts: [{ text: m.text }],
+  }));
+
+  const res = await fetch(GEMINI_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-goog-api-key': GEMINI_KEY,
+    },
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: SYSTEM_PROMPT + (userName ? `\n\nThe user's name is ${userName}.` : '') }],
+      },
+      contents,
+      generationConfig: { temperature: 0.6, maxOutputTokens: 1024 },
+    }),
+  });
+
+  if (!res.ok) {
+    const t = await res.text();
+    let msg = t;
+    try { msg = JSON.parse(t)?.error?.message || t; } catch {}
+    if (res.status === 429) throw new Error('Sadhak AI is receiving many questions right now. Please try again in a minute.');
+    throw new Error(`AI error: ${String(msg).slice(0, 160)}`);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join('') || '';
+  if (!text) throw new Error('Sadhak AI could not form a reply. Please rephrase your question.');
+  return text.trim();
+}
+
+export const STARTER_QUESTIONS = [
+  'What should I do on Ekadashi?',
+  'Explain Gayatri Mantra and when to chant it',
+  'How do I start a daily puja at home?',
+  'Why is Tulsi sacred?',
+  'गीता का सार क्या है?',
+  'What is the meaning of my japa count 108?',
+];
