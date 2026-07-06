@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Image,
-  FlatList, ActivityIndicator, RefreshControl,
+  FlatList, ActivityIndicator, RefreshControl, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -11,7 +11,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLayoutInsets } from '../constants/layout';
 import {
   subscribeFeed, toggleLike, searchUsers, searchPosts,
-  type Post, type UserResult,
+  subscribeComments, addComment,
+  type Post, type UserResult, type PostComment,
 } from '../services/posts';
 
 function timeAgo(createdAt: any): string {
@@ -39,6 +40,11 @@ export default function FeedScreen() {
 
   const [term, setTerm] = useState('');
   const [searching, setSearching] = useState(false);
+  // Comments sheet
+  const [commentsFor, setCommentsFor] = useState<Post | null>(null);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [sendingComment, setSendingComment] = useState(false);
   const [userResults, setUserResults] = useState<UserResult[]>([]);
   const [postResults, setPostResults] = useState<Post[]>([]);
   const searchTimer = useRef<any>(null);
@@ -77,6 +83,27 @@ export default function FeedScreen() {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 600);
   }, []);
+
+  // Live comments for the open sheet
+  useEffect(() => {
+    if (!commentsFor) { setComments([]); return; }
+    const unsub = subscribeComments(commentsFor.id, setComments);
+    return unsub;
+  }, [commentsFor?.id]);
+
+  const sendComment = async () => {
+    if (!user || !profile || !commentsFor || !commentText.trim()) return;
+    setSendingComment(true);
+    try {
+      await addComment(commentsFor.id, {
+        uid: user.uid,
+        displayName: profile.displayName,
+        profilePicUrl: profile.profilePicUrl,
+      }, commentText);
+      setCommentText('');
+    } catch {}
+    setSendingComment(false);
+  };
 
   const like = useCallback(
     async (post: Post) => {
@@ -134,10 +161,10 @@ export default function FeedScreen() {
             <MaterialCommunityIcons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? colors.error : colors.textSecondary} />
             <Text style={[styles.actionText, { color: liked ? colors.error : colors.textSecondary }]}>{item.likeCount || 0}</Text>
           </TouchableOpacity>
-          <View style={styles.action}>
+          <TouchableOpacity style={styles.action} onPress={() => setCommentsFor(item)} hitSlop={8}>
             <MaterialCommunityIcons name="comment-outline" size={19} color={colors.textSecondary} />
             <Text style={[styles.actionText, { color: colors.textSecondary }]}>{item.commentCount || 0}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -243,6 +270,66 @@ export default function FeedScreen() {
           <MaterialCommunityIcons name="feather" size={24} color="#FFF" />
         </LinearGradient>
       </TouchableOpacity>
+
+      {/* ═══ Comments sheet ═══ */}
+      <Modal visible={!!commentsFor} transparent animationType="slide" onRequestClose={() => setCommentsFor(null)}>
+        <KeyboardAvoidingView
+          style={styles.sheetOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setCommentsFor(null)} />
+          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>
+              Comments {comments.length > 0 ? `(${comments.length})` : ''}
+            </Text>
+            <FlatList
+              data={comments}
+              keyExtractor={(c) => c.id}
+              style={{ maxHeight: 340 }}
+              contentContainerStyle={{ gap: 12, paddingVertical: 8 }}
+              ListEmptyComponent={
+                <Text style={[styles.empty, { color: colors.textTertiary, marginTop: 20 }]}>
+                  No comments yet — be the first. 🙏
+                </Text>
+              }
+              renderItem={({ item: c }) => (
+                <View style={styles.commentRow}>
+                  {c.authorPfp ? (
+                    <Image source={{ uri: c.authorPfp }} style={styles.pfpSm} />
+                  ) : (
+                    <View style={[styles.pfpSm, styles.pfpFallback, { backgroundColor: colors.primaryMuted }]}>
+                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>{(c.authorName || 'S')[0]}</Text>
+                    </View>
+                  )}
+                  <View style={[styles.commentBubble, { backgroundColor: colors.background }]}>
+                    <Text style={[styles.commentAuthor, { color: colors.text }]}>{c.authorName}</Text>
+                    <Text style={[styles.commentText, { color: colors.textSecondary }]}>{c.text}</Text>
+                  </View>
+                </View>
+              )}
+            />
+            <View style={[styles.commentInputRow, { borderTopColor: colors.divider }]}>
+              <TextInput
+                style={[styles.commentInput, { color: colors.text, backgroundColor: colors.background }]}
+                placeholder="Write a comment…"
+                placeholderTextColor={colors.textTertiary}
+                value={commentText}
+                onChangeText={setCommentText}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                onPress={sendComment}
+                disabled={!commentText.trim() || sendingComment}
+                style={[styles.commentSend, { backgroundColor: colors.primary, opacity: commentText.trim() ? 1 : 0.5 }]}
+              >
+                {sendingComment ? <ActivityIndicator size="small" color="#FFF" /> : <Ionicons name="send" size={16} color="#FFF" />}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -275,4 +362,17 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 17, fontWeight: '700' },
   fab: { position: 'absolute', right: 20 },
   fabGrad: { width: 58, height: 58, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#D94F00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8 },
+
+  // Comments sheet
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 20, paddingBottom: 26 },
+  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 12 },
+  sheetTitle: { fontSize: 17, fontWeight: '800', marginBottom: 4 },
+  commentRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  commentBubble: { flex: 1, borderRadius: 14, padding: 11 },
+  commentAuthor: { fontSize: 12.5, fontWeight: '700' },
+  commentText: { fontSize: 13.5, lineHeight: 19, marginTop: 2 },
+  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingTop: 12, borderTopWidth: 1, marginTop: 8 },
+  commentInput: { flex: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 90 },
+  commentSend: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
 });

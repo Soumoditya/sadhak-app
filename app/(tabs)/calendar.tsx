@@ -34,8 +34,8 @@ const TIME_PRESETS = [
   { label: 'Evening', time: '18:00', icon: 'weather-sunset-down' },
   { label: 'Night', time: '21:00', icon: 'moon-waning-crescent' },
 ];
-const HOURS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
-const MINUTES = [0, 15, 30, 45];
+const HOURS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
 interface DayInfo {
   status: GroomingStatus;
@@ -598,7 +598,7 @@ export default function CalendarScreen() {
             </ScrollView>
 
             <Text style={[st.sheetLabel, { color: colors.textTertiary }]}>MINUTE</Text>
-            <View style={st.minuteRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.minuteRow}>
               {MINUTES.map((m) => {
                 const active = remMinute === m;
                 return (
@@ -611,7 +611,7 @@ export default function CalendarScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
 
             <TouchableOpacity onPress={scheduleReminder} activeOpacity={0.85}>
               <LinearGradient colors={['#D94F00', '#F07830']} style={st.primaryBtn}>
@@ -713,8 +713,8 @@ const st = StyleSheet.create({
   hourRow: { gap: 7, paddingBottom: 14 },
   hourChip: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 11, borderWidth: 1 },
   hourChipText: { fontSize: 13, fontWeight: '700' },
-  minuteRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
-  minuteChip: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11, borderWidth: 1 },
+  minuteRow: { gap: 7, paddingBottom: 18 },
+  minuteChip: { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 11, borderWidth: 1 },
 
   noteInput: { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 15, minHeight: 110, marginBottom: 16 },
   primaryBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderRadius: 14, height: 52 },
