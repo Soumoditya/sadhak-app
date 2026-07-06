@@ -12,7 +12,8 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { db, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
+import { db, auth, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { sendTestNotification } from '../../services/notifications';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { APP_VERSION, WEBSITE_URL } from '../../constants/appInfo';
@@ -188,6 +189,25 @@ export default function ProfileScreen() {
     Linking.openURL(WEBSITE_URL).catch(() => {});
   };
 
+  const handleChangePassword = () => {
+    const em = profile?.email;
+    if (!em) {
+      dialog.alert('No email on account', 'Guest accounts have no password. Create an account with email to set one.', undefined, { tone: 'info' });
+      return;
+    }
+    dialog.alert('Change password', `We'll email a secure password-reset link to ${em}.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Send link', onPress: async () => {
+        try {
+          await sendPasswordResetEmail(auth, em);
+          dialog.alert('Sent', 'Check your inbox (and spam) for the reset link.', undefined, { tone: 'success' });
+        } catch {
+          dialog.alert('Failed', 'Could not send the reset email. Try again later.');
+        }
+      }},
+    ]);
+  };
+
   const getInitials = () => {
     const name = profile?.displayName || 'S';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -348,6 +368,7 @@ export default function ProfileScreen() {
             { label: t('settings.rateApp'), icon: 'star-outline', color: '#FFB300', action: handleRateApp },
             { label: t('settings.shareApp'), icon: 'share-variant-outline', color: '#4ADE80', action: handleShareApp },
             { label: 'Website', icon: 'web', color: '#38BDF8', action: handleWebsite },
+            { label: 'Change Password', icon: 'lock-reset', color: '#A78BFA', action: handleChangePassword },
             { label: t('settings.about'), icon: 'information-outline', color: '#37474F', action: () => router.push('/about' as any) },
             { label: t('settings.privacyPolicy'), icon: 'shield-lock-outline', color: '#1565C0', action: () => router.push('/privacy' as any) },
             { label: t('settings.terms'), icon: 'file-document-outline', color: '#9C27B0', action: () => router.push('/terms' as any) },

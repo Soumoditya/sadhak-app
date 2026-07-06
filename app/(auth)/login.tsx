@@ -10,6 +10,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from "../../contexts/DialogContext";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, FontSize, Shadows } from '../../constants/theme';
+import { sendPasswordResetEmail, signInAnonymously as fbAnon, signOut as fbSignOut, deleteUser as fbDeleteUser } from 'firebase/auth';
+import { auth, db, doc, getDoc } from '../../config/firebase';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -38,23 +40,59 @@ export default function LoginScreen() {
     ]).start();
   }, []);
 
+  /** Resolve a @username to its account email (brief anonymous session for the lookup). */
+  const resolveUsernameToEmail = async (username: string): Promise<string> => {
+    const anon = await fbAnon(auth);
+    try {
+      const uSnap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
+      if (!uSnap.exists()) throw new Error('No account found with this username.');
+      const uid = (uSnap.data() as any).uid;
+      const pSnap = await getDoc(doc(db, 'users', uid));
+      const em = (pSnap.data() as any)?.email;
+      if (!em) throw new Error('This account has no email — sign in with your email instead.');
+      return em;
+    } finally {
+      // Clean up the throwaway anonymous session.
+      try { await fbDeleteUser(anon.user); } catch { try { await fbSignOut(auth); } catch {} }
+    }
+  };
+
   const handleEmailLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      dialog.alert('Error', 'Please enter email and password');
+      dialog.alert('Missing details', 'Please enter your email (or username) and password.');
       return;
     }
     try {
       setLoading(true);
-      await signInWithEmail(email.trim(), password);
+      let loginEmail = email.trim();
+      // Username login: no '@' means it's a username, not an email.
+      if (!loginEmail.includes('@')) {
+        loginEmail = await resolveUsernameToEmail(loginEmail.replace(/^@/, ''));
+      }
+      await signInWithEmail(loginEmail, password);
       router.replace('/(tabs)');
     } catch (error: any) {
       const msg = error.code === 'auth/user-not-found' ? 'No account found with this email'
-        : error.code === 'auth/wrong-password' ? 'Incorrect password'
+        : error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' ? 'Incorrect email/username or password'
         : error.code === 'auth/invalid-email' ? 'Invalid email format'
-        : 'Login failed. Please try again.';
+        : String(error?.message || 'Login failed. Please try again.').slice(0, 160);
       dialog.alert('Login Failed', msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const em = email.trim();
+    if (!em || !em.includes('@')) {
+      dialog.alert('Enter your email', 'Type your account email in the email field above, then tap "Forgot password?" again.', undefined, { tone: 'info' });
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, em);
+      dialog.alert('Reset link sent', `A password reset link has been sent to ${em}. Check your inbox (and spam).`, undefined, { tone: 'success' });
+    } catch (e: any) {
+      dialog.alert('Could not send', e?.code === 'auth/user-not-found' ? 'No account exists with this email.' : 'Failed to send the reset email. Try again.');
     }
   };
 
@@ -124,7 +162,7 @@ export default function LoginScreen() {
                 <Ionicons name="mail-outline" size={18} color={emailFocused ? colors.primary : colors.textTertiary} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
-                  placeholder="Email"
+                  placeholder="Email or username"
                   placeholderTextColor={colors.textTertiary}
                   value={email}
                   onChangeText={setEmail}
@@ -157,6 +195,11 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
 
+              {/* Forgot password */}
+              <TouchableOpacity onPress={handleForgotPassword} hitSlop={8} style={{ alignSelf: 'flex-end', marginBottom: 14, marginTop: -4 }}>
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Forgot password?</Text>
+              </TouchableOpacity>
+
               {/* Login Button */}
               <TouchableOpacity onPress={handleEmailLogin} disabled={loading} activeOpacity={0.85} style={styles.loginButtonWrapper}>
                 <LinearGradient
@@ -173,23 +216,12 @@ export default function LoginScreen() {
                 </LinearGradient>
               </TouchableOpacity>
 
-              {/* Divider */}
+              {/* Divider — Google/Phone stubs removed: dead buttons read as broken.
+                  Google Sign-In can return once its Firebase config is set up. */}
               <View style={styles.dividerContainer}>
                 <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or continue with</Text>
+                <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
                 <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-              </View>
-
-              {/* Social Buttons */}
-              <View style={styles.socialRow}>
-                <TouchableOpacity style={[styles.socialButton, { borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]} activeOpacity={0.7}>
-                  <MaterialCommunityIcons name="google" size={20} color="#DB4437" />
-                  <Text style={[styles.socialText, { color: colors.text }]}>Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.socialButton, { borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]} activeOpacity={0.7}>
-                  <Ionicons name="call-outline" size={20} color="#16A34A" />
-                  <Text style={[styles.socialText, { color: colors.text }]}>Phone</Text>
-                </TouchableOpacity>
               </View>
 
               {/* Guest */}

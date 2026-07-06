@@ -280,7 +280,7 @@ export default function LibraryScreen() {
       </View>
 
       {/* Categories */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.catRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.catScroll} contentContainerStyle={st.catRow}>
         {CATEGORIES.map(cat => (
           <TouchableOpacity key={cat.id}
             style={[st.catChip, { backgroundColor: selectedCategory === cat.id ? cat.color : colors.surface, borderColor: selectedCategory === cat.id ? cat.color : colors.border }]}
@@ -441,8 +441,11 @@ const st = StyleSheet.create({
   sortChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   sortText: { fontSize: 12, fontWeight: '600' },
 
-  catRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 6 },
-  catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, borderWidth: 1, gap: 4 },
+  // flexGrow:0 + capped height — without it the horizontal ScrollView stretches
+  // in the flex column and the category chips render as giant full-height cards.
+  catScroll: { flexGrow: 0, maxHeight: 50 },
+  catRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 34, borderRadius: 17, borderWidth: 1, gap: 5 },
   catText: { fontSize: 11, fontWeight: '600' },
 
   // List view

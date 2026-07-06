@@ -115,15 +115,19 @@ export default function CalendarScreen() {
         const p = calculatePanchang(date, lat, lon);
         const g = getDailyGroomingAdvice(date, profile?.gender || 'male', profile?.marriageStatus || 'unmarried', p.tithi.name);
         const tn = (p.tithi.name || '').toLowerCase();
+        // Only day-precise festivals mark the grid: an entry must carry a tithi
+        // (or be a fixed Gregorian date). Month-wide observances without a tithi
+        // were matching EVERY day and gold-washing half the calendar.
+        const dayFestivals = [
+          ...getFestivalsForDate(p.hinduMonth.name, p.tithi.name, p.tithi.paksha).filter(f => !!f.tithi),
+          ...getFixedFestivals(month + 1, d),
+        ].filter(f => f.type === 'major' || f.type === 'minor' || f.type === 'sankranti');
         map[d] = {
           status: g.overallStatus,
           isPurnima: tn.includes('purnima'),
           isAmavasya: tn.includes('amavasya'),
           isEkadashi: tn.includes('ekadashi'),
-          festivals: [
-            ...getFestivalsForDate(p.hinduMonth.name, p.tithi.name, p.tithi.paksha),
-            ...getFixedFestivals(month + 1, d),
-          ],
+          festivals: dayFestivals,
         };
       } catch {
         map[d] = { status: 'allowed', isPurnima: false, isAmavasya: false, isEkadashi: false, festivals: [] };
@@ -309,7 +313,9 @@ export default function CalendarScreen() {
               const hasFestival = (info?.festivals.length || 0) > 0;
               const dayHasNote = !!notes[getDateKey(new Date(year, month, day))];
               const restricted = info?.status === 'forbidden';
-              const caution = info?.status === 'avoid';
+              // Only hard "avoid" days get a mark — amber caution bars on most
+              // days made the grid read as noise. Caution stays in the day sheet.
+              const caution = false;
 
               return (
                 <TouchableOpacity
@@ -354,8 +360,7 @@ export default function CalendarScreen() {
 
           <View style={[st.legend, { borderTopColor: colors.divider }]}>
             {[
-              { swatch: <View style={[st.legendBar, { backgroundColor: '#F59E0B' }]} />, label: 'Caution' },
-              { swatch: <View style={[st.legendBar, { backgroundColor: colors.festival }]} />, label: 'Avoid' },
+              { swatch: <View style={[st.legendBar, { backgroundColor: colors.festival }]} />, label: 'Avoid grooming' },
               { swatch: <View style={[st.legendDot, { backgroundColor: colors.purnima }]} />, label: 'Purnima' },
               { swatch: <View style={[st.legendDot, { backgroundColor: colors.amavasya, borderWidth: 1, borderColor: colors.textTertiary }]} />, label: 'Amavasya' },
               { swatch: <View style={[st.legendDot, { backgroundColor: colors.ekadashi }]} />, label: 'Ekadashi' },

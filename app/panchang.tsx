@@ -6,10 +6,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { calculatePanchang } from '../services/panchang';
+import { useLayoutInsets } from '../constants/layout';
 
 export default function PanchangScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const today = new Date();
 
   const panchang = useMemo(() => {
@@ -40,7 +42,7 @@ export default function PanchangScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Fixed Header */}
-      <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.surface] : ['#4A148C', '#7B1FA2']} style={styles.header}>
+      <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.surface] : ['#4A148C', '#7B1FA2']} style={[styles.header, { paddingTop: headerPaddingTop }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color="#FFF" />
@@ -87,7 +89,7 @@ export default function PanchangScreen() {
         <TimeItem icon="spider-web" label="Gulika Kaal" time={`${panchang.gulikaKaal.start} - ${panchang.gulikaKaal.end}`} color="#D32F2F" warning />
       </View>
 
-      <View style={{ height: 40 }} />
+      <View style={{ height: screenBottomPadding }} />
     </ScrollView>
     </View>
   );
@@ -108,8 +110,10 @@ const styles = StyleSheet.create({
   itemLabel: { fontSize: 12, fontWeight: '500' },
   itemValue: { fontSize: 15, fontWeight: '700', marginTop: 2 },
   itemValueHi: { fontSize: 14, fontWeight: '600', marginTop: 1 },
-  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 8 },
-  timeItem: { width: '47%', padding: 14, borderRadius: 14, borderWidth: 1, alignItems: 'center', gap: 4, marginHorizontal: 4 },
+  // flexBasis+grow (no side margins): '47%' width + margins + gap overflowed
+  // 100% and every card wrapped alone into a half-width single column.
+  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 },
+  timeItem: { flexBasis: '45%', flexGrow: 1, padding: 14, borderRadius: 14, borderWidth: 1, alignItems: 'center', gap: 4 },
   timeLabel: { fontSize: 12, fontWeight: '500' },
   timeValue: { fontSize: 15, fontWeight: '700' },
 });
