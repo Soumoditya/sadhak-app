@@ -55,6 +55,13 @@ service cloud.firestore {
       allow update, delete: if signedIn() && (resource.data.createdBy == request.auth.uid || isAdmin());
     }
 
+    // Community-added temples & bhandaras — read by all signed-in; author creates; author/admin moderates.
+    match /community_places/{placeId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.addedBy == request.auth.uid;
+      allow update, delete: if signedIn() && (resource.data.addedBy == request.auth.uid || isAdmin());
+    }
+
     // Future: community posts (Instagram-style feed) — read by all signed-in, write by author.
     match /posts/{postId} {
       allow read: if signedIn();

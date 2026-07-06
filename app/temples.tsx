@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, Linking, Platform, ActivityIndicator, RefreshControl,
+  Alert, Linking, Platform, ActivityIndicator, RefreshControl, Modal,
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -14,6 +14,7 @@ import * as Location from 'expo-location';
 import { useLayoutInsets } from '../constants/layout';
 import TempleMap, { type TempleMapHandle, type MapPin } from '../components/TempleMap';
 import { useRef } from 'react';
+import { getNearbyCommunityPlaces, addCommunityPlace, type CommunityPlace } from '../services/communityPlaces';
 
 interface Temple {
   id: string;
@@ -45,6 +46,12 @@ export default function TemplesScreen() {
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [selected, setSelected] = useState<Temple | null>(null);
   const mapRef = useRef<TempleMapHandle>(null);
+  // Community-added places (small local mandirs + bhandaras missing from OSM).
+  const [communityPlaces, setCommunityPlaces] = useState<CommunityPlace[]>([]);
+  const [addSheet, setAddSheet] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addDesc, setAddDesc] = useState('');
+  const [addSaving, setAddSaving] = useState(false);
 
   useEffect(() => {
     fetchNearbyTemples();
@@ -88,6 +95,11 @@ export default function TemplesScreen() {
 
       setUserLat(lat);
       setUserLon(lon);
+
+      // Community places load in parallel and never block the OSM results.
+      getNearbyCommunityPlaces(lat, lon, searchRadius)
+        .then(setCommunityPlaces)
+        .catch(() => {});
 
       const radiusMeters = searchRadius * 1000;
       // Broadened so smaller towns aren't empty: Hindu-tagged worship places AND
@@ -202,18 +214,65 @@ export default function TemplesScreen() {
     Linking.openURL(url);
   };
 
-  const filtered = temples.filter(t => {
-    const matchSearch = !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.address.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchSearch;
-  });
+  // Community places rendered in the same shape as OSM temples.
+  const communityAsTemples: Temple[] = communityPlaces
+    .filter(p => p.type === (activeTab === 'bhandara' ? 'bhandara' : 'temple'))
+    .map(p => ({
+      id: `c_${p.id}`,
+      name: p.name,
+      address: p.description || `Added by ${p.addedByName}`,
+      lat: p.lat,
+      lon: p.lon,
+      distance: p.distance,
+      type: p.type,
+    }));
+
+  // Temples tab: OSM + community temples. Bhandara tab: community only (OSM has none).
+  const displayed = (activeTab === 'temples' ? [...temples, ...communityAsTemples] : communityAsTemples)
+    .filter(t => {
+      const q = searchQuery.toLowerCase();
+      return !q || t.name.toLowerCase().includes(q) || t.address.toLowerCase().includes(q);
+    })
+    .sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
+
+  const filtered = displayed;
 
   const mapPins: MapPin[] = filtered
     .filter(t => t.lat && t.lon)
     .map(t => ({ id: t.id, name: t.name, lat: t.lat, lon: t.lon, kind: t.type }));
 
   const onSelectPin = useCallback((id: string) => {
-    setSelected(temples.find(t => t.id === id) || null);
-  }, [temples]);
+    setSelected(displayed.find(t => t.id === id) || null);
+  }, [displayed]);
+
+  const submitPlace = async () => {
+    if (!addName.trim()) return;
+    if (!userLat || !userLon) {
+      dialog.alert('Location needed', 'Enable location so the place is pinned where you are.', undefined, { tone: 'warning' });
+      return;
+    }
+    setAddSaving(true);
+    try {
+      await addCommunityPlace({
+        name: addName,
+        type: activeTab === 'bhandara' ? 'bhandara' : 'temple',
+        description: addDesc,
+        lat: userLat,
+        lon: userLon,
+        addedBy: profile?.uid || 'anonymous',
+        addedByName: profile?.displayName || 'Sadhak',
+      });
+      setAddSheet(false);
+      setAddName('');
+      setAddDesc('');
+      getNearbyCommunityPlaces(userLat, userLon, searchRadius).then(setCommunityPlaces).catch(() => {});
+      dialog.alert('Added', `Your ${activeTab === 'bhandara' ? 'bhandara' : 'temple'} is now on the map for everyone nearby.`, undefined, { tone: 'success' });
+    } catch (e: any) {
+      dialog.alert('Could not add', String(e?.message || e).slice(0, 200));
+    } finally {
+      setAddSaving(false);
+    }
+  };
 
   const distanceFormatted = (d?: number) => {
     if (!d) return '';
@@ -234,7 +293,7 @@ export default function TemplesScreen() {
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={st.headerTitle}>Nearby Temples</Text>
-            <Text style={st.headerSub}>{temples.length} found within {searchRadius}km</Text>
+            <Text style={st.headerSub}>{filtered.length} found within {searchRadius}km</Text>
           </View>
           <TouchableOpacity onPress={() => setViewMode(viewMode === 'map' ? 'list' : 'map')} style={st.refreshBtn}>
             <MaterialCommunityIcons name={viewMode === 'map' ? 'format-list-bulleted' : 'map-outline'} size={20} color="#FFF" />
@@ -258,6 +317,37 @@ export default function TemplesScreen() {
         <Ionicons name="search" size={18} color={colors.textTertiary} />
         <TextInput style={[st.searchInput, { color: colors.text }]} placeholder="Search temples..." placeholderTextColor={colors.textTertiary} value={searchQuery} onChangeText={setSearchQuery} />
         {searchQuery ? <TouchableOpacity onPress={() => setSearchQuery('')}><Ionicons name="close-circle" size={18} color={colors.textTertiary} /></TouchableOpacity> : null}
+      </View>
+
+      {/* Temples / Bhandara tabs + Add */}
+      <View style={st.tabRow}>
+        <View style={[st.segment, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {(['temples', 'bhandara'] as TabType[]).map(tab => {
+            const active = activeTab === tab;
+            return (
+              <TouchableOpacity
+                key={tab}
+                style={[st.segmentBtn, active && { backgroundColor: colors.primary }]}
+                onPress={() => { setActiveTab(tab); setSelected(null); }}
+              >
+                <MaterialCommunityIcons
+                  name={tab === 'temples' ? 'temple-hindu' : 'food-variant'}
+                  size={14} color={active ? '#FFF' : colors.textSecondary}
+                />
+                <Text style={[st.segmentText, { color: active ? '#FFF' : colors.textSecondary }]}>
+                  {tab === 'temples' ? 'Temples' : 'Bhandara'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <TouchableOpacity
+          style={[st.addBtn, { backgroundColor: colors.primary + '14', borderColor: colors.primary + '40' }]}
+          onPress={() => setAddSheet(true)}
+        >
+          <MaterialCommunityIcons name="map-marker-plus" size={15} color={colors.primary} />
+          <Text style={[st.addBtnText, { color: colors.primary }]}>Add</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Radius selector */}
@@ -342,15 +432,21 @@ export default function TemplesScreen() {
           {filtered.length === 0 ? (
             <View style={st.empty}>
               <View style={[st.emptyCircle, { backgroundColor: isDark ? colors.surfaceElevated : '#FFF3E0' }]}>
-                <MaterialCommunityIcons name="temple-hindu" size={40} color={colors.textTertiary} />
+                <MaterialCommunityIcons name={activeTab === 'bhandara' ? 'food-variant' : 'temple-hindu'} size={40} color={colors.textTertiary} />
               </View>
-              <Text style={[st.emptyTitle, { color: colors.text }]}>No temples found</Text>
-              <Text style={[st.emptyText, { color: colors.textSecondary }]}>
-                Try increasing the search radius or check your internet connection
+              <Text style={[st.emptyTitle, { color: colors.text }]}>
+                {activeTab === 'bhandara' ? 'No bhandara mapped yet' : 'No temples found'}
               </Text>
-              <TouchableOpacity style={[st.retryBtn, { backgroundColor: colors.primary + '12' }]} onPress={() => fetchNearbyTemples()}>
-                <MaterialCommunityIcons name="refresh" size={18} color={colors.primary} />
-                <Text style={{ color: colors.primary, fontWeight: '600' }}>Retry</Text>
+              <Text style={[st.emptyText, { color: colors.textSecondary }]}>
+                {activeTab === 'bhandara'
+                  ? 'Bhandaras are added by the community. Know one nearby? Be the first to put it on the map.'
+                  : 'Try increasing the search radius, or add a local mandir yourself.'}
+              </Text>
+              <TouchableOpacity style={[st.retryBtn, { backgroundColor: colors.primary + '12' }]} onPress={() => setAddSheet(true)}>
+                <MaterialCommunityIcons name="map-marker-plus" size={18} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                  Add {activeTab === 'bhandara' ? 'a Bhandara' : 'a Temple'}
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -388,6 +484,63 @@ export default function TemplesScreen() {
           <Text style={[st.credit, { color: colors.textTertiary }]}>🗺️ Data from OpenStreetMap contributors</Text>
         </ScrollView>
       )}
+
+      {/* ═══ Add temple / bhandara sheet ═══ */}
+      <Modal visible={addSheet} transparent animationType="slide" onRequestClose={() => setAddSheet(false)}>
+        <View style={st.sheetOverlay}>
+          <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 24 + bottomInset }]}>
+            <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
+            <View style={st.sheetHeader}>
+              <Text style={[st.sheetTitle, { color: colors.text }]}>
+                Add {activeTab === 'bhandara' ? 'a Bhandara' : 'a Temple'}
+              </Text>
+              <TouchableOpacity onPress={() => setAddSheet(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[st.sheetSub, { color: colors.textSecondary }]}>
+              {activeTab === 'bhandara'
+                ? 'Know a bhandara (free food seva) happening nearby? Put it on the map for everyone.'
+                : 'Local mandir missing from the map? Add it — it will appear for all Sadhaks nearby.'}
+            </Text>
+            <View style={[st.locationRow, { backgroundColor: colors.primary + '0D', borderColor: colors.primary + '30' }]}>
+              <MaterialCommunityIcons name="crosshairs-gps" size={15} color={colors.primary} />
+              <Text style={[st.locationRowText, { color: colors.textSecondary }]}>
+                Pinned at your current location
+              </Text>
+            </View>
+            <TextInput
+              style={[st.sheetInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+              placeholder={activeTab === 'bhandara' ? 'Bhandara name / occasion *' : 'Temple name *'}
+              placeholderTextColor={colors.textTertiary}
+              value={addName}
+              onChangeText={setAddName}
+              maxLength={80}
+            />
+            <TextInput
+              style={[st.sheetInput, st.sheetInputMulti, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+              placeholder={activeTab === 'bhandara' ? 'Details — timing, what is served, landmark…' : 'Details — deity, timings, landmark… (optional)'}
+              placeholderTextColor={colors.textTertiary}
+              value={addDesc}
+              onChangeText={setAddDesc}
+              multiline
+              maxLength={300}
+            />
+            <TouchableOpacity onPress={submitPlace} disabled={addSaving || !addName.trim()} activeOpacity={0.85}>
+              <LinearGradient colors={['#D94F00', '#F07830']} style={[st.sheetSubmit, (!addName.trim() || addSaving) && { opacity: 0.6 }]}>
+                {addSaving ? (
+                  <ActivityIndicator color="#FFF" size="small" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="map-marker-check" size={18} color="#FFF" />
+                    <Text style={st.sheetSubmitText}>Put it on the map</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -406,6 +559,24 @@ const st = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, paddingHorizontal: 14, height: 42, borderRadius: 12, borderWidth: 1, gap: 8 },
   searchInput: { flex: 1, fontSize: 14 },
 
+  tabRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 10 },
+  segment: { flex: 1, flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3 },
+  segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 10 },
+  segmentText: { fontSize: 12.5, fontWeight: '700' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, height: 40, borderRadius: 13, borderWidth: 1 },
+  addBtnText: { fontSize: 13, fontWeight: '700' },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 22 },
+  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 14 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sheetTitle: { fontSize: 19, fontWeight: '800' },
+  sheetSub: { fontSize: 13, lineHeight: 19, marginTop: 6, marginBottom: 14 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 11, borderRadius: 11, borderWidth: 1, marginBottom: 12 },
+  locationRowText: { fontSize: 12.5, fontWeight: '600' },
+  sheetInput: { borderWidth: 1, borderRadius: 13, padding: 13, fontSize: 15, marginBottom: 10 },
+  sheetInputMulti: { minHeight: 84, textAlignVertical: 'top' },
+  sheetSubmit: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderRadius: 14, height: 52, marginTop: 6 },
+  sheetSubmitText: { color: '#FFF', fontSize: 15.5, fontWeight: '800' },
   radiusScroll: { flexGrow: 0, maxHeight: 52 },
   radiusRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
   radiusChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, height: 34, borderRadius: 17, borderWidth: 1 },

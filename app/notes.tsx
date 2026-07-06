@@ -10,6 +10,7 @@ import { useDialog } from "../contexts/DialogContext";
 import { useLanguage } from '../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { db, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, serverTimestamp } from '../config/firebase';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -116,6 +117,11 @@ export default function NotesScreen() {
   const [highlightColor, setHighlightColor] = useState('transparent');
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+  // Note reminders
+  const [showReminderSheet, setShowReminderSheet] = useState(false);
+  const [remDayOffset, setRemDayOffset] = useState(0); // 0 = today
+  const [remHour, setRemHour] = useState(8);
+  const [remMinute, setRemMinute] = useState(0);
   const [showFontSizePicker, setShowFontSizePicker] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
 
@@ -157,6 +163,44 @@ export default function NotesScreen() {
       setFontSize(16); setTextColor('default'); setHighlightColor('transparent');
     }
     setShowEditor(true);
+  };
+
+  const fmt12 = (h: number, m: number) => {
+    const ap = h >= 12 ? 'PM' : 'AM';
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    return `${hh}:${String(m).padStart(2, '0')} ${ap}`;
+  };
+
+  const scheduleNoteReminder = async () => {
+    try {
+      let perm = await Notifications.getPermissionsAsync();
+      if (!perm.granted) perm = await Notifications.requestPermissionsAsync();
+      if (!perm.granted) {
+        dialog.alert('Notifications off', 'Please allow notifications so reminders can reach you.', undefined, { tone: 'warning' });
+        return;
+      }
+      const now = new Date();
+      const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + remDayOffset, remHour, remMinute, 0);
+      if (target.getTime() <= Date.now()) {
+        dialog.alert('Time has passed', 'Pick a future time for this reminder.', undefined, { tone: 'warning' });
+        return;
+      }
+      const body = (title || content || 'Open your note').slice(0, 120);
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '📝 Note Reminder',
+          body,
+          sound: true,
+          data: { route: '/notes' },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: target, channelId: 'sadhak-spiritual' },
+      });
+      setShowReminderSheet(false);
+      const dayLabel = remDayOffset === 0 ? 'today' : remDayOffset === 1 ? 'tomorrow' : target.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' });
+      dialog.alert('Reminder set', `You'll be reminded ${dayLabel} at ${fmt12(remHour, remMinute)}.`, undefined, { tone: 'success' });
+    } catch {
+      dialog.alert('Error', 'Could not set the reminder. Please try again.');
+    }
   };
 
   const saveNote = async () => {
@@ -427,6 +471,9 @@ export default function NotesScreen() {
               <TouchableOpacity onPress={handleRedo} disabled={!undoRedo.canRedo} style={st.editorBtn}>
                 <MaterialCommunityIcons name="redo" size={20} color={undoRedo.canRedo ? colors.text : colors.textTertiary} />
               </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowReminderSheet(true)} style={st.editorBtn}>
+                <MaterialCommunityIcons name="bell-plus-outline" size={20} color={colors.textTertiary} />
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => setPinned(!pinned)} style={st.editorBtn}>
                 <MaterialCommunityIcons name={pinned ? 'pin' : 'pin-outline'} size={20} color={pinned ? colors.gold : colors.textTertiary} />
               </TouchableOpacity>
@@ -603,6 +650,82 @@ export default function NotesScreen() {
       </Modal>
 
       {/* ════ More Actions Modal ════ */}
+      {/* ═══ Note reminder sheet ═══ */}
+      <Modal visible={showReminderSheet} transparent animationType="slide" onRequestClose={() => setShowReminderSheet(false)}>
+        <View style={st.remOverlay}>
+          <View style={[st.remSheet, { backgroundColor: colors.surface }]}>
+            <View style={[st.remHandle, { backgroundColor: colors.divider }]} />
+            <View style={st.remHeader}>
+              <Text style={[st.remTitle, { color: colors.text }]}>Remind me</Text>
+              <TouchableOpacity onPress={() => setShowReminderSheet(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[st.remSub, { color: colors.textSecondary }]}>
+              {(title || 'This note').slice(0, 40)} · <Text style={{ color: colors.primary, fontWeight: '800' }}>{fmt12(remHour, remMinute)}</Text>
+            </Text>
+
+            <Text style={[st.remLabel, { color: colors.textTertiary }]}>DAY</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.remChipRow}>
+              {[0, 1, 2, 3, 4, 5, 6].map((d) => {
+                const date = new Date();
+                date.setDate(date.getDate() + d);
+                const label = d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' });
+                const active = remDayOffset === d;
+                return (
+                  <TouchableOpacity
+                    key={d}
+                    style={[st.remChip, { backgroundColor: active ? colors.primary : colors.background, borderColor: active ? colors.primary : colors.cardBorder }]}
+                    onPress={() => setRemDayOffset(d)}
+                  >
+                    <Text style={[st.remChipText, { color: active ? '#FFF' : colors.text }]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <Text style={[st.remLabel, { color: colors.textTertiary }]}>HOUR</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.remChipRow}>
+              {[5, 6, 7, 8, 9, 10, 12, 14, 16, 17, 18, 19, 20, 21].map((h) => {
+                const active = remHour === h;
+                return (
+                  <TouchableOpacity
+                    key={h}
+                    style={[st.remChip, { backgroundColor: active ? colors.primary : colors.background, borderColor: active ? colors.primary : colors.cardBorder }]}
+                    onPress={() => setRemHour(h)}
+                  >
+                    <Text style={[st.remChipText, { color: active ? '#FFF' : colors.text }]}>{fmt12(h, 0).replace(':00 ', '')}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <Text style={[st.remLabel, { color: colors.textTertiary }]}>MINUTE</Text>
+            <View style={st.remMinuteRow}>
+              {[0, 15, 30, 45].map((m) => {
+                const active = remMinute === m;
+                return (
+                  <TouchableOpacity
+                    key={m}
+                    style={[st.remMinute, { backgroundColor: active ? colors.primary : colors.background, borderColor: active ? colors.primary : colors.cardBorder }]}
+                    onPress={() => setRemMinute(m)}
+                  >
+                    <Text style={[st.remChipText, { color: active ? '#FFF' : colors.text }]}>:{String(m).padStart(2, '0')}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity onPress={scheduleNoteReminder} activeOpacity={0.85}>
+              <LinearGradient colors={['#D94F00', '#F07830']} style={st.remSubmit}>
+                <MaterialCommunityIcons name="bell-check-outline" size={19} color="#FFF" />
+                <Text style={st.remSubmitText}>Set reminder</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={showMoreActions} transparent animationType="fade">
         <TouchableOpacity style={st.moreOverlay} activeOpacity={1} onPress={() => setShowMoreActions(false)}>
           <View style={[st.moreSheet, { backgroundColor: colors.surface }]}>
@@ -664,6 +787,21 @@ const st = StyleSheet.create({
   // Editor
   editorContainer: { flex: 1 },
   editorHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 56 : 44, paddingBottom: 10, borderBottomWidth: 0.5 },
+  // Reminder sheet
+  remOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  remSheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 22, paddingBottom: 32 },
+  remHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 14 },
+  remHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  remTitle: { fontSize: 19, fontWeight: '800' },
+  remSub: { fontSize: 13.5, marginTop: 4, marginBottom: 14 },
+  remLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
+  remChipRow: { gap: 7, paddingBottom: 12 },
+  remChip: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 11, borderWidth: 1 },
+  remChipText: { fontSize: 13, fontWeight: '700' },
+  remMinuteRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  remMinute: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11, borderWidth: 1 },
+  remSubmit: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderRadius: 14, height: 52 },
+  remSubmitText: { color: '#FFF', fontSize: 15.5, fontWeight: '800' },
   editorActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   editorBtn: { padding: 6 },
   saveBtn: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
