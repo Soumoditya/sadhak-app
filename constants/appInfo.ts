@@ -26,6 +26,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.0',
+    date: '2026-07-06',
+    title: 'The Big One 🔱',
+    changes: [
+      'Uploads fixed for real — profile photos, PDFs and post images',
+      'Devotional Library: full Hanuman Chalisa, complete aartis, mantras with meanings, stotras',
+      'Listen/Watch any aarti or mantra inside the app',
+      'Sadhak AI — your spiritual companion, powered by Gemini',
+      'Sign in with username, forgot & change password',
+      'Community bhandara & temple pins on the live map',
+      'Comments on community posts',
+      'Chat: delete messages, copy text, day separators',
+      'Reminders at any hour with 5-minute precision',
+      'Calendar decluttered; festival days marked correctly',
+      'In-app PDF reader; launcher icon no longer cut',
+    ],
+  },
+  {
     version: '1.0.0',
     date: '2026-06-27',
     title: 'Initial Release 🚀',
