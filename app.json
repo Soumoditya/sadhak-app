@@ -11,7 +11,7 @@
       "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#0B0E13",
-        "foregroundImage": "./assets/images/icon.png"
+        "foregroundImage": "./assets/images/adaptive-foreground.png"
       },
       "package": "com.sadhak.app",
       "permissions": [

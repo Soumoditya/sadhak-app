@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
@@ -50,10 +51,20 @@ export default function CreatePostScreen() {
     try {
       let imageUrl: string | null = null;
       if (localImage) {
-        const up = await uploadToCloudinary(localImage, 'sadhak/posts', 'image');
+        // Compress to feed size first — full camera photos are multi-MB and die
+        // on weak connections; ~1280px JPEG uploads reliably.
+        const small = await ImageManipulator.manipulateAsync(
+          localImage,
+          [{ resize: { width: 1280 } }],
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        const up = await uploadToCloudinary(small.uri, 'sadhak/posts', 'image');
         imageUrl = up.secure_url;
       }
-      await createPost({
+      // Fire-and-close: Firestore shows the post instantly from the local queue
+      // and syncs when the connection allows — no more false "could not post"
+      // failures on a flaky network.
+      createPost({
         author: {
           uid: user.uid,
           displayName: profile.displayName,
@@ -62,16 +73,10 @@ export default function CreatePostScreen() {
         },
         text,
         imageUrl,
-      });
+      }).catch(() => {});
       router.back();
     } catch (e: any) {
-      const permission = String(e?.message || e).toLowerCase().includes('permission');
-      dialog.alert(
-        'Could not post',
-        permission
-          ? 'Firestore rules are rejecting the write. Publish the Firestore rules to enable posting.'
-          : 'Something went wrong. Check your connection and try again.',
-      );
+      dialog.alert('Could not post', String(e?.message || e).slice(0, 250));
     } finally {
       setPosting(false);
     }

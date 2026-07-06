@@ -15,7 +15,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { db, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
 import { sendTestNotification } from '../../services/notifications';
 import { uploadToCloudinary } from '../../services/cloudinary';
-import { APP_VERSION, PLAY_STORE_URL, PLAY_STORE_MARKET_URL } from '../../constants/appInfo';
+import { APP_VERSION, WEBSITE_URL } from '../../constants/appInfo';
 import { useLayoutInsets } from '../../constants/layout';
 
 export default function ProfileScreen() {
@@ -163,14 +163,29 @@ export default function ProfileScreen() {
 
   const handleShareApp = async () => {
     try {
+      // Share the live website until the Play Store listing exists —
+      // a dead store link reads as fake.
       await Share.share({
-        message: `🙏 Check out Sadhak — your complete Hindu spiritual companion!\n\nDaily Panchang, grooming guidance, sacred library, community chat & more.\n\n${PLAY_STORE_URL}`,
+        message: `🙏 Sadhak — your Hindu spiritual companion.\n\nAccurate Panchang, Hindu calendar, nearby temples, sacred library, aarti & community.\n\n${WEBSITE_URL}`,
       });
     } catch (e) {}
   };
 
   const handleRateApp = () => {
-    Linking.openURL(PLAY_STORE_MARKET_URL).catch(() => Linking.openURL(PLAY_STORE_URL));
+    // Not on the Play Store yet — an honest dialog beats a broken store page.
+    dialog.alert(
+      'Coming to Play Store',
+      'Sadhak is preparing for its Play Store release. Once live, you can rate it here — until then, sharing the app with fellow sadhaks helps the most. 🙏',
+      [
+        { text: 'Share instead', onPress: handleShareApp },
+        { text: 'OK', style: 'cancel' },
+      ],
+      { tone: 'info' },
+    );
+  };
+
+  const handleWebsite = () => {
+    Linking.openURL(WEBSITE_URL).catch(() => {});
   };
 
   const getInitials = () => {
@@ -332,6 +347,7 @@ export default function ProfileScreen() {
           {[
             { label: t('settings.rateApp'), icon: 'star-outline', color: '#FFB300', action: handleRateApp },
             { label: t('settings.shareApp'), icon: 'share-variant-outline', color: '#4ADE80', action: handleShareApp },
+            { label: 'Website', icon: 'web', color: '#38BDF8', action: handleWebsite },
             { label: t('settings.about'), icon: 'information-outline', color: '#37474F', action: () => router.push('/about' as any) },
             { label: t('settings.privacyPolicy'), icon: 'shield-lock-outline', color: '#1565C0', action: () => router.push('/privacy' as any) },
             { label: t('settings.terms'), icon: 'file-document-outline', color: '#9C27B0', action: () => router.push('/terms' as any) },

@@ -29,8 +29,6 @@ export async function uploadToCloudinary(
   folder: string = 'sadhak',
   resourceType: string = 'auto'
 ): Promise<CloudinaryUploadResponse> {
-  const formData = new FormData();
-
   // Get filename from URI
   const uriParts = fileUri.split('/');
   const fileName = uriParts[uriParts.length - 1];
@@ -43,60 +41,50 @@ export async function uploadToCloudinary(
   else if (extension === 'png') mimeType = 'image/png';
   else if (extension === 'webp') mimeType = 'image/webp';
 
-  formData.append('file', {
-    uri: fileUri,
-    type: mimeType,
-    name: fileName,
-  } as any);
-  formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-  // This Cloudinary account requires the api_key present even for the unsigned
-  // preset — verified by direct API test. Without it: {"error":"Unknown API key"}.
-  formData.append('api_key', CLOUDINARY_CONFIG.apiKey);
-  formData.append('folder', folder);
-
   // Route PDFs/other docs to the raw endpoint, images to auto (Cloudinary picks).
   const uploadUrl =
     resourceType === 'raw' || mimeType === 'application/pdf'
       ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/raw/upload`
       : CLOUDINARY_CONFIG.uploadUrl;
 
-  // Flaky-network hardening: per-attempt timeout + automatic retries with backoff.
-  // Single-shot multi-MB uploads die on unstable connections; retrying recovers
-  // the transient resets, and the surfaced error tells the user what really happened.
+  // IMPORTANT: we use expo-file-system's NATIVE multipart uploader, not fetch()+
+  // FormData. React Native's new architecture throws "Unsupported FormDataPart
+  // implementation" for {uri,...} file parts before the request even leaves the
+  // phone — confirmed on-device. uploadAsync streams the file natively.
+  const { uploadAsync, FileSystemUploadType } = require('expo-file-system/legacy');
+
   const MAX_ATTEMPTS = 3;
-  const TIMEOUT_MS = 90_000;
   let lastError: any = null;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-      // IMPORTANT: do NOT set Content-Type manually. React Native's fetch must add
-      // the multipart boundary itself; hardcoding 'multipart/form-data' omits the
-      // boundary and Cloudinary rejects the body.
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
+      const res = await uploadAsync(uploadUrl, fileUri, {
+        httpMethod: 'POST',
+        uploadType: FileSystemUploadType.MULTIPART,
+        fieldName: 'file',
+        mimeType,
+        parameters: {
+          upload_preset: CLOUDINARY_CONFIG.uploadPreset,
+          // This account requires api_key even on the unsigned preset —
+          // verified by direct API test ("Unknown API key" without it).
+          api_key: CLOUDINARY_CONFIG.apiKey,
+          folder,
+        },
       });
-      clearTimeout(timer);
 
-      if (!response.ok) {
-        const errText = await response.text();
-        let message = errText;
-        try { message = JSON.parse(errText)?.error?.message || errText; } catch {}
-        // Server rejected it (preset/key/size) — retrying won't change the answer.
-        throw Object.assign(new Error(`Cloudinary: ${message}`), { noRetry: true });
+      if (res.status >= 200 && res.status < 300) {
+        return JSON.parse(res.body) as CloudinaryUploadResponse;
       }
 
-      const data: CloudinaryUploadResponse = await response.json();
-      return data;
+      let message = res.body;
+      try { message = JSON.parse(res.body)?.error?.message || res.body; } catch {}
+      // Server rejected it (preset/key/size) — retrying won't change the answer.
+      throw Object.assign(new Error(`Cloudinary: ${message}`), { noRetry: true });
     } catch (error: any) {
-      clearTimeout(timer);
       lastError = error;
       if (error?.noRetry) break;
       if (attempt < MAX_ATTEMPTS) {
-        // brief backoff before retrying (1s, 2s)
+        // transient network failure — brief backoff, then retry (1s, 2s)
         await new Promise((r) => setTimeout(r, attempt * 1000));
         continue;
       }
@@ -105,11 +93,8 @@ export async function uploadToCloudinary(
 
   console.error('Cloudinary upload error:', lastError);
   const raw = String(lastError?.message || lastError);
-  if (lastError?.name === 'AbortError') {
-    throw new Error('Upload timed out — your connection dropped mid-upload. Try again on stronger internet or with a smaller file.');
-  }
-  if (/network request failed/i.test(raw)) {
-    throw new Error('Network failed mid-upload. Your connection is resetting large uploads — try smaller files or stronger internet.');
+  if (/network request failed|econnreset|socket|abort/i.test(raw)) {
+    throw new Error('Network failed mid-upload. Your connection is resetting large uploads — try again on stronger internet.');
   }
   throw new Error(raw);
 }

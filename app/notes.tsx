@@ -457,7 +457,7 @@ export default function NotesScreen() {
       )}
 
       {/* ════ Editor Modal ════ */}
-      <Modal visible={showEditor} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={showEditor} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowEditor(false)}>
         <View style={[st.editorContainer, { backgroundColor: getNoteColor(selectedColor) || colors.background }]}>
           {/* Editor header */}
           <View style={[st.editorHeader, { borderColor: colors.divider }]}>
