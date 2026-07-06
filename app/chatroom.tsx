@@ -11,7 +11,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { rtdb, ref, push, set, onValue, off, rtServerTimestamp, limitToLast, rtQuery, orderByChild } from '../config/firebase';
+import { remove } from 'firebase/database';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
 
 const GIPHY_API_KEY = 'wAKLYXMGICxFXZ3CZvycYzxk876dQDMM';
 const { width } = Dimensions.get('window');
@@ -275,13 +277,47 @@ export default function ChatRoomScreen() {
 
   const isMe = (senderId: string) => senderId === user?.uid;
 
+  const deleteMessage = (msgId: string) => {
+    setShowReactions(null);
+    dialog.alert('Delete message', 'Remove this message for everyone?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await remove(ref(rtdb, `messages/${roomId}/${msgId}`)); } catch {}
+      }},
+    ]);
+  };
+
+  const copyMessage = async (text: string) => {
+    setShowReactions(null);
+    try { await Clipboard.setStringAsync(text); } catch {}
+  };
+
+  const dayKey = (ts?: number) => (ts ? new Date(ts).toDateString() : '');
+  const dayLabel = (ts: number) => {
+    const d = new Date(ts);
+    const today = new Date();
+    const yest = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yest.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  };
+
   // ─── RENDER MESSAGE ─────────────────────────────────────────────
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const mine = isMe(item.senderId);
     const showAvatar = !mine && (index === 0 || messages[index - 1]?.senderId !== item.senderId);
     const reactionEntries = Object.entries(item.reactions || {});
+    const showDay = !!item.timestamp && (index === 0 || dayKey(messages[index - 1]?.timestamp) !== dayKey(item.timestamp));
 
     return (
+      <>
+      {showDay && (
+        <View style={styles.dayRow}>
+          <View style={[styles.dayChip, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.dayChipText, { color: colors.textTertiary }]}>{dayLabel(item.timestamp)}</Text>
+          </View>
+        </View>
+      )}
       <View style={[styles.msgRow, mine && styles.msgRowMine]}>
         {/* Avatar */}
         {!mine && (
@@ -375,10 +411,21 @@ export default function ChatRoomScreen() {
               <TouchableOpacity style={styles.reactionPickBtn} onPress={() => { setReplyingTo(item); setShowReactions(null); }}>
                 <MaterialCommunityIcons name="reply" size={20} color={colors.primary} />
               </TouchableOpacity>
+              {item.type === 'text' && !!item.text && (
+                <TouchableOpacity style={styles.reactionPickBtn} onPress={() => copyMessage(item.text)}>
+                  <MaterialCommunityIcons name="content-copy" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+              {mine && (
+                <TouchableOpacity style={styles.reactionPickBtn} onPress={() => deleteMessage(item.id)}>
+                  <MaterialCommunityIcons name="trash-can-outline" size={19} color={colors.error || '#DC2626'} />
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
       </View>
+      </>
     );
   };
 
@@ -510,6 +557,9 @@ export default function ChatRoomScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   messagesList: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8 },
+  dayRow: { alignItems: 'center', marginVertical: 10 },
+  dayChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 100, borderWidth: 1 },
+  dayChipText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4 },
   msgRow: { flexDirection: 'row', marginBottom: 4, alignItems: 'flex-end' },
   msgRowMine: { justifyContent: 'flex-end' },
   avatarCol: { width: 32, marginRight: 6 },
