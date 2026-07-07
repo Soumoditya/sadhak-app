@@ -227,6 +227,9 @@ function RootLayoutInner() {
         <Stack.Screen name="feed" options={{ headerShown: false }} />
         <Stack.Screen name="reader" options={{ headerShown: false }} />
         <Stack.Screen name="play" options={{ headerShown: false }} />
+        <Stack.Screen name="compass" options={{ headerShown: false }} />
+        <Stack.Screen name="puja-guide" options={{ headerShown: false }} />
+        <Stack.Screen name="bhog" options={{ headerShown: false }} />
         <Stack.Screen name="ask" options={{ headerShown: false }} />
         <Stack.Screen name="create-post" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
         <Stack.Screen name="faq" options={{ headerShown: false }} />

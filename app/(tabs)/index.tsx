@@ -131,6 +131,9 @@ export default function HomeScreen() {
     { icon: 'counter', label: t('feat.japa'), route: '/japa', color: '#1565C0' },
     { icon: 'music-note', label: t('feat.aarti'), route: '/aarti', color: '#EA580C' },
     { icon: 'note-edit-outline', label: t('feat.notes'), route: '/notes', color: '#37474F' },
+    { icon: 'compass-rose', label: 'Vastu', route: '/compass', color: '#7B1FA2' },
+    { icon: 'hands-pray', label: 'Puja Guide', route: '/puja-guide', color: '#8B1A1A' },
+    { icon: 'food-variant', label: 'Satvik Bhog', route: '/bhog', color: '#2D6A4F' },
     { icon: 'creation', label: 'Sadhak AI', route: '/ask', color: '#B8860B' },
     { icon: 'compass-outline', label: 'Explore Feed', route: '/feed', color: '#8B1A1A' },
   ];
