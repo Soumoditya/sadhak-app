@@ -57,6 +57,7 @@ export default function ChatRoomScreen() {
   const [showReactions, setShowReactions] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [othersTyping, setOthersTyping] = useState<string[]>([]);
+  const [viewMedia, setViewMedia] = useState<{ url: string; kind: 'gif' | 'image' } | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sendBtnAnim = useRef(new Animated.Value(0)).current;
@@ -360,7 +361,12 @@ export default function ChatRoomScreen() {
                 : [styles.msgBubbleOther, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
             ]}
             onLongPress={() => setShowReactions(item.id)}
-            onPress={() => showReactions === item.id ? setShowReactions(null) : null}
+            onPress={() => {
+              if (showReactions === item.id) { setShowReactions(null); return; }
+              // Tap media to view fullscreen
+              if (item.type === 'gif' && item.gifUrl) setViewMedia({ url: item.gifUrl, kind: 'gif' });
+              else if (item.type === 'image' && item.imageUrl) setViewMedia({ url: item.imageUrl, kind: 'image' });
+            }}
             activeOpacity={0.8}
           >
             {item.type === 'gif' && item.gifUrl ? (
@@ -549,6 +555,19 @@ export default function ChatRoomScreen() {
             <Text style={[styles.giphyPowered, { color: colors.textTertiary }]}>Powered by GIPHY</Text>
           </View>
         </Modal>
+
+        {/* ═══ Fullscreen media viewer ═══ */}
+        <Modal visible={!!viewMedia} transparent animationType="fade" onRequestClose={() => setViewMedia(null)}>
+          <View style={styles.mediaViewer}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setViewMedia(null)} />
+            {viewMedia && (
+              <Image source={{ uri: viewMedia.url }} style={styles.mediaViewerImg} resizeMode="contain" />
+            )}
+            <TouchableOpacity style={styles.mediaViewerClose} onPress={() => setViewMedia(null)} hitSlop={10}>
+              <Ionicons name="close" size={26} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </>
   );
@@ -557,6 +576,9 @@ export default function ChatRoomScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   messagesList: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8 },
+  mediaViewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  mediaViewerImg: { width: '96%', height: '80%' },
+  mediaViewerClose: { position: 'absolute', top: 50, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   dayRow: { alignItems: 'center', marginVertical: 10 },
   dayChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 100, borderWidth: 1 },
   dayChipText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4 },

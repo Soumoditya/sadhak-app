@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
@@ -67,6 +68,7 @@ export default function CalendarScreen() {
   const [reminderSheet, setReminderSheet] = useState(false);
   const [remHour, setRemHour] = useState(6);
   const [remMinute, setRemMinute] = useState(0);
+  const [showClock, setShowClock] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -563,6 +565,30 @@ export default function CalendarScreen() {
               <Text style={{ color: colors.primary, fontWeight: '800' }}>{fmt12(remHour, remMinute)}</Text>
             </Text>
 
+            {/* Native clock dial — pick any exact time */}
+            <TouchableOpacity
+              style={[st.dialBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '35' }]}
+              onPress={() => setShowClock(true)}
+            >
+              <MaterialCommunityIcons name="clock-edit-outline" size={18} color={colors.primary} />
+              <Text style={[st.dialBtnText, { color: colors.primary }]}>Pick exact time on the clock</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
+            {showClock && (
+              <DateTimePicker
+                value={new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), remHour, remMinute)}
+                mode="time"
+                display="clock"
+                onChange={(event, date) => {
+                  setShowClock(false);
+                  if (event.type === 'set' && date) {
+                    setRemHour(date.getHours());
+                    setRemMinute(date.getMinutes());
+                  }
+                }}
+              />
+            )}
+
             <Text style={[st.sheetLabel, { color: colors.textTertiary }]}>QUICK PICK</Text>
             <View style={st.presetWrap}>
               {TIME_PRESETS.map((p) => {
@@ -707,6 +733,8 @@ const st = StyleSheet.create({
   sheetSub: { fontSize: 13.5, marginTop: 4, marginBottom: 16 },
   sheetLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
 
+  dialBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 13, borderRadius: 13, borderWidth: 1, marginBottom: 14 },
+  dialBtnText: { flex: 1, fontSize: 13.5, fontWeight: '700' },
   presetWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   preset: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 11, borderWidth: 1 },
   presetText: { fontSize: 12, fontWeight: '700' },

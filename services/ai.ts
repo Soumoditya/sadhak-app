@@ -42,7 +42,9 @@ export async function askSadhakAI(history: AiMessage[], userName?: string): Prom
         parts: [{ text: SYSTEM_PROMPT + (userName ? `\n\nThe user's name is ${userName}.` : '') }],
       },
       contents,
-      generationConfig: { temperature: 0.6, maxOutputTokens: 1024 },
+      // Flash "thinking" consumes output budget before visible text — 1024 was
+      // truncating replies mid-sentence. 4096 leaves room for full answers.
+      generationConfig: { temperature: 0.6, maxOutputTokens: 4096 },
     }),
   });
 

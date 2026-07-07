@@ -11,6 +11,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { db, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, serverTimestamp } from '../config/firebase';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -122,6 +123,7 @@ export default function NotesScreen() {
   const [remDayOffset, setRemDayOffset] = useState(0); // 0 = today
   const [remHour, setRemHour] = useState(8);
   const [remMinute, setRemMinute] = useState(0);
+  const [pickStage, setPickStage] = useState<'date' | 'time' | null>(null);
   const [showFontSizePicker, setShowFontSizePicker] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
 
@@ -404,7 +406,7 @@ export default function NotesScreen() {
       </View>
 
       {/* ── Folders ── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.folderRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.folderScroll} contentContainerStyle={st.folderRow}>
         {FOLDERS.map(folder => {
           const isActive = activeFolder === folder;
           const icon = folder === 'Trash' ? 'delete-outline' : folder === 'Archive' ? 'archive-outline' : folder === 'All' ? 'folder-multiple-outline' : 'folder-outline';
@@ -665,6 +667,41 @@ export default function NotesScreen() {
               {(title || 'This note').slice(0, 40)} · <Text style={{ color: colors.primary, fontWeight: '800' }}>{fmt12(remHour, remMinute)}</Text>
             </Text>
 
+            {/* Native date + time dials — pick anything exactly */}
+            <TouchableOpacity
+              style={[st.remDialBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '35' }]}
+              onPress={() => setPickStage('date')}
+            >
+              <MaterialCommunityIcons name="calendar-clock" size={18} color={colors.primary} />
+              <Text style={[st.remDialText, { color: colors.primary }]}>Pick exact date & time</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
+            {pickStage === 'date' && (
+              <DateTimePicker
+                value={(() => { const d = new Date(); d.setDate(d.getDate() + remDayOffset); d.setHours(remHour, remMinute, 0, 0); return d; })()}
+                mode="date"
+                minimumDate={new Date()}
+                onChange={(event, date) => {
+                  if (event.type !== 'set' || !date) { setPickStage(null); return; }
+                  const today = new Date(); today.setHours(0, 0, 0, 0);
+                  const picked = new Date(date); picked.setHours(0, 0, 0, 0);
+                  setRemDayOffset(Math.max(0, Math.round((picked.getTime() - today.getTime()) / 86400000)));
+                  setPickStage('time');
+                }}
+              />
+            )}
+            {pickStage === 'time' && (
+              <DateTimePicker
+                value={(() => { const d = new Date(); d.setHours(remHour, remMinute, 0, 0); return d; })()}
+                mode="time"
+                display="clock"
+                onChange={(event, date) => {
+                  setPickStage(null);
+                  if (event.type === 'set' && date) { setRemHour(date.getHours()); setRemMinute(date.getMinutes()); }
+                }}
+              />
+            )}
+
             <Text style={[st.remLabel, { color: colors.textTertiary }]}>DAY</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.remChipRow}>
               {[0, 1, 2, 3, 4, 5, 6].map((d) => {
@@ -757,8 +794,11 @@ const st = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, paddingHorizontal: 14, height: 42, borderRadius: 12, borderWidth: 1, gap: 8 },
   searchInput: { flex: 1, fontSize: 14 },
 
-  folderRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 6 },
-  folderChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  // flexGrow:0 + height cap — unconstrained horizontal ScrollViews stretch
+  // their chips to fill the column (same bug the library had).
+  folderScroll: { flexGrow: 0, maxHeight: 50 },
+  folderRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  folderChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, height: 34, borderRadius: 17, borderWidth: 1 },
   folderText: { fontSize: 12, fontWeight: '600' },
 
   scrollContent: { paddingHorizontal: 16 },
@@ -795,6 +835,8 @@ const st = StyleSheet.create({
   remTitle: { fontSize: 19, fontWeight: '800' },
   remSub: { fontSize: 13.5, marginTop: 4, marginBottom: 14 },
   remLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
+  remDialBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 13, borderRadius: 13, borderWidth: 1, marginBottom: 12 },
+  remDialText: { flex: 1, fontSize: 13.5, fontWeight: '700' },
   remChipRow: { gap: 7, paddingBottom: 12 },
   remChip: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 11, borderWidth: 1 },
   remChipText: { fontSize: 13, fontWeight: '700' },

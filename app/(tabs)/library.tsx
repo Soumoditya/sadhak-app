@@ -171,13 +171,17 @@ export default function LibraryScreen() {
       const fileName = `${book.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
       const fileUri = FileSystem.documentDirectory + fileName;
       const download = await FileSystem.downloadAsync(book.cloudinaryUrl, fileUri);
-      if (download.status === 200) {
-        await Sharing.shareAsync(download.uri);
-        // Increment download count
-        try { await updateDoc(doc(db, 'library', book.id), { downloadCount: (book.downloadCount || 0) + 1 }); } catch (e) {}
-      }
-    } catch (error) { dialog.alert('Error', 'Download failed'); }
-    finally { setDownloadingId(null); }
+      if (download.status !== 200) throw new Error(`Server replied HTTP ${download.status}.`);
+      try { await updateDoc(doc(db, 'library', book.id), { downloadCount: (book.downloadCount || 0) + 1 }); } catch (e) {}
+      dialog.alert('Downloaded', `"${book.title}" is saved offline. What next?`, [
+        { text: 'Read now', onPress: () => openPDF(download.uri, book.title) },
+        { text: 'Share / save', onPress: async () => { try { await Sharing.shareAsync(download.uri); } catch {} } },
+        { text: 'Done', style: 'cancel' },
+      ]);
+    } catch (error: any) {
+      // Real reason instead of a generic guess — debuggable from a screenshot.
+      dialog.alert('Download failed', String(error?.message || error).slice(0, 200));
+    } finally { setDownloadingId(null); }
   };
 
   const formatFileSize = (bytes: number) => {
