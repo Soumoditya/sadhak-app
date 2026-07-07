@@ -254,39 +254,47 @@ export default function CalendarScreen() {
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabContentPadding }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabContentPadding }}>
 
-        {/* ═══ Immersive header with integrated month navigation ═══ */}
-        <LinearGradient
-          colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-          style={[st.header, { paddingTop: headerPaddingTop }]}
-        >
-          <View style={st.headerTopRow}>
-            <View>
-              <Text style={st.headerTitle}>{t('cal.title')}</Text>
-              <Text style={st.headerSub}>
-                {selectedPanchang ? `${selectedPanchang.hinduMonth.nameHi} • ${selectedPanchang.tithi.pakshaHi}` : ''}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={goToToday} style={st.todayPill} activeOpacity={0.8}>
-              <MaterialCommunityIcons name="calendar-today" size={13} color="#FFF" />
-              <Text style={st.todayPillText}>Today</Text>
-            </TouchableOpacity>
+        {/* ═══ Inline title + Today pill ═══ */}
+        <View style={[st.headerTopRow, { paddingTop: headerPaddingTop + 4, paddingHorizontal: 0 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[st.headerTitle, { color: colors.text }]}>Hindu Calendar</Text>
+            <Text style={[st.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
+              {selectedPanchang ? `${selectedPanchang.hinduMonth.nameHi} · ${selectedPanchang.tithi.pakshaHi}` : ''}
+            </Text>
           </View>
+          <TouchableOpacity
+            onPress={goToToday}
+            style={[st.todayPill, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="calendar-today" size={13} color={colors.primary} />
+            <Text style={[st.todayPillText, { color: colors.primary }]}>Today</Text>
+          </TouchableOpacity>
+        </View>
 
-          <View style={st.monthRow}>
-            <TouchableOpacity onPress={goToPrevMonth} style={st.monthArrow} hitSlop={8}>
-              <Ionicons name="chevron-back" size={20} color="#FFF" />
-            </TouchableOpacity>
-            <View style={st.monthCenter}>
-              <Text style={st.monthText}>{MONTHS[month]}</Text>
-              <Text style={st.yearText}>{year}</Text>
-            </View>
-            <TouchableOpacity onPress={goToNextMonth} style={st.monthArrow} hitSlop={8}>
-              <Ionicons name="chevron-forward" size={20} color="#FFF" />
-            </TouchableOpacity>
+        {/* ═══ Month navigator (subdued, not the hero) ═══ */}
+        <View style={[st.monthRow, { marginTop: 16, marginHorizontal: 0 }]}>
+          <TouchableOpacity
+            onPress={goToPrevMonth}
+            style={[st.monthArrow, { backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={20} color={colors.text} />
+          </TouchableOpacity>
+          <View style={st.monthCenter}>
+            <Text style={[st.monthText, { color: colors.text }]}>{MONTHS[month]}</Text>
+            <Text style={[st.yearText, { color: colors.textTertiary }]}>{year}</Text>
           </View>
-        </LinearGradient>
+          <TouchableOpacity
+            onPress={goToNextMonth}
+            style={[st.monthArrow, { backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-forward" size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
         {/* ═══ Calendar grid — clean by default, markers only when meaningful ═══ */}
         <View style={[st.calendarCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -656,20 +664,19 @@ const st = StyleSheet.create({
   container: { flex: 1 },
 
   // Header
-  header: { paddingBottom: 18, paddingHorizontal: 20, borderBottomLeftRadius: 26, borderBottomRightRadius: 26 },
-  headerTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF', letterSpacing: 0.2 },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 3 },
-  todayPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100 },
-  todayPillText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
-  monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
-  monthArrow: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center', alignItems: 'center' },
+  headerTopRow: { flexDirection: 'row', alignItems: 'center' },
+  headerTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
+  headerSub: { fontSize: 13, marginTop: 3 },
+  todayPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100 },
+  todayPillText: { fontSize: 12, fontWeight: '800' },
+  monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  monthArrow: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   monthCenter: { alignItems: 'center' },
-  monthText: { fontSize: 20, fontWeight: '800', color: '#FFF', letterSpacing: 0.3 },
-  yearText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.8)', marginTop: 1 },
+  monthText: { fontSize: 20, fontWeight: '800', letterSpacing: -0.2 },
+  yearText: { fontSize: 12, fontWeight: '600', marginTop: 1 },
 
   // Grid
-  calendarCard: { marginHorizontal: 16, marginTop: 14, borderRadius: 20, padding: GRID_PAD, borderWidth: 1 },
+  calendarCard: { marginTop: 14, borderRadius: 20, padding: GRID_PAD, borderWidth: 1 },
   dayHeaders: { flexDirection: 'row' },
   dayHeaderText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
@@ -689,7 +696,7 @@ const st = StyleSheet.create({
   legendText: { fontSize: 10, fontWeight: '600' },
 
   // Day sheet
-  detailCard: { marginHorizontal: 16, marginTop: 14, borderRadius: 20, padding: 18, borderWidth: 1 },
+  detailCard: { marginTop: 14, borderRadius: 20, padding: 18, borderWidth: 1 },
   detailHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   detailWeekday: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
   detailDate: { fontSize: 24, fontWeight: '800', marginTop: 2 },

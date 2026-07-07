@@ -1,566 +1,425 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch, Alert,
-  TextInput, Image, Animated, Modal, ActivityIndicator, Platform, Share, Linking,
+  View, Text, StyleSheet, TouchableOpacity, TextInput, Image, Modal,
+  Share, Linking, ActivityIndicator,
 } from 'react-native';
+import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import { useDialog } from "../../contexts/DialogContext";
-import { useLanguage, SUPPORTED_LANGUAGES, type LanguageCode } from '../../contexts/LanguageContext';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useDialog } from '../../contexts/DialogContext';
+import { useLanguage, SUPPORTED_LANGUAGES, type LanguageCode } from '../../contexts/LanguageContext';
 import { db, auth, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { sendTestNotification } from '../../services/notifications';
 import { uploadToCloudinary } from '../../services/cloudinary';
+import { sendTestNotification } from '../../services/notifications';
 import { APP_VERSION, WEBSITE_URL } from '../../constants/appInfo';
-import { useLayoutInsets } from '../../constants/layout';
+import { Screen, Card, Button, SettingsRow } from '../../components/ui';
+import { DS } from '../../constants/ds';
 
 export default function ProfileScreen() {
   const { profile, isGuest, isAdmin, logout, updateProfile, user, deleteAccount } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
   const dialog = useDialog();
-  const { language, setLanguage, t } = useLanguage();
-  const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
-  const router = useRouter();
+  const { t, language, setLanguage } = useLanguage();
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
-
-  // Modals
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
-  
-  // Username
-  const [newUsername, setNewUsername] = useState(profile?.username || '');
-  const [usernameError, setUsernameError] = useState('');
-  const [checkingUsername, setCheckingUsername] = useState(false);
   const [uploadingPfp, setUploadingPfp] = useState(false);
-
-  // Edit Profile
-  const [editName, setEditName] = useState(profile?.displayName || '');
-  const [editBio, setEditBio] = useState(profile?.bio || '');
-
-  // Settings state
-  const settings = profile?.settings;
-  const [notifications, setNotifications] = useState(settings?.notifications ?? true);
-  const [groomingReminders, setGroomingReminders] = useState(settings?.groomingReminders ?? true);
-  const [festivalReminders, setFestivalReminders] = useState(settings?.festivalReminders ?? true);
-  const [ekadashiReminders, setEkadashiReminders] = useState(settings?.ekadashiReminders ?? true);
-  const [quietHours, setQuietHours] = useState(settings?.quietHoursEnabled ?? false);
-  const [showInCommunity, setShowInCommunity] = useState(settings?.showProfileInCommunity ?? true);
-  const [allowDMs, setAllowDMs] = useState(settings?.allowDMs ?? true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [usernameOpen, setUsernameOpen] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [languageOpen, setLanguageOpen] = useState(false);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 8, useNativeDriver: true }),
-    ]).start();
-  }, []);
+    if (profile) {
+      setEditName(profile.displayName || '');
+      setEditBio(profile.bio || '');
+    }
+  }, [profile]);
 
-  // ─── PROFILE PICTURE ────────────────────────────────────────
+  // ─── Profile picture (Cloudinary) ───────────────────────
   const pickAndUploadPfp = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        dialog.alert('Permission needed', 'Please allow photo library access.');
-        return;
-      }
+      if (status !== 'granted') { dialog.alert('Permission needed', 'Allow photo library access.'); return; }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
+        mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7,
       });
       if (result.canceled || !result.assets?.[0]) return;
       setUploadingPfp(true);
-      // Shrink to avatar size first — a multi-MB camera photo dies on weak
-      // connections; a 512px JPEG (~100-200KB) uploads reliably.
       const small = await ImageManipulator.manipulateAsync(
-        result.assets[0].uri,
-        [{ resize: { width: 512 } }],
+        result.assets[0].uri, [{ resize: { width: 512 } }],
         { compress: 0.75, format: ImageManipulator.SaveFormat.JPEG },
       );
-      // Upload to Cloudinary so the photo persists across reinstall / cache clear.
       const up = await uploadToCloudinary(small.uri, 'sadhak/avatars', 'image');
       await updateProfile({ profilePicUrl: up.secure_url });
       dialog.alert('Updated', 'Your profile picture has been updated.', undefined, { tone: 'success' });
     } catch (e: any) {
-      console.error(e);
-      // Show the REAL reason so failures are debuggable from a screenshot.
       dialog.alert('Upload failed', String(e?.message || e).slice(0, 300));
-    } finally {
-      setUploadingPfp(false);
-    }
+    } finally { setUploadingPfp(false); }
   };
 
-  // ─── USERNAME ────────────────────────────────────────
-  const validateUsername = (text: string) => {
-    const cleaned = text.toLowerCase().replace(/[^a-z0-9_]/g, '');
-    setNewUsername(cleaned);
-    if (cleaned.length < 3) setUsernameError('Min 3 characters');
-    else if (cleaned.length > 20) setUsernameError('Max 20 characters');
-    else setUsernameError('');
-  };
-
-  const checkAndSaveUsername = async () => {
-    if (newUsername.length < 3 || newUsername.length > 20) return;
+  // ─── Username ───────────────────────────────────────────
+  const saveUsername = async () => {
+    const name = newUsername.trim().toLowerCase();
+    if (name.length < 3) { dialog.alert('Too short', 'Username must be 3+ characters.'); return; }
+    if (!/^[a-z0-9_]+$/.test(name)) { dialog.alert('Invalid', 'Only lowercase letters, numbers, underscores.'); return; }
     setCheckingUsername(true);
     try {
-      const q = query(collection(db, 'usernames'), where('username', '==', newUsername));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const isOurs = snap.docs.some(d => d.data().uid === user?.uid);
-        if (!isOurs) { setUsernameError('Username taken'); setCheckingUsername(false); return; }
+      const snap = await getDocs(query(collection(db, 'usernames'), where('username', '==', name)));
+      if (!snap.empty && snap.docs[0].data().uid !== user?.uid) {
+        dialog.alert('Taken', 'That username is already taken.');
+        setCheckingUsername(false);
+        return;
       }
-      await updateProfile({ username: newUsername });
-      await setDoc(doc(db, 'usernames', newUsername), { uid: user?.uid, username: newUsername, createdAt: new Date().toISOString() });
-      setShowUsernameModal(false);
-      dialog.alert('Done!', `Username set to @${newUsername}`);
-    } catch (e) {
-      dialog.alert('Error', 'Could not update username');
+      if (profile?.username) {
+        await setDoc(doc(db, 'usernames', profile.username), { deletedAt: Date.now() }, { merge: true });
+      }
+      await setDoc(doc(db, 'usernames', name), { uid: user?.uid, username: name, createdAt: Date.now() });
+      await updateProfile({ username: name });
+      setUsernameOpen(false); setNewUsername('');
+      dialog.alert('Set!', `You're now @${name}.`, undefined, { tone: 'success' });
+    } catch (e: any) {
+      dialog.alert('Could not save', String(e?.message || e).slice(0, 200));
     } finally { setCheckingUsername(false); }
   };
 
-  // ─── EDIT PROFILE ────────────────────────────────────────
-  const saveEditProfile = async () => {
+  const saveEdit = async () => {
+    setSavingEdit(true);
     try {
       await updateProfile({ displayName: editName.trim() || 'Sadhak', bio: editBio.trim() });
-      setShowEditProfileModal(false);
-      dialog.alert('✅ Saved!', 'Profile updated.');
-    } catch (e) { dialog.alert('Error', 'Could not update profile'); }
+      setEditOpen(false);
+    } catch (e: any) {
+      dialog.alert('Could not save', String(e?.message || e).slice(0, 200));
+    } finally { setSavingEdit(false); }
   };
 
-  // ─── SETTINGS ────────────────────────────────────────
+  // ─── Settings ───────────────────────────────────────────
   const updateSetting = async (key: string, value: boolean) => {
     const s = { ...(profile?.settings || {}), [key]: value };
     await updateProfile({ settings: s } as any);
   };
 
   const handleLogout = () => {
-    dialog.alert(t('settings.logout'), 'Are you sure?', [
-      { text: t('common.cancel') },
-      { text: t('settings.logout'), style: 'destructive', onPress: logout },
+    dialog.alert('Sign out', 'You will need to sign in again to access your account.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: logout },
     ]);
   };
 
   const handleDeleteAccount = () => {
-    dialog.alert('⚠️ Delete Account', 'This will permanently delete your account and all data. This action cannot be undone.', [
-      { text: t('common.cancel') },
-      { text: 'Delete Forever', style: 'destructive', onPress: () => {
-        dialog.alert('Final Confirmation', 'Are you absolutely sure?', [
-          { text: t('common.cancel') },
-          { text: 'Yes, Delete', style: 'destructive', onPress: deleteAccount },
+    dialog.alert('Delete account?', 'This permanently deletes your account and all data. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete forever', style: 'destructive', onPress: () => {
+        dialog.alert('Are you absolutely sure?', 'Last chance — this is permanent.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Yes, delete', style: 'destructive', onPress: deleteAccount },
         ]);
       }},
     ]);
   };
 
-  const handleShareApp = async () => {
+  const shareApp = async () => {
     try {
-      // Share the live website until the Play Store listing exists —
-      // a dead store link reads as fake.
       await Share.share({
         message: `🙏 Sadhak — your Hindu spiritual companion.\n\nAccurate Panchang, Hindu calendar, nearby temples, sacred library, aarti & community.\n\n${WEBSITE_URL}`,
       });
-    } catch (e) {}
+    } catch {}
   };
 
-  const handleRateApp = () => {
-    // Not on the Play Store yet — an honest dialog beats a broken store page.
+  const rateApp = () => {
     dialog.alert(
       'Coming to Play Store',
-      'Sadhak is preparing for its Play Store release. Once live, you can rate it here — until then, sharing the app with fellow sadhaks helps the most. 🙏',
-      [
-        { text: 'Share instead', onPress: handleShareApp },
-        { text: 'OK', style: 'cancel' },
-      ],
+      "Sadhak isn't on the Play Store yet. Until then, sharing with fellow sadhaks helps the most. 🙏",
+      [{ text: 'Share instead', onPress: shareApp }, { text: 'OK', style: 'cancel' }],
       { tone: 'info' },
     );
   };
 
-  const handleWebsite = () => {
-    Linking.openURL(WEBSITE_URL).catch(() => {});
-  };
-
-  const handleChangePassword = () => {
+  const changePassword = () => {
     const em = profile?.email;
-    if (!em) {
-      dialog.alert('No email on account', 'Guest accounts have no password. Create an account with email to set one.', undefined, { tone: 'info' });
-      return;
-    }
-    dialog.alert('Change password', `We'll email a secure password-reset link to ${em}.`, [
+    if (!em) { dialog.alert('No email', 'Guest accounts have no password.', undefined, { tone: 'info' }); return; }
+    dialog.alert('Change password', `We'll email a secure reset link to ${em}.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Send link', onPress: async () => {
         try {
           await sendPasswordResetEmail(auth, em);
-          dialog.alert('Sent', 'Check your inbox (and spam) for the reset link.', undefined, { tone: 'success' });
-        } catch {
-          dialog.alert('Failed', 'Could not send the reset email. Try again later.');
-        }
+          dialog.alert('Sent', 'Check your inbox and spam folder.', undefined, { tone: 'success' });
+        } catch { dialog.alert('Failed', 'Try again later.'); }
       }},
     ]);
   };
 
-  const getInitials = () => {
-    const name = profile?.displayName || 'S';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  const selectedLangInfo = SUPPORTED_LANGUAGES.find(l => l.code === language);
+  const initials = (profile?.displayName || 'S').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+  const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === language);
+  const s = profile?.settings || ({} as any);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: tabContentPadding }} showsVerticalScrollIndicator={false}>
-      {/* ─── Profile Card ──── */}
-      <Animated.View style={[styles.profileCard, { marginTop: headerPaddingTop }, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }] }]}>
-        <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.surface] : ['#D94F00', '#F07830']} style={styles.profileGradient}>
-          <TouchableOpacity style={styles.pfpContainer} onPress={pickAndUploadPfp} activeOpacity={0.8}>
-            {uploadingPfp ? (
-              <View style={styles.pfpPlaceholder}><ActivityIndicator size="large" color="#FFD700" /></View>
-            ) : profile?.profilePicUrl ? (
-              <Image source={{ uri: profile.profilePicUrl }} style={styles.pfpImage} />
+    <Screen scroll tabbed edges={{ top: false, bottom: false }}>
+
+      {/* ═══ Identity ═══ */}
+      <View style={styles.identityRow}>
+        <TouchableOpacity onPress={pickAndUploadPfp} activeOpacity={0.8}>
+          <View style={styles.avatarWrap}>
+            {profile?.profilePicUrl ? (
+              <Image source={{ uri: profile.profilePicUrl }} style={styles.avatar} />
             ) : (
-              <View style={styles.pfpPlaceholder}><Text style={styles.pfpInitials}>{getInitials()}</Text></View>
+              <View style={[styles.avatar, { backgroundColor: colors.primary + '25', justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ color: colors.primary, fontSize: 26, fontWeight: '800' }}>{initials}</Text>
+              </View>
             )}
-            <View style={styles.pfpEdit}><MaterialCommunityIcons name="camera" size={14} color="#FFF" /></View>
+            <View style={[styles.pfpEdit, { backgroundColor: colors.primary }]}>
+              {uploadingPfp ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <MaterialCommunityIcons name="camera" size={13} color="#FFF" />
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+        <View style={{ flex: 1, marginLeft: DS.space.lg }}>
+          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{profile?.displayName || 'Sadhak'}</Text>
+          <TouchableOpacity onPress={() => setUsernameOpen(true)} hitSlop={4}>
+            <Text style={[styles.handle, { color: colors.textTertiary }]}>@{profile?.username || 'set-username'}</Text>
           </TouchableOpacity>
-
-          <Text style={styles.profileName}>{profile?.displayName || 'Sadhak'}</Text>
-          <TouchableOpacity style={styles.usernameRow} onPress={() => setShowUsernameModal(true)}>
-            <Text style={styles.username}>@{profile?.username || 'set_username'}</Text>
-            <MaterialCommunityIcons name="pencil-outline" size={14} color="rgba(255,255,255,0.7)" />
-          </TouchableOpacity>
-
-          {/* Bio */}
-          {profile?.bio ? (
-            <Text style={styles.bioText} numberOfLines={2}>{profile.bio}</Text>
-          ) : null}
-
-          {/* Info Chips */}
-          <View style={styles.infoChips}>
-            {profile?.gender && (
-              <View style={styles.chip}>
-                <MaterialCommunityIcons name={profile.gender === 'male' ? 'gender-male' : 'gender-female'} size={14} color="#FFD700" />
-                <Text style={styles.chipText}>{profile.gender === 'male' ? 'Male' : 'Female'}</Text>
+          <View style={styles.badgeRow}>
+            {isAdmin && (
+              <View style={[styles.badge, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B55' }]}>
+                <MaterialCommunityIcons name="shield-crown" size={11} color="#F59E0B" />
+                <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '800' }}>Admin</Text>
+              </View>
+            )}
+            {isGuest && (
+              <View style={[styles.badge, { backgroundColor: colors.textTertiary + '18', borderColor: colors.textTertiary + '55' }]}>
+                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '800' }}>Guest</Text>
               </View>
             )}
             {profile?.location?.city && (
-              <View style={styles.chip}>
-                <MaterialCommunityIcons name="map-marker" size={14} color="#FFD700" />
-                <Text style={styles.chipText}>{profile.location.city}</Text>
-              </View>
-            )}
-            {isAdmin && (
-              <View style={[styles.chip, { backgroundColor: 'rgba(255,215,0,0.3)' }]}>
-                <MaterialCommunityIcons name="shield-crown" size={14} color="#FFD700" />
-                <Text style={[styles.chipText, { color: '#FFD700' }]}>Admin</Text>
+              <View style={[styles.badge, { backgroundColor: colors.info + '18' || '#1565C018', borderColor: colors.info + '55' || '#1565C055' }]}>
+                <Ionicons name="location-outline" size={11} color={colors.info || '#1565C0'} />
+                <Text style={{ color: colors.info || '#1565C0', fontSize: 11, fontWeight: '700' }}>{profile.location.city}</Text>
               </View>
             )}
           </View>
-          <Text style={styles.email}>{profile?.email || 'Guest User'}</Text>
-
-          {/* Edit Profile Button */}
-          <TouchableOpacity style={styles.editProfileBtn} onPress={() => { setEditName(profile?.displayName || ''); setEditBio(profile?.bio || ''); setShowEditProfileModal(true); }}>
-            <MaterialCommunityIcons name="account-edit-outline" size={16} color="#FFF" />
-            <Text style={styles.editProfileBtnText}>{t('profile.editProfile')}</Text>
-          </TouchableOpacity>
-        </LinearGradient>
-      </Animated.View>
-
-      <Animated.View style={{ opacity: fadeAnim }}>
-        {/* ─── APPEARANCE ──── */}
-        <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>{t('settings.appearance').toUpperCase()}</Text>
-        <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          <View style={styles.settingRow}>
-            <View style={[styles.settingIcon, { backgroundColor: isDark ? '#FFD700' + '15' : colors.text + '10' }]}>
-              <MaterialCommunityIcons name={isDark ? 'weather-night' : 'weather-sunny'} size={20} color={isDark ? '#FFD700' : '#FF8C00'} />
-            </View>
-            <Text style={[styles.settingLabel, { color: colors.text }]}>{t('settings.darkMode')}</Text>
-            <Switch value={isDark} onValueChange={toggleTheme} trackColor={{ false: '#ccc', true: colors.primary + '60' }} thumbColor={isDark ? colors.primary : '#f4f4f4'} />
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.divider }]} />
-          <TouchableOpacity style={styles.settingRow} onPress={() => setShowLanguageModal(true)} activeOpacity={0.7}>
-            <View style={[styles.settingIcon, { backgroundColor: '#1A73E8' + '15' }]}>
-              <MaterialCommunityIcons name="translate" size={20} color="#1A73E8" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.settingLabel, { color: colors.text }]}>{t('settings.appLanguage')}</Text>
-              <Text style={[styles.settingHint, { color: colors.textTertiary }]}>{selectedLangInfo?.nativeName || 'English'}</Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
-          </TouchableOpacity>
         </View>
+      </View>
 
-        {/* ─── NOTIFICATIONS ──── */}
-        <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>{t('settings.notifications').toUpperCase()}</Text>
-        <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          {[
-            { key: 'notifications', label: t('settings.spiritualReminders'), icon: 'bell-ring-outline', color: '#D94F00', state: notifications, setter: setNotifications },
-            { key: 'groomingReminders', label: t('settings.groomingAlerts'), icon: 'content-cut', color: '#2D6A4F', state: groomingReminders, setter: setGroomingReminders },
-            { key: 'festivalReminders', label: t('settings.festivalAlerts'), icon: 'party-popper', color: '#D32F2F', state: festivalReminders, setter: setFestivalReminders },
-            { key: 'ekadashiReminders', label: t('settings.ekadashiAlerts'), icon: 'calendar-star', color: '#9C27B0', state: ekadashiReminders, setter: setEkadashiReminders },
-            { key: 'quietHoursEnabled', label: t('settings.quietHours'), icon: 'moon-waning-crescent', color: '#37474F', state: quietHours, setter: setQuietHours, hint: t('settings.quietHoursDesc') },
-          ].map((item, idx) => (
-            <React.Fragment key={item.key}>
-              {idx > 0 && <View style={[styles.divider, { backgroundColor: colors.divider }]} />}
-              <View style={styles.settingRow}>
-                <View style={[styles.settingIcon, { backgroundColor: item.color + '15' }]}>
-                  <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.settingLabel, { color: colors.text }]}>{item.label}</Text>
-                  {(item as any).hint && <Text style={[styles.settingHint, { color: colors.textTertiary }]}>{(item as any).hint}</Text>}
-                </View>
-                <Switch
-                  value={item.state}
-                  onValueChange={(val) => { item.setter(val); updateSetting(item.key, val); }}
-                  trackColor={{ false: '#ccc', true: colors.primary + '60' }}
-                  thumbColor={item.state ? colors.primary : '#f4f4f4'}
-                />
-              </View>
-            </React.Fragment>
-          ))}
-        </View>
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: DS.space.lg }}>
+        <Button title="Edit Profile" variant="secondary" size="md" icon="account-edit-outline" onPress={() => setEditOpen(true)} />
+        <Button title="Share App" variant="secondary" size="md" icon="share-variant-outline" onPress={shareApp} />
+      </View>
 
-        <TouchableOpacity
-          style={[styles.testNotifBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-          onPress={() => { sendTestNotification(); dialog.alert('Sent!', 'Check your notification tray.'); }}
-        >
-          <MaterialCommunityIcons name="bell-badge-outline" size={20} color={colors.primary} />
-          <Text style={[styles.testNotifText, { color: colors.primary }]}>Send Test Notification</Text>
-        </TouchableOpacity>
+      {/* ═══ Preferences ═══ */}
+      <SectionLabel label="Preferences" />
+      <Card padded={false} style={{ overflow: 'hidden' }}>
+        <SettingsRow icon="theme-light-dark" iconColor="#F59E0B" label="Dark Mode" right="switch" switchValue={isDark} onSwitchChange={toggleTheme} />
+        <Divider />
+        <SettingsRow icon="translate" iconColor="#1565C0" label="App Language" detail={langInfo?.nativeName} onPress={() => setLanguageOpen(true)} />
+      </Card>
 
-        {/* ─── PRIVACY ──── */}
-        <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>{t('settings.privacy').toUpperCase()}</Text>
-        <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          {[
-            { key: 'showProfileInCommunity', label: t('settings.showInCommunity'), icon: 'eye-outline', color: '#1565C0', state: showInCommunity, setter: setShowInCommunity },
-            { key: 'allowDMs', label: t('settings.allowDMs'), icon: 'message-outline', color: '#4ADE80', state: allowDMs, setter: setAllowDMs },
-          ].map((item, idx) => (
-            <React.Fragment key={item.key}>
-              {idx > 0 && <View style={[styles.divider, { backgroundColor: colors.divider }]} />}
-              <View style={styles.settingRow}>
-                <View style={[styles.settingIcon, { backgroundColor: item.color + '15' }]}>
-                  <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
-                </View>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>{item.label}</Text>
-                <Switch
-                  value={item.state}
-                  onValueChange={(val) => { item.setter(val); updateSetting(item.key, val); }}
-                  trackColor={{ false: '#ccc', true: colors.primary + '60' }}
-                  thumbColor={item.state ? colors.primary : '#f4f4f4'}
-                />
-              </View>
-            </React.Fragment>
-          ))}
-        </View>
+      {/* ═══ Notifications ═══ */}
+      <SectionLabel label="Notifications" />
+      <Card padded={false} style={{ overflow: 'hidden' }}>
+        <SettingsRow icon="bell-outline" iconColor="#D94F00" label="Spiritual reminders" right="switch" switchValue={s.notifications !== false} onSwitchChange={(v) => updateSetting('notifications', v)} />
+        <Divider />
+        <SettingsRow icon="content-cut" iconColor="#2D6A4F" label="Grooming alerts" right="switch" switchValue={s.groomingReminders !== false} onSwitchChange={(v) => updateSetting('groomingReminders', v)} />
+        <Divider />
+        <SettingsRow icon="party-popper" iconColor="#DC2626" label="Festival alerts" right="switch" switchValue={s.festivalReminders !== false} onSwitchChange={(v) => updateSetting('festivalReminders', v)} />
+        <Divider />
+        <SettingsRow icon="moon-waning-crescent" iconColor="#7C3AED" label="Ekadashi alerts" right="switch" switchValue={s.ekadashiReminders !== false} onSwitchChange={(v) => updateSetting('ekadashiReminders', v)} />
+        <Divider />
+        <SettingsRow icon="bell-ring-outline" iconColor={colors.textSecondary} label="Send test notification" onPress={sendTestNotification} />
+      </Card>
 
-        {/* ─── SUPPORT ──── */}
-        <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>{t('settings.support').toUpperCase()}</Text>
-        <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          {[
-            { label: t('settings.rateApp'), icon: 'star-outline', color: '#FFB300', action: handleRateApp },
-            { label: t('settings.shareApp'), icon: 'share-variant-outline', color: '#4ADE80', action: handleShareApp },
-            { label: 'Website', icon: 'web', color: '#38BDF8', action: handleWebsite },
-            { label: 'Change Password', icon: 'lock-reset', color: '#A78BFA', action: handleChangePassword },
-            { label: t('settings.about'), icon: 'information-outline', color: '#37474F', action: () => router.push('/about' as any) },
-            { label: t('settings.privacyPolicy'), icon: 'shield-lock-outline', color: '#1565C0', action: () => router.push('/privacy' as any) },
-            { label: t('settings.terms'), icon: 'file-document-outline', color: '#9C27B0', action: () => router.push('/terms' as any) },
-            { label: t('settings.contact'), icon: 'email-outline', color: '#D94F00', action: () => router.push('/contact' as any) },
-            { label: t('settings.changelog'), icon: 'format-list-bulleted', color: '#2D6A4F', action: () => router.push('/changelog' as any) },
-            { label: t('settings.faq'), icon: 'help-circle-outline', color: '#1A73E8', action: () => router.push('/faq' as any) },
-            ...(isAdmin ? [{ label: 'Admin Panel', icon: 'shield-crown-outline', color: '#D94F00', action: () => router.push('/admin' as any) }] : []),
-          ].map((item, idx) => (
-            <React.Fragment key={idx}>
-              {idx > 0 && <View style={[styles.divider, { backgroundColor: colors.divider }]} />}
-              <TouchableOpacity style={styles.settingRow} onPress={item.action} activeOpacity={0.7}>
-                <View style={[styles.settingIcon, { backgroundColor: item.color + '15' }]}>
-                  <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
-                </View>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>{item.label}</Text>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
-        </View>
+      {/* ═══ Privacy ═══ */}
+      {!isGuest && (
+        <>
+          <SectionLabel label="Privacy" />
+          <Card padded={false} style={{ overflow: 'hidden' }}>
+            <SettingsRow icon="eye-outline" iconColor="#1565C0" label="Show profile in community" right="switch" switchValue={s.showProfileInCommunity !== false} onSwitchChange={(v) => updateSetting('showProfileInCommunity', v)} />
+            <Divider />
+            <SettingsRow icon="message-outline" iconColor="#2D6A4F" label="Allow direct messages" right="switch" switchValue={s.allowDMs !== false} onSwitchChange={(v) => updateSetting('allowDMs', v)} />
+          </Card>
+        </>
+      )}
 
-        {/* ─── ACCOUNT ──── */}
-        <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>{t('settings.account').toUpperCase()}</Text>
-        <TouchableOpacity style={[styles.logoutBtn, { borderColor: colors.error }]} onPress={handleLogout}>
-          <MaterialCommunityIcons name="logout" size={20} color={colors.error} />
-          <Text style={[styles.logoutText, { color: colors.error }]}>{isGuest ? 'Exit Guest Mode' : t('settings.logout')}</Text>
-        </TouchableOpacity>
+      {/* ═══ Support & About ═══ */}
+      <SectionLabel label="Support" />
+      <Card padded={false} style={{ overflow: 'hidden' }}>
+        <SettingsRow icon="star-outline" iconColor="#FFB300" label="Rate Sadhak" onPress={rateApp} />
+        <Divider />
+        <SettingsRow icon="web" iconColor="#38BDF8" label="Visit website" onPress={() => Linking.openURL(WEBSITE_URL).catch(() => {})} />
+        <Divider />
+        <SettingsRow icon="email-outline" iconColor="#EA580C" label="Contact & feedback" onPress={() => router.push('/contact')} />
+        <Divider />
+        <SettingsRow icon="help-circle-outline" iconColor="#7C3AED" label="FAQ & help" onPress={() => router.push('/faq')} />
+      </Card>
 
+      <SectionLabel label="About" />
+      <Card padded={false} style={{ overflow: 'hidden' }}>
+        <SettingsRow icon="information-outline" iconColor={colors.textSecondary} label="About Sadhak" onPress={() => router.push('/about')} />
+        <Divider />
+        <SettingsRow icon="shield-outline" iconColor={colors.textSecondary} label="Privacy Policy" onPress={() => router.push('/privacy')} />
+        <Divider />
+        <SettingsRow icon="file-document-outline" iconColor={colors.textSecondary} label="Terms & Conditions" onPress={() => router.push('/terms')} />
+        <Divider />
+        <SettingsRow icon="format-list-bulleted" iconColor={colors.textSecondary} label="Changelog" detail={`v${APP_VERSION}`} onPress={() => router.push('/changelog')} />
+      </Card>
+
+      {/* ═══ Account ═══ */}
+      <SectionLabel label="Account" />
+      <Card padded={false} style={{ overflow: 'hidden' }}>
         {!isGuest && (
-          <TouchableOpacity style={[styles.deleteBtn, { borderColor: '#EF4444' }]} onPress={handleDeleteAccount}>
-            <MaterialCommunityIcons name="delete-forever-outline" size={20} color="#EF4444" />
-            <Text style={[styles.logoutText, { color: '#EF4444' }]}>{t('settings.deleteAccount')}</Text>
-          </TouchableOpacity>
+          <>
+            <SettingsRow icon="lock-reset" iconColor="#A78BFA" label="Change password" onPress={changePassword} />
+            <Divider />
+          </>
         )}
+        {isAdmin && (
+          <>
+            <SettingsRow icon="shield-crown-outline" iconColor="#D94F00" label="Admin Panel" onPress={() => router.push('/admin' as any)} />
+            <Divider />
+          </>
+        )}
+        <SettingsRow icon="logout" iconColor="#EF4444" label="Sign out" onPress={handleLogout} />
+        {!isGuest && (
+          <>
+            <Divider />
+            <SettingsRow icon="trash-can-outline" label="Delete account" danger onPress={handleDeleteAccount} />
+          </>
+        )}
+      </Card>
 
-        <Text style={[styles.versionText, { color: colors.textTertiary }]}>Sadhak v{APP_VERSION}</Text>
-        <View style={{ height: 100 }} />
-      </Animated.View>
+      <Text style={[styles.versionText, { color: colors.textTertiary }]}>Sadhak v{APP_VERSION}</Text>
 
-      {/* ─── USERNAME MODAL ──── */}
-      <Modal visible={showUsernameModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Username</Text>
-            <View style={[styles.usernameInputRow, { borderColor: usernameError ? colors.error : colors.border }]}>
-              <Text style={[styles.atSign, { color: colors.textTertiary }]}>@</Text>
-              <TextInput
-                style={[styles.usernameInput, { color: colors.text }]}
-                value={newUsername}
-                onChangeText={validateUsername}
-                placeholder="username"
-                placeholderTextColor={colors.textTertiary}
-                autoCapitalize="none"
-                maxLength={20}
-              />
-            </View>
-            {usernameError ? <Text style={[styles.errorText, { color: colors.error }]}>{usernameError}</Text> : null}
-            <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => setShowUsernameModal(false)} style={[styles.modalBtn, { borderColor: colors.border }]}>
-                <Text style={[styles.modalBtnText, { color: colors.textSecondary }]}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={checkAndSaveUsername} disabled={!!usernameError || checkingUsername}>
-                <LinearGradient colors={['#D94F00', '#F07830']} style={styles.modalBtnPrimary}>
-                  {checkingUsername ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.modalBtnPrimaryText}>{t('common.save')}</Text>}
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* ═══ Edit Profile Modal ═══ */}
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>Edit profile</Text>
 
-      {/* ─── EDIT PROFILE MODAL ──── */}
-      <Modal visible={showEditProfileModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('profile.editProfile')}</Text>
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Display Name</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>DISPLAY NAME</Text>
             <TextInput
-              style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-              value={editName}
-              onChangeText={setEditName}
-              placeholder="Your name"
-              placeholderTextColor={colors.textTertiary}
+              style={[styles.field, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.background }]}
+              value={editName} onChangeText={setEditName} placeholder="Your name" placeholderTextColor={colors.textTertiary}
             />
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>{t('profile.bio')}</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>BIO</Text>
             <TextInput
-              style={[styles.modalInput, styles.bioInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-              value={editBio}
-              onChangeText={(t) => setEditBio(t.slice(0, 150))}
-              placeholder={t('profile.bioPlaceholder')}
-              placeholderTextColor={colors.textTertiary}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
+              style={[styles.field, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.background, height: 96, textAlignVertical: 'top' }]}
+              value={editBio} onChangeText={setEditBio} placeholder="Tell us about your spiritual journey…"
+              placeholderTextColor={colors.textTertiary} multiline maxLength={150}
             />
             <Text style={[styles.charCount, { color: colors.textTertiary }]}>{editBio.length}/150</Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => setShowEditProfileModal(false)} style={[styles.modalBtn, { borderColor: colors.border }]}>
-                <Text style={[styles.modalBtnText, { color: colors.textSecondary }]}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={saveEditProfile}>
-                <LinearGradient colors={['#D94F00', '#F07830']} style={styles.modalBtnPrimary}>
-                  <Text style={styles.modalBtnPrimaryText}>{t('common.save')}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
+              <Button title="Cancel" variant="secondary" onPress={() => setEditOpen(false)} />
+              <Button title="Save" loading={savingEdit} onPress={saveEdit} />
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* ─── LANGUAGE PICKER MODAL ──── */}
-      <Modal visible={showLanguageModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, styles.langModalCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('settings.appLanguage')}</Text>
-            <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
-              {SUPPORTED_LANGUAGES.map((lang) => (
-                <TouchableOpacity
-                  key={lang.code}
-                  style={[styles.langRow, language === lang.code && { backgroundColor: '#D94F00' + '15', borderColor: '#D94F00' }]}
-                  onPress={() => { setLanguage(lang.code as LanguageCode); setShowLanguageModal(false); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.langName, { color: language === lang.code ? '#D94F00' : colors.text }]}>{lang.nativeName}</Text>
-                    <Text style={[styles.langSub, { color: colors.textTertiary }]}>{lang.name}</Text>
-                  </View>
-                  {language === lang.code && <MaterialCommunityIcons name="check-circle" size={22} color="#D94F00" />}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity onPress={() => setShowLanguageModal(false)} style={[styles.modalBtn, { borderColor: colors.border, alignSelf: 'center', marginTop: 12 }]}>
-              <Text style={[styles.modalBtnText, { color: colors.textSecondary }]}>{t('common.close')}</Text>
-            </TouchableOpacity>
+      {/* ═══ Username Modal ═══ */}
+      <Modal visible={usernameOpen} transparent animationType="slide" onRequestClose={() => setUsernameOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>Set username</Text>
+            <Text style={[styles.sheetSub, { color: colors.textSecondary }]}>
+              Others can find and mention you by your @username.
+            </Text>
+            <View style={[styles.usernameField, { borderColor: colors.cardBorder, backgroundColor: colors.background }]}>
+              <Text style={{ color: colors.textTertiary, fontSize: 17, fontWeight: '600' }}>@</Text>
+              <TextInput
+                style={{ flex: 1, color: colors.text, fontSize: 15.5, marginLeft: 4 }}
+                value={newUsername} onChangeText={setNewUsername}
+                placeholder="your_username" placeholderTextColor={colors.textTertiary}
+                autoCapitalize="none" autoCorrect={false}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+              <Button title="Cancel" variant="secondary" onPress={() => setUsernameOpen(false)} />
+              <Button title="Save" loading={checkingUsername} onPress={saveUsername} />
+            </View>
           </View>
         </View>
       </Modal>
-    </ScrollView>
+
+      {/* ═══ Language Modal ═══ */}
+      <Modal visible={languageOpen} transparent animationType="slide" onRequestClose={() => setLanguageOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>App language</Text>
+            <View style={{ marginTop: 8, maxHeight: 380 }}>
+              {SUPPORTED_LANGUAGES.map((lang) => {
+                const active = language === lang.code;
+                return (
+                  <TouchableOpacity
+                    key={lang.code}
+                    onPress={() => { setLanguage(lang.code as LanguageCode); setLanguageOpen(false); }}
+                    style={[styles.langRow, { backgroundColor: active ? colors.primary + '15' : 'transparent' }]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.text, fontSize: 15, fontWeight: '700' }}>{lang.nativeName}</Text>
+                      <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 1 }}>{lang.name}</Text>
+                    </View>
+                    {active && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+    </Screen>
   );
 }
 
+// ─── Local helpers ───────────────────────────────────────────
+function SectionLabel({ label }: { label: string }) {
+  const { colors } = useTheme();
+  return (
+    <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>{label.toUpperCase()}</Text>
+  );
+}
+function Divider() {
+  const { colors } = useTheme();
+  return <View style={[styles.divider, { backgroundColor: colors.divider }]} />;
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  profileCard: { marginHorizontal: 20, marginTop: Platform.OS === 'ios' ? 60 : 48, borderRadius: 20, overflow: 'hidden' },
-  profileGradient: { alignItems: 'center', paddingVertical: 30, paddingHorizontal: 20 },
-  pfpContainer: { position: 'relative', marginBottom: 12 },
-  pfpImage: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)' },
-  pfpPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)' },
-  pfpInitials: { fontSize: 32, fontWeight: '800', color: '#FFD700' },
-  pfpEdit: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: '#D94F00', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFF' },
-  profileName: { fontSize: 22, fontWeight: '800', color: '#FFF' },
-  usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  username: { fontSize: 14, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  bioText: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 8, textAlign: 'center', lineHeight: 18, paddingHorizontal: 20 },
-  infoChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 12 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  chipText: { fontSize: 12, color: 'rgba(255,255,255,0.9)', fontWeight: '500' },
-  email: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 6 },
-  editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  editProfileBtnText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
-  sectionTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 1, marginHorizontal: 20, marginTop: 24, marginBottom: 8 },
-  settingsCard: { marginHorizontal: 20, borderRadius: 16, padding: 4, borderWidth: 1, overflow: 'hidden' },
-  settingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, gap: 12 },
-  settingIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  settingLabel: { flex: 1, fontSize: 15, fontWeight: '500' },
-  settingHint: { fontSize: 11, marginTop: 1 },
-  divider: { height: 1, marginHorizontal: 12 },
-  testNotifBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginTop: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed' },
-  testNotifText: { fontSize: 13, fontWeight: '600' },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginTop: 8, padding: 14, borderRadius: 14, borderWidth: 1.5 },
-  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginTop: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed' },
-  logoutText: { fontSize: 15, fontWeight: '600' },
-  versionText: { textAlign: 'center', marginTop: 20, fontSize: 12 },
-  // Modals
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 24 },
-  modalCard: { width: '100%', borderRadius: 20, padding: 24 },
-  langModalCard: { maxHeight: '80%' },
-  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, textAlign: 'center' },
-  usernameInputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, height: 50 },
-  atSign: { fontSize: 18, fontWeight: '600', marginRight: 2 },
-  usernameInput: { flex: 1, fontSize: 16 },
-  errorText: { fontSize: 12, marginTop: 6, marginLeft: 4 },
-  modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  modalBtn: { flex: 1, height: 46, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
-  modalBtnText: { fontSize: 15, fontWeight: '600' },
-  modalBtnPrimary: { flex: 1, height: 46, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  modalBtnPrimaryText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
-  inputLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 8 },
-  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 48, fontSize: 15 },
-  bioInput: { height: 80, paddingTop: 12 },
-  charCount: { fontSize: 11, textAlign: 'right', marginTop: 4 },
-  langRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, marginBottom: 4, borderWidth: 1, borderColor: 'transparent' },
-  langName: { fontSize: 16, fontWeight: '600' },
-  langSub: { fontSize: 12, marginTop: 1 },
+  identityRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 14 },
+  avatarWrap: { position: 'relative' },
+  avatar: { width: 78, height: 78, borderRadius: 39 },
+  pfpEdit: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#0B0E13' },
+  name: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  handle: { fontSize: 13.5, marginTop: 2 },
+  badgeRow: { flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100, borderWidth: 1 },
+
+  sectionLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginTop: 24, marginBottom: 8, marginLeft: 4 },
+  divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
+  versionText: { fontSize: 11.5, textAlign: 'center', marginTop: 24, marginBottom: 8 },
+
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 28 },
+  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 12 },
+  sheetTitle: { fontSize: 19, fontWeight: '800' },
+  sheetSub: { fontSize: 13, marginTop: 4, marginBottom: 12 },
+
+  fieldLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2, marginBottom: 6, marginTop: 12 },
+  field: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  charCount: { fontSize: 11.5, textAlign: 'right', marginTop: 4, marginBottom: 8 },
+
+  usernameField: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 52, marginTop: 12 },
+
+  langRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 4 },
 });
