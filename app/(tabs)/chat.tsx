@@ -5,6 +5,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { db, rtdb, collection, getDocs, addDoc, serverTimestamp, ref, onValue, off } from '../../config/firebase';
 import { Screen, Card, Button } from '../../components/ui';
 import { DS, useDsInsets } from '../../constants/ds';
@@ -39,6 +40,7 @@ function relTime(ts?: number): string {
 export default function CommunityScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const dialog = useDialog();
   const { insets, tabScrollBottom } = useDsInsets();
 
@@ -115,7 +117,7 @@ export default function CommunityScreen() {
       {/* Header */}
       <View style={{ paddingTop: insets.top + 12 }}>
         <View style={s.headRow}>
-          <Text style={[s.title, { color: colors.text }]}>Community</Text>
+          <Text style={[s.title, { color: colors.text }]}>{t('chat.title')}</Text>
           {canCreate && (
             <TouchableOpacity
               onPress={() => setCreateOpen(true)}
@@ -126,7 +128,7 @@ export default function CommunityScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <Text style={[s.sub, { color: colors.textTertiary }]}>Connect with fellow Sadhaks</Text>
+        <Text style={[s.sub, { color: colors.textTertiary }]}>{t('chat.subtitle')}</Text>
       </View>
 
       {/* Explore Feed banner */}
@@ -139,8 +141,8 @@ export default function CommunityScreen() {
             <Ionicons name="compass" size={20} color="#FFF" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.exploreTitle, { color: colors.text }]}>Explore Feed</Text>
-            <Text style={[s.exploreSub, { color: colors.textSecondary }]}>Posts, discoveries, and Sadhaks near you</Text>
+            <Text style={[s.exploreTitle, { color: colors.text }]}>{t('chat.explore')}</Text>
+            <Text style={[s.exploreSub, { color: colors.textSecondary }]}>{t('chat.exploreSub')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
         </View>
@@ -160,14 +162,14 @@ export default function CommunityScreen() {
 
       {/* Compact tabs */}
       <View style={[s.tabBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        {(['rooms', 'dms', 'groups', 'channels'] as ChatTab[]).map((t) => {
-          const active = tab === t;
-          const label = t === 'rooms' ? 'Rooms' : t === 'dms' ? 'DMs' : t === 'groups' ? 'Groups' : 'Channels';
+        {(['rooms', 'dms', 'groups', 'channels'] as ChatTab[]).map((k) => {
+          const active = tab === k;
+          const label = k === 'rooms' ? t('chat.rooms') : k === 'dms' ? t('chat.dms') : k === 'groups' ? t('chat.groups') : t('chat.channels');
           return (
             <TouchableOpacity
-              key={t}
+              key={k}
               style={[s.tab, active && { backgroundColor: colors.primary }]}
-              onPress={() => setTab(t)}
+              onPress={() => setTab(k)}
               activeOpacity={0.8}
             >
               <Text style={[s.tabText, { color: active ? '#FFF' : colors.textSecondary }]}>{label}</Text>

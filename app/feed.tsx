@@ -271,27 +271,35 @@ export default function FeedScreen() {
         </LinearGradient>
       </TouchableOpacity>
 
-      {/* ═══ Comments sheet ═══ */}
+      {/* ═══ Comments sheet — 75% height, Instagram-style layout ═══ */}
       <Modal visible={!!commentsFor} transparent animationType="slide" onRequestClose={() => setCommentsFor(null)}>
         <KeyboardAvoidingView
           style={styles.sheetOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => setCommentsFor(null)} />
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setCommentsFor(null)} />
           <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
-            <Text style={[styles.sheetTitle, { color: colors.text }]}>
-              Comments {comments.length > 0 ? `(${comments.length})` : ''}
-            </Text>
+            <View style={styles.sheetHeaderRow}>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>
+                {comments.length > 0 ? `${comments.length} Comments` : 'Comments'}
+              </Text>
+              <TouchableOpacity onPress={() => setCommentsFor(null)} hitSlop={10}>
+                <Ionicons name="close" size={22} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.sheetDivider, { backgroundColor: colors.divider }]} />
             <FlatList
               data={comments}
               keyExtractor={(c) => c.id}
-              style={{ maxHeight: 340 }}
-              contentContainerStyle={{ gap: 12, paddingVertical: 8 }}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ gap: 14, paddingVertical: 12, paddingBottom: 20 }}
+              keyboardShouldPersistTaps="handled"
               ListEmptyComponent={
-                <Text style={[styles.empty, { color: colors.textTertiary, marginTop: 20 }]}>
-                  No comments yet — be the first. 🙏
-                </Text>
+                <View style={{ alignItems: 'center', marginTop: 60, gap: 8 }}>
+                  <MaterialCommunityIcons name="comment-text-outline" size={44} color={colors.textTertiary} />
+                  <Text style={[styles.empty, { color: colors.textTertiary }]}>Be the first to comment.</Text>
+                </View>
               }
               renderItem={({ item: c }) => (
                 <View style={styles.commentRow}>
@@ -302,14 +310,14 @@ export default function FeedScreen() {
                       <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>{(c.authorName || 'S')[0]}</Text>
                     </View>
                   )}
-                  <View style={[styles.commentBubble, { backgroundColor: colors.background }]}>
+                  <View style={{ flex: 1 }}>
                     <Text style={[styles.commentAuthor, { color: colors.text }]}>{c.authorName}</Text>
                     <Text style={[styles.commentText, { color: colors.textSecondary }]}>{c.text}</Text>
                   </View>
                 </View>
               )}
             />
-            <View style={[styles.commentInputRow, { borderTopColor: colors.divider }]}>
+            <View style={[styles.commentInputRow, { borderTopColor: colors.divider, backgroundColor: colors.surface }]}>
               <TextInput
                 style={[styles.commentInput, { color: colors.text, backgroundColor: colors.background }]}
                 placeholder="Write a comment…"
@@ -365,14 +373,17 @@ const styles = StyleSheet.create({
 
   // Comments sheet
   sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
-  sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 20, paddingBottom: 26 },
-  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 12 },
-  sheetTitle: { fontSize: 17, fontWeight: '800', marginBottom: 4 },
+  // 78% viewport so comments actually breathe, input is always in reach.
+  sheet: { height: '78%', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8 },
+  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 10 },
+  sheetHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12 },
+  sheetTitle: { fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  sheetDivider: { height: StyleSheet.hairlineWidth },
   commentRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  commentBubble: { flex: 1, borderRadius: 14, padding: 11 },
-  commentAuthor: { fontSize: 12.5, fontWeight: '700' },
-  commentText: { fontSize: 13.5, lineHeight: 19, marginTop: 2 },
-  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingTop: 12, borderTopWidth: 1, marginTop: 8 },
-  commentInput: { flex: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 90 },
-  commentSend: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  commentAuthor: { fontSize: 13, fontWeight: '700' },
+  commentText: { fontSize: 14, lineHeight: 20, marginTop: 2 },
+  // Sits above the system nav bar; borderTop keeps it visually anchored.
+  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingTop: 10, paddingBottom: 22, borderTopWidth: StyleSheet.hairlineWidth },
+  commentInput: { flex: 1, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, fontSize: 14.5, maxHeight: 90, minHeight: 44 },
+  commentSend: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
 });

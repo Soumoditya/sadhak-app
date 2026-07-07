@@ -259,7 +259,7 @@ export default function CalendarScreen() {
         {/* ═══ Inline title + Today pill ═══ */}
         <View style={[st.headerTopRow, { paddingTop: headerPaddingTop + 4, paddingHorizontal: 0 }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[st.headerTitle, { color: colors.text }]}>Hindu Calendar</Text>
+            <Text style={[st.headerTitle, { color: colors.text }]}>{t('cal.title')}</Text>
             <Text style={[st.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
               {selectedPanchang ? `${selectedPanchang.hinduMonth.nameHi} · ${selectedPanchang.tithi.pakshaHi}` : ''}
             </Text>
@@ -569,18 +569,19 @@ export default function CalendarScreen() {
             </View>
             <Text style={[st.sheetSub, { color: colors.textSecondary }]}>
               {selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
-              {'  ·  '}
-              <Text style={{ color: colors.primary, fontWeight: '800' }}>{fmt12(remHour, remMinute)}</Text>
             </Text>
 
-            {/* Native clock dial — pick any exact time */}
+            {/* Big time display — tap to open native clock dial */}
             <TouchableOpacity
-              style={[st.dialBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '35' }]}
+              style={[st.remTimeDisplay, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
               onPress={() => setShowClock(true)}
+              activeOpacity={0.85}
             >
-              <MaterialCommunityIcons name="clock-edit-outline" size={18} color={colors.primary} />
-              <Text style={[st.dialBtnText, { color: colors.primary }]}>Pick exact time on the clock</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+              <Text style={[st.remTimeBig, { color: colors.primary }]}>{fmt12(remHour, remMinute)}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                <MaterialCommunityIcons name="clock-edit-outline" size={13} color={colors.textSecondary} />
+                <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>Tap to change</Text>
+              </View>
             </TouchableOpacity>
             {showClock && (
               <DateTimePicker
@@ -597,55 +598,27 @@ export default function CalendarScreen() {
               />
             )}
 
-            <Text style={[st.sheetLabel, { color: colors.textTertiary }]}>QUICK PICK</Text>
-            <View style={st.presetWrap}>
-              {TIME_PRESETS.map((p) => {
-                const [h, m] = p.time.split(':').map(Number);
-                const active = remHour === h && remMinute === m;
+            {/* Three devotional quick picks — Brahma Muhurta, Sunrise, Evening */}
+            <View style={st.remQuickRow}>
+              {[
+                { label: 'Brahma\nMuhurta', h: 4, m: 30, icon: 'weather-night' },
+                { label: 'Sunrise', h: 6, m: 0, icon: 'weather-sunset-up' },
+                { label: 'Evening', h: 18, m: 0, icon: 'weather-sunset-down' },
+              ].map((p) => {
+                const active = remHour === p.h && remMinute === p.m;
                 return (
                   <TouchableOpacity
                     key={p.label}
-                    style={[st.preset, { backgroundColor: active ? colors.primary : colors.background, borderColor: active ? colors.primary : colors.cardBorder }]}
-                    onPress={() => { setRemHour(h); setRemMinute(m); }}
+                    style={[st.remQuickBtn, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary + '15' : 'transparent' }]}
+                    onPress={() => { setRemHour(p.h); setRemMinute(p.m); }}
+                    activeOpacity={0.7}
                   >
-                    <MaterialCommunityIcons name={p.icon as any} size={14} color={active ? '#FFF' : colors.textSecondary} />
-                    <Text style={[st.presetText, { color: active ? '#FFF' : colors.text }]}>{p.label}</Text>
+                    <MaterialCommunityIcons name={p.icon as any} size={17} color={active ? colors.primary : colors.textSecondary} />
+                    <Text style={[st.remQuickText, { color: active ? colors.primary : colors.text }]}>{p.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-
-            <Text style={[st.sheetLabel, { color: colors.textTertiary }]}>HOUR</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.hourRow}>
-              {HOURS.map((h) => {
-                const active = remHour === h;
-                return (
-                  <TouchableOpacity
-                    key={h}
-                    style={[st.hourChip, { backgroundColor: active ? colors.primary : colors.background, borderColor: active ? colors.primary : colors.cardBorder }]}
-                    onPress={() => setRemHour(h)}
-                  >
-                    <Text style={[st.hourChipText, { color: active ? '#FFF' : colors.text }]}>{fmt12(h, 0).replace(':00 ', '')}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            <Text style={[st.sheetLabel, { color: colors.textTertiary }]}>MINUTE</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.minuteRow}>
-              {MINUTES.map((m) => {
-                const active = remMinute === m;
-                return (
-                  <TouchableOpacity
-                    key={m}
-                    style={[st.minuteChip, { backgroundColor: active ? colors.primary : colors.background, borderColor: active ? colors.primary : colors.cardBorder }]}
-                    onPress={() => setRemMinute(m)}
-                  >
-                    <Text style={[st.hourChipText, { color: active ? '#FFF' : colors.text }]}>:{String(m).padStart(2, '0')}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
 
             <TouchableOpacity onPress={scheduleReminder} activeOpacity={0.85}>
               <LinearGradient colors={['#D94F00', '#F07830']} style={st.primaryBtn}>
@@ -739,6 +712,13 @@ const st = StyleSheet.create({
   sheetTitle: { fontSize: 19, fontWeight: '800' },
   sheetSub: { fontSize: 13.5, marginTop: 4, marginBottom: 16 },
   sheetLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
+
+  remTimeDisplay: { alignItems: 'center', paddingVertical: 22, borderRadius: 20, borderWidth: 1, marginTop: 6, marginBottom: 16 },
+  remTimeBig: { fontSize: 44, fontWeight: '800', letterSpacing: -1 },
+  remQuickRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  remQuickBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 4, borderRadius: 14, borderWidth: 1 },
+  remQuickText: { fontSize: 11.5, fontWeight: '700', textAlign: 'center', lineHeight: 14 },
+
 
   dialBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 13, borderRadius: 13, borderWidth: 1, marginBottom: 14 },
   dialBtnText: { flex: 1, fontSize: 13.5, fontWeight: '700' },

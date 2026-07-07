@@ -8,9 +8,10 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLayoutInsets } from '../constants/layout';
 
 // In-app PDF reader.
-// The PDF is downloaded NATIVELY first (WebView fetches of remote PDFs die on
-// CORS), then pdf.js renders the local file — which also makes reading offline.
-const VIEWER_HTML = (bg: string, fg: string) => `<!DOCTYPE html><html><head>
+// The PDF is downloaded natively, then base64-embedded into a data-URL HTML so
+// pdf.js loads it without any file:// origin issues — one of the reasons the
+// previous reader silently failed on Android.
+const VIEWER_HTML = (bg: string, fg: string, pdfBase64: string) => `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=4.0"/>
 <style>
   html,body{margin:0;padding:0;background:${bg}}
@@ -23,11 +24,14 @@ const VIEWER_HTML = (bg: string, fg: string) => `<!DOCTYPE html><html><head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
   function post(o){ if(window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(o)); }
-  if (!window.pdfjsLib) { post({type:'fatal', message:'pdf.js failed to load (no internet for first open)'}); }
+  if (!window.pdfjsLib) { post({type:'fatal', message:'PDF library did not load. Please check internet on first open.'}); }
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  fetch('sadhak-doc.pdf').then(function(r){ return r.arrayBuffer(); }).then(function(buf){
-    return pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
-  }).then(function(pdf){
+  // Decode base64 to Uint8Array (embedded, no file:// fetch needed).
+  var b64 = '${pdfBase64}';
+  var raw = atob(b64);
+  var bytes = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf){
     post({type:'meta', pages: pdf.numPages});
     document.getElementById('status').style.display='none';
     var container = document.getElementById('pages');
@@ -72,7 +76,7 @@ export default function ReaderScreen() {
   const [page, setPage] = useState(1);
   const [failed, setFailed] = useState<string | null>(null);
   const [phase, setPhase] = useState<'download' | 'render' | 'ready'>('download');
-  const [viewerUri, setViewerUri] = useState<string | null>(null);
+  const [html, setHtml] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,18 +88,17 @@ export default function ReaderScreen() {
         const pdfPath = dir + 'sadhak-doc.pdf';
 
         if (String(url).startsWith('file://')) {
-          // Already local (opened from a download) — just copy alongside the viewer.
           try { await FileSystem.deleteAsync(pdfPath, { idempotent: true }); } catch {}
           await FileSystem.copyAsync({ from: String(url), to: pdfPath });
         } else {
           const dl = await FileSystem.downloadAsync(String(url), pdfPath);
-          if (dl.status !== 200) throw new Error(`Download failed (HTTP ${dl.status}). Check your connection.`);
+          if (dl.status !== 200) throw new Error(`Download failed (HTTP ${dl.status}).`);
         }
 
-        const htmlPath = dir + 'viewer.html';
-        await FileSystem.writeAsStringAsync(htmlPath, VIEWER_HTML(isDark ? '#0B0E13' : '#F5F3F0', isDark ? '#8b8e94' : '#6b6b6b'));
+        // Read the PDF as base64 — embedded into the HTML, no file:// origin needed.
+        const b64 = await FileSystem.readAsStringAsync(pdfPath, { encoding: FileSystem.EncodingType.Base64 });
         if (!cancelled) {
-          setViewerUri(htmlPath);
+          setHtml(VIEWER_HTML(isDark ? '#0B0E13' : '#F5F3F0', isDark ? '#8b8e94' : '#6b6b6b', b64));
           setPhase('render');
         }
       } catch (e: any) {
@@ -131,17 +134,16 @@ export default function ReaderScreen() {
             <Text style={{ color: '#FFF', fontWeight: '700' }}>Open externally</Text>
           </TouchableOpacity>
         </View>
-      ) : viewerUri ? (
+      ) : html ? (
         <View style={{ flex: 1 }}>
           <WebView
-            source={{ uri: viewerUri }}
+            source={{ html, baseUrl: 'https://sadhak.local/' }}
             style={{ flex: 1, backgroundColor: isDark ? '#0B0E13' : '#F5F3F0' }}
             originWhitelist={['*']}
             javaScriptEnabled
             domStorageEnabled
-            allowFileAccess
-            allowFileAccessFromFileURLs
-            allowUniversalAccessFromFileURLs
+            mixedContentMode="always"
+            cacheEnabled={false}
             onMessage={(e) => {
               try {
                 const d = JSON.parse(e.nativeEvent.data);

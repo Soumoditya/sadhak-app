@@ -248,7 +248,7 @@ export default function LibraryScreen() {
       <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#B33D00']} style={[st.header, { paddingTop: headerPaddingTop }]}>
         <View style={st.headerRow}>
           <View>
-            <Text style={st.headerTitle}>Sacred Library</Text>
+            <Text style={st.headerTitle}>{t('lib.title')}</Text>
             <Text style={st.headerSub}>{books.length} texts available</Text>
           </View>
           <View style={st.headerActions}>

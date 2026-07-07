@@ -48,26 +48,26 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(false);
   const [opts, setOpts] = useState<DialogOptions | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.92)).current;
+  const slide = useRef(new Animated.Value(1)).current; // 1 = offscreen bottom, 0 = shown
 
   const animateIn = useCallback(() => {
     opacity.setValue(0);
-    scale.setValue(0.92);
+    slide.setValue(1);
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, friction: 8, tension: 90, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.spring(slide, { toValue: 0, friction: 12, tension: 90, useNativeDriver: true }),
     ]).start();
-  }, [opacity, scale]);
+  }, [opacity, slide]);
 
   const close = useCallback(() => {
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 0, duration: 140, useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 0.96, duration: 140, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0, duration: 160, useNativeDriver: true }),
+      Animated.timing(slide, { toValue: 1, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
     ]).start(() => {
       setVisible(false);
       setOpts(null);
     });
-  }, [opacity, scale]);
+  }, [opacity, slide]);
 
   const show = useCallback((o: DialogOptions) => {
     setOpts(o);
@@ -114,35 +114,47 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     colors.primary;
   const stacked = buttons.length > 2;
 
+  const slideTranslate = slide.interpolate({ inputRange: [0, 1], outputRange: [0, 400] });
+  const hasSingleOk = buttons.length === 1 && buttons[0].style !== 'destructive';
+
   return (
     <DialogContext.Provider value={value}>
       {children}
       <Modal visible={visible} transparent statusBarTranslucent animationType="none" onRequestClose={close}>
-        <Animated.View style={[styles.backdrop, { backgroundColor: colors.overlayHeavy, opacity }]}>
+        <Animated.View style={[styles.backdrop, { opacity, backgroundColor: 'rgba(0,0,0,0.55)' }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => { if (opts?.dismissable !== false) close(); }}
           />
           <Animated.View
             style={[
-              styles.card,
-              { backgroundColor: colors.surfaceElevated, borderColor: colors.cardBorder, transform: [{ scale }] },
+              styles.sheet,
+              { backgroundColor: colors.surfaceElevated, transform: [{ translateY: slideTranslate }] },
             ]}
           >
-            <View style={[styles.iconWrap, { backgroundColor: `${toneColor}1A` }]}>
-              <MaterialCommunityIcons name={iconName} size={30} color={toneColor} />
+            {/* Grabber handle — makes it feel like a sheet, not a system alert */}
+            <View style={[styles.handle, { backgroundColor: colors.divider }]} />
+
+            {/* Content row: tiny inline icon + text (no giant circle) */}
+            <View style={styles.body}>
+              {tone !== 'default' && (
+                <MaterialCommunityIcons name={iconName} size={18} color={toneColor} style={{ marginTop: 3 }} />
+              )}
+              <View style={{ flex: 1 }}>
+                {!!opts?.title && <Text style={[styles.title, { color: colors.text }]}>{opts.title}</Text>}
+                {!!opts?.message && <Text style={[styles.message, { color: colors.textSecondary }]}>{opts.message}</Text>}
+              </View>
             </View>
 
-            {!!opts?.title && <Text style={[styles.title, { color: colors.text }]}>{opts.title}</Text>}
-            {!!opts?.message && <Text style={[styles.message, { color: colors.textSecondary }]}>{opts.message}</Text>}
-
+            {/* Actions */}
             <View style={[styles.actions, stacked && styles.actionsStacked]}>
               {buttons.map((btn, i) => {
                 const isDestructive = btn.style === 'destructive';
                 const isCancel = btn.style === 'cancel';
-                const filled = !isCancel;
-                const bg = isDestructive ? colors.error : isCancel ? 'transparent' : colors.primary;
-                const fg = isCancel ? colors.textSecondary : '#FFFFFF';
+                // Primary style: single-OK OR last action in a multi-button row that isn't cancel.
+                const isPrimary = !isCancel && !isDestructive && (hasSingleOk || i === buttons.length - 1);
+                const bg = isDestructive ? colors.error : isPrimary ? colors.primary : 'transparent';
+                const fg = isPrimary || isDestructive ? '#FFFFFF' : isCancel ? colors.textTertiary : colors.text;
                 return (
                   <Pressable
                     key={`${btn.text}-${i}`}
@@ -151,10 +163,10 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                       styles.btn,
                       stacked ? styles.btnStacked : styles.btnRow,
                       {
-                        backgroundColor: filled ? bg : 'transparent',
-                        borderColor: isCancel ? colors.cardBorder : bg,
-                        borderWidth: isCancel ? 1 : 0,
-                        opacity: pressed ? 0.8 : 1,
+                        backgroundColor: bg,
+                        borderColor: colors.divider,
+                        borderWidth: bg === 'transparent' ? 1 : 0,
+                        opacity: pressed ? 0.72 : 1,
                       },
                     ]}
                     android_ripple={{ color: `${fg}22` }}
@@ -178,29 +190,26 @@ export function useDialog(): DialogContextValue {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  card: {
-    width: '100%',
-    maxWidth: 380,
-    borderRadius: 24,
-    borderWidth: 1,
-    paddingTop: 24,
-    paddingBottom: 20,
-    paddingHorizontal: 22,
-    alignItems: 'center',
-    // subtle elevation
+  backdrop: { flex: 1, justifyContent: 'flex-end' },
+  sheet: {
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 34, // above system nav bar
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
-    elevation: 16,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 24,
   },
-  iconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  title: { fontSize: 19, fontWeight: '700', textAlign: 'center', marginBottom: 6 },
-  message: { fontSize: 14.5, lineHeight: 21, textAlign: 'center', marginBottom: 20 },
-  actions: { flexDirection: 'row', gap: 10, width: '100%', marginTop: 4 },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 14 },
+  body: { flexDirection: 'row', gap: 10, paddingHorizontal: 4, marginBottom: 22 },
+  title: { fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  message: { fontSize: 14.5, lineHeight: 21, marginTop: 4 },
+  actions: { flexDirection: 'row', gap: 8 },
   actionsStacked: { flexDirection: 'column-reverse' },
-  btn: { borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, overflow: 'hidden' },
+  btn: { borderRadius: 14, alignItems: 'center', justifyContent: 'center', height: 50, overflow: 'hidden' },
   btnRow: { flex: 1 },
   btnStacked: { width: '100%' },
   btnText: { fontSize: 15, fontWeight: '700' },
