@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
+import { sanitizeCloudinaryPdfUrl } from '../services/cloudinary';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLayoutInsets } from '../constants/layout';
 
@@ -91,7 +92,10 @@ export default function ReaderScreen() {
           try { await FileSystem.deleteAsync(pdfPath, { idempotent: true }); } catch {}
           await FileSystem.copyAsync({ from: String(url), to: pdfPath });
         } else {
-          const dl = await FileSystem.downloadAsync(String(url), pdfPath);
+          // sanitizeCloudinaryPdfUrl rewrites /raw/authenticated/ → /raw/upload/
+          // for older uploads stored before the preset was fixed to public.
+          const cleanUrl = sanitizeCloudinaryPdfUrl(String(url));
+          const dl = await FileSystem.downloadAsync(cleanUrl, pdfPath);
           if (dl.status !== 200) throw new Error(`Download failed (HTTP ${dl.status}).`);
         }
 
@@ -126,13 +130,37 @@ export default function ReaderScreen() {
       </View>
 
       {failed ? (
-        <View style={st.center}>
-          <MaterialCommunityIcons name="file-alert-outline" size={44} color={colors.textTertiary} />
-          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, marginTop: 10 }}>Couldn't open this PDF</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 12.5, marginTop: 6, textAlign: 'center', paddingHorizontal: 36 }}>{failed}</Text>
-          <TouchableOpacity style={[st.fallbackBtn, { backgroundColor: colors.primary }]} onPress={() => Linking.openURL(String(url))}>
-            <Text style={{ color: '#FFF', fontWeight: '700' }}>Open externally</Text>
-          </TouchableOpacity>
+        <View style={[st.errorWrap, { paddingBottom: bottomInset + 24 }]}>
+          <View style={[st.errorArt, { backgroundColor: colors.primary + '14', borderColor: colors.primary + '2E' }]}>
+            <MaterialCommunityIcons
+              name={failed.includes('401') ? 'lock-outline' : 'file-alert-outline'}
+              size={40} color={colors.primary}
+            />
+          </View>
+          <Text style={[st.errorTitle, { color: colors.text }]}>
+            {failed.includes('401') ? 'This document is locked' : "Couldn't open this PDF"}
+          </Text>
+          <Text style={[st.errorMsg, { color: colors.textSecondary }]}>
+            {failed.includes('401')
+              ? 'Cloudinary is refusing to serve this file (HTTP 401). Newer accounts block PDF delivery by default — enable it once in your Cloudinary dashboard: Settings → Security → allow PDF and ZIP files.'
+              : failed}
+          </Text>
+          <View style={st.errorActions}>
+            <TouchableOpacity
+              style={[st.errorBtnPrimary, { backgroundColor: colors.primary }]}
+              onPress={() => { setFailed(null); setPhase('download'); setHtml(null); }}
+            >
+              <MaterialCommunityIcons name="refresh" size={16} color="#FFF" />
+              <Text style={st.errorBtnPrimaryText}>Try again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[st.errorBtnGhost, { borderColor: colors.cardBorder }]}
+              onPress={() => Linking.openURL(sanitizeCloudinaryPdfUrl(String(url)))}
+            >
+              <MaterialCommunityIcons name="open-in-new" size={16} color={colors.textSecondary} />
+              <Text style={[st.errorBtnGhostText, { color: colors.textSecondary }]}>Open externally</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : html ? (
         <View style={{ flex: 1 }}>
@@ -180,4 +208,14 @@ const st = StyleSheet.create({
   title: { fontSize: 15.5, fontWeight: '700' },
   pageInfo: { fontSize: 11.5, marginTop: 1 },
   fallbackBtn: { marginTop: 16, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12 },
+  // Redesigned error state — calm, informative, not accusatory.
+  errorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  errorArt: { width: 92, height: 92, borderRadius: 46, justifyContent: 'center', alignItems: 'center', borderWidth: 1, marginBottom: 20 },
+  errorTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, marginBottom: 10, textAlign: 'center' },
+  errorMsg: { fontSize: 13.5, lineHeight: 20, textAlign: 'center', maxWidth: 340 },
+  errorActions: { flexDirection: 'row', gap: 10, marginTop: 22 },
+  errorBtnPrimary: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 100 },
+  errorBtnPrimaryText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  errorBtnGhost: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 100, borderWidth: 1 },
+  errorBtnGhostText: { fontWeight: '700', fontSize: 14 },
 });

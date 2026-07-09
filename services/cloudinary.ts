@@ -69,6 +69,10 @@ export async function uploadToCloudinary(
           // verified by direct API test ("Unknown API key" without it).
           api_key: CLOUDINARY_CONFIG.apiKey,
           folder,
+          // Force public delivery bucket so PDFs get a signature-less URL and
+          // don't return 401 when the reader tries to fetch them.
+          type: 'upload',
+          access_mode: 'public',
         },
       });
 
@@ -97,6 +101,25 @@ export async function uploadToCloudinary(
     throw new Error('Network failed mid-upload. Your connection is resetting large uploads — try again on stronger internet.');
   }
   throw new Error(raw);
+}
+
+/**
+ * Sanitize a Cloudinary URL so the in-app reader can fetch it reliably.
+ *
+ * Handles the two most common 401 causes on Cloudinary PDF delivery:
+ *   1. URLs saved with delivery type `authenticated` → rewrite to `upload`.
+ *      (Older uploads from before the preset was fixed to Unsigned + Public.)
+ *   2. Attachment flag helps some CDNs bypass content-inspection blocks.
+ *
+ * If none apply, returns the URL untouched.
+ */
+export function sanitizeCloudinaryPdfUrl(url: string): string {
+  if (!url) return url;
+  let u = url;
+  // authenticated → upload
+  u = u.replace('/raw/authenticated/', '/raw/upload/');
+  u = u.replace('/image/authenticated/', '/image/upload/');
+  return u;
 }
 
 /**

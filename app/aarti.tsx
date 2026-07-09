@@ -36,23 +36,35 @@ export default function DevotionalScreen() {
     return (
       <View style={[st.container, { backgroundColor: colors.background }]}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottomPadding }}>
-          <LinearGradient
-            colors={[selected.color, selected.color + 'B3']}
-            style={[st.detailHeader, { paddingTop: headerPaddingTop }]}
-          >
-            <TouchableOpacity style={st.detailBack} onPress={() => setSelected(null)} hitSlop={8}>
-              <Ionicons name="arrow-back" size={22} color="#FFF" />
+          {/* Calm dark hero — deity color used only as a soft radial glow behind
+              the candle emblem, not a wall of color. Keeps the app's dark aesthetic. */}
+          <View style={[st.detailHero, { paddingTop: headerPaddingTop, backgroundColor: colors.background }]}>
+            <TouchableOpacity
+              style={[st.detailBack, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+              onPress={() => setSelected(null)}
+              hitSlop={8}
+            >
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
             </TouchableOpacity>
-            <MaterialCommunityIcons name="candle" size={34} color="#FFD700" />
-            <Text style={st.detailTitle}>{selected.title}</Text>
-            <Text style={st.detailTitleHi}>{selected.titleHi}</Text>
-            <Text style={st.detailDeity}>{selected.deity}</Text>
 
-            <TouchableOpacity style={st.listenBtn} onPress={() => openPlayer(selected)} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="play-circle" size={20} color={selected.color} />
-              <Text style={[st.listenBtnText, { color: selected.color }]}>Listen / Watch</Text>
+            {/* Emblem: dark ambient panel with the deity color as a soft ring + glow */}
+            <View style={st.emblemWrap}>
+              <View style={[st.emblemGlow, { backgroundColor: selected.color, opacity: 0.16 }]} />
+              <View style={[st.emblemRing, { borderColor: selected.color + '55' }]} />
+              <View style={[st.emblemCore, { backgroundColor: colors.surfaceElevated, borderColor: selected.color + '55' }]}>
+                <MaterialCommunityIcons name="candle" size={34} color={selected.color} />
+              </View>
+            </View>
+
+            <Text style={[st.detailTitle, { color: colors.text }]}>{selected.title}</Text>
+            <Text style={[st.detailTitleHi, { color: selected.color }]}>{selected.titleHi}</Text>
+            <Text style={[st.detailDeity, { color: colors.textTertiary }]}>{selected.deity}</Text>
+
+            <TouchableOpacity style={[st.listenBtn, { backgroundColor: selected.color }]} onPress={() => openPlayer(selected)} activeOpacity={0.85}>
+              <MaterialCommunityIcons name="play-circle" size={19} color="#FFF" />
+              <Text style={st.listenBtnText}>Listen / Watch</Text>
             </TouchableOpacity>
-          </LinearGradient>
+          </View>
 
           <View style={[st.lyricsCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <Text style={[st.lyricsText, { color: colors.text }]}>{selected.text}</Text>
@@ -157,13 +169,20 @@ const st = StyleSheet.create({
   cardDeity: { fontSize: 11.5, marginTop: 2 },
   playBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
 
+  // Old header (kept for reference — now unused). New hero below.
   detailHeader: { paddingBottom: 24, alignItems: 'center', borderBottomLeftRadius: 26, borderBottomRightRadius: 26 },
-  detailBack: { position: 'absolute', left: 16, bottom: undefined, top: undefined, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-start', marginTop: 0, transform: [{ translateY: 0 }] },
-  detailTitle: { fontSize: 22, fontWeight: '800', color: '#FFF', marginTop: 10, textAlign: 'center', paddingHorizontal: 30 },
-  detailTitleHi: { fontSize: 17, color: '#FFD700', marginTop: 4, textAlign: 'center' },
-  detailDeity: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
-  listenBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#FFF', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 100, marginTop: 14 },
-  listenBtnText: { fontSize: 14, fontWeight: '800' },
+  // Redesigned hero — dark ambient, deity color only as a soft glow.
+  detailHero: { paddingHorizontal: 24, paddingBottom: 28, alignItems: 'center', position: 'relative' },
+  detailBack: { position: 'absolute', left: 16, top: undefined, marginTop: 6, width: 38, height: 38, borderRadius: 19, borderWidth: 1, justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-start', zIndex: 2 },
+  emblemWrap: { width: 112, height: 112, alignItems: 'center', justifyContent: 'center', marginTop: 18, marginBottom: 18 },
+  emblemGlow: { position: 'absolute', width: 160, height: 160, borderRadius: 80 },
+  emblemRing: { position: 'absolute', width: 112, height: 112, borderRadius: 56, borderWidth: 1 },
+  emblemCore: { width: 88, height: 88, borderRadius: 44, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  detailTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center', paddingHorizontal: 12 },
+  detailTitleHi: { fontSize: 17, fontWeight: '600', marginTop: 6, textAlign: 'center' },
+  detailDeity: { fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 8 },
+  listenBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 100, marginTop: 20 },
+  listenBtnText: { fontSize: 14.5, fontWeight: '800', color: '#FFF' },
 
   lyricsCard: { marginHorizontal: 16, marginTop: 16, borderRadius: 18, padding: 20, borderWidth: 1 },
   lyricsText: { fontSize: 17.5, lineHeight: 34, fontWeight: '500' },
