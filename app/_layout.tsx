@@ -10,6 +10,7 @@ import { LanguageProvider } from '../contexts/LanguageContext';
 import { DialogProvider } from '../contexts/DialogContext';
 import * as SplashScreen from 'expo-splash-screen';
 import { ensureNotificationsScheduled } from '../services/notifications';
+import { requestFirstRunPermissions } from '../services/firstRunPermissions';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -182,6 +183,8 @@ function RootLayoutInner() {
     // covers the blank gap and is guaranteed full-screen/centered (Modal).
     const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 120);
     ensureNotificationsScheduled();
+    // First launch: ask for all needed permissions up front (runs once).
+    requestFirstRunPermissions();
 
     // Deep-link: tapping a reminder/notification opens the relevant screen.
     const sub = Notifications.addNotificationResponseReceivedListener((resp) => {

@@ -57,7 +57,7 @@ export default function CalendarScreen() {
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
   const { t } = useLanguage();
-  const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
+  const { headerPaddingTop, tabContentPadding, bottomInset } = useLayoutInsets();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -69,6 +69,7 @@ export default function CalendarScreen() {
   const [remHour, setRemHour] = useState(6);
   const [remMinute, setRemMinute] = useState(0);
   const [showClock, setShowClock] = useState(false);
+  const [monthPicker, setMonthPicker] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -283,10 +284,13 @@ export default function CalendarScreen() {
           >
             <Ionicons name="chevron-back" size={20} color={colors.text} />
           </TouchableOpacity>
-          <View style={st.monthCenter}>
-            <Text style={[st.monthText, { color: colors.text }]}>{MONTHS[month]}</Text>
+          <TouchableOpacity style={st.monthCenter} onPress={() => setMonthPicker(true)} activeOpacity={0.7}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={[st.monthText, { color: colors.text }]}>{MONTHS[month]}</Text>
+              <Ionicons name="chevron-down" size={16} color={colors.textTertiary} />
+            </View>
             <Text style={[st.yearText, { color: colors.textTertiary }]}>{year}</Text>
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={goToNextMonth}
             style={[st.monthArrow, { backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}
@@ -353,10 +357,8 @@ export default function CalendarScreen() {
                     >
                       {day}
                     </Text>
-                    {/* Grooming: thin underline only for caution/avoid — safe days stay clean */}
-                    {(restricted || caution) && (
-                      <View style={[st.statusBar, { backgroundColor: selected ? 'rgba(255,255,255,0.85)' : restricted ? colors.festival : '#F59E0B' }]} />
-                    )}
+                    {/* Grooming underlines removed — they made the grid look noisy.
+                        Grooming guidance now lives only in the day sheet below. */}
                     {/* Special tithi micro-marks */}
                     {info?.isPurnima && <View style={[st.tithiDot, { backgroundColor: colors.purnima, borderColor: selected ? '#FFF' : 'transparent' }]} />}
                     {info?.isAmavasya && <View style={[st.tithiDot, { backgroundColor: colors.amavasya, borderColor: colors.textTertiary }]} />}
@@ -370,7 +372,6 @@ export default function CalendarScreen() {
 
           <View style={[st.legend, { borderTopColor: colors.divider }]}>
             {[
-              { swatch: <View style={[st.legendBar, { backgroundColor: colors.festival }]} />, label: 'Avoid grooming' },
               { swatch: <View style={[st.legendDot, { backgroundColor: colors.purnima }]} />, label: 'Purnima' },
               { swatch: <View style={[st.legendDot, { backgroundColor: colors.amavasya, borderWidth: 1, borderColor: colors.textTertiary }]} />, label: 'Amavasya' },
               { swatch: <View style={[st.legendDot, { backgroundColor: colors.ekadashi }]} />, label: 'Ekadashi' },
@@ -525,7 +526,7 @@ export default function CalendarScreen() {
       {/* ═══ Note modal ═══ */}
       <Modal visible={noteModal} transparent animationType="slide" onRequestClose={() => setNoteModal(false)}>
         <View style={st.modalOverlay}>
-          <View style={[st.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + bottomInset }]}>
             <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
             <View style={st.sheetHeader}>
               <Text style={[st.sheetTitle, { color: colors.text }]}>{hasNote ? 'Edit Note' : 'Add Note'}</Text>
@@ -559,7 +560,7 @@ export default function CalendarScreen() {
       {/* ═══ Reminder time sheet ═══ */}
       <Modal visible={reminderSheet} transparent animationType="slide" onRequestClose={() => setReminderSheet(false)}>
         <View style={st.modalOverlay}>
-          <View style={[st.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + bottomInset }]}>
             <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
             <View style={st.sheetHeader}>
               <Text style={[st.sheetTitle, { color: colors.text }]}>Set Reminder</Text>
@@ -598,34 +599,55 @@ export default function CalendarScreen() {
               />
             )}
 
-            {/* Three devotional quick picks — Brahma Muhurta, Sunrise, Evening */}
-            <View style={st.remQuickRow}>
-              {[
-                { label: 'Brahma\nMuhurta', h: 4, m: 30, icon: 'weather-night' },
-                { label: 'Sunrise', h: 6, m: 0, icon: 'weather-sunset-up' },
-                { label: 'Evening', h: 18, m: 0, icon: 'weather-sunset-down' },
-              ].map((p) => {
-                const active = remHour === p.h && remMinute === p.m;
-                return (
-                  <TouchableOpacity
-                    key={p.label}
-                    style={[st.remQuickBtn, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary + '15' : 'transparent' }]}
-                    onPress={() => { setRemHour(p.h); setRemMinute(p.m); }}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialCommunityIcons name={p.icon as any} size={17} color={active ? colors.primary : colors.textSecondary} />
-                    <Text style={[st.remQuickText, { color: active ? colors.primary : colors.text }]}>{p.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
             <TouchableOpacity onPress={scheduleReminder} activeOpacity={0.85}>
               <LinearGradient colors={['#D94F00', '#F07830']} style={st.primaryBtn}>
                 <MaterialCommunityIcons name="bell-check-outline" size={19} color="#FFF" />
                 <Text style={st.primaryBtnText}>Set for {fmt12(remHour, remMinute)}</Text>
               </LinearGradient>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ═══ Month / year jump ═══ */}
+      <Modal visible={monthPicker} transparent animationType="slide" onRequestClose={() => setMonthPicker(false)}>
+        <View style={st.modalOverlay}>
+          <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + bottomInset }]}>
+            <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
+            <View style={st.sheetHeader}>
+              <Text style={[st.sheetTitle, { color: colors.text }]}>Jump to</Text>
+              <TouchableOpacity onPress={() => setMonthPicker(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Year stepper */}
+            <View style={st.yearStepper}>
+              <TouchableOpacity onPress={() => setCurrentDate(new Date(year - 1, month, 1))} style={[st.monthArrow, { backgroundColor: colors.background, borderColor: colors.cardBorder, borderWidth: 1 }]} hitSlop={8}>
+                <Ionicons name="chevron-back" size={20} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={[st.yearStepperText, { color: colors.text }]}>{year}</Text>
+              <TouchableOpacity onPress={() => setCurrentDate(new Date(year + 1, month, 1))} style={[st.monthArrow, { backgroundColor: colors.background, borderColor: colors.cardBorder, borderWidth: 1 }]} hitSlop={8}>
+                <Ionicons name="chevron-forward" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Month grid */}
+            <View style={st.monthGrid}>
+              {MONTHS.map((m, i) => {
+                const active = i === month;
+                return (
+                  <TouchableOpacity
+                    key={m}
+                    style={[st.monthGridItem, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary : 'transparent' }]}
+                    onPress={() => { setCurrentDate(new Date(year, i, 1)); setMonthPicker(false); }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[st.monthGridText, { color: active ? '#FFF' : colors.text }]}>{m.slice(0, 3)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         </View>
       </Modal>
@@ -707,6 +729,11 @@ const st = StyleSheet.create({
   // Sheets
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 22, paddingBottom: 30 },
+  yearStepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginTop: 8, marginBottom: 18 },
+  yearStepperText: { fontSize: 22, fontWeight: '800', minWidth: 80, textAlign: 'center' },
+  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  monthGridItem: { flexBasis: '30%', flexGrow: 1, alignItems: 'center', paddingVertical: 13, borderRadius: 12, borderWidth: 1 },
+  monthGridText: { fontSize: 14, fontWeight: '700' },
   sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 14 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sheetTitle: { fontSize: 19, fontWeight: '800' },

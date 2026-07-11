@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList,
   KeyboardAvoidingView, Platform, ActivityIndicator, Image,
@@ -6,10 +6,14 @@ import {
 import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDialog } from '../contexts/DialogContext';
 import { useLayoutInsets } from '../constants/layout';
 import { askSadhakAI, STARTER_QUESTIONS, type AiMessage } from '../services/ai';
+
+const AI_HISTORY_KEY = 'sadhak_ai_history';
 
 interface ChatItem extends AiMessage {
   id: string;
@@ -19,11 +23,34 @@ interface ChatItem extends AiMessage {
 export default function AskScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const dialog = useDialog();
   const { headerPaddingTop, backBtnTop, bottomInset, insets } = useLayoutInsets();
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const listRef = useRef<FlatList>(null);
+
+  // Load saved chat history on mount so the conversation persists across visits.
+  useEffect(() => {
+    AsyncStorage.getItem(AI_HISTORY_KEY)
+      .then((raw) => { if (raw) setMessages(JSON.parse(raw)); })
+      .catch(() => {});
+  }, []);
+
+  // Persist whenever messages change (skip the empty initial state).
+  useEffect(() => {
+    if (messages.length) AsyncStorage.setItem(AI_HISTORY_KEY, JSON.stringify(messages.slice(-50))).catch(() => {});
+  }, [messages]);
+
+  const clearChat = () => {
+    dialog.alert('Clear chat?', 'This removes your Sadhak AI conversation history.', [
+      { text: 'Cancel' },
+      { text: 'Clear', style: 'destructive', onPress: async () => {
+        setMessages([]);
+        await AsyncStorage.removeItem(AI_HISTORY_KEY);
+      }},
+    ]);
+  };
 
   const send = async (textArg?: string) => {
     const text = (textArg ?? input).trim();
@@ -81,6 +108,11 @@ export default function AskScreen() {
         <TouchableOpacity style={[st.backBtn, { top: backBtnTop }]} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
+        {messages.length > 0 && (
+          <TouchableOpacity style={[st.clearBtn, { top: backBtnTop }]} onPress={clearChat} hitSlop={8}>
+            <MaterialCommunityIcons name="broom" size={20} color="#FFF" />
+          </TouchableOpacity>
+        )}
         <View style={st.headerCenter}>
           <View style={st.headerTitleRow}>
             <MaterialCommunityIcons name="creation" size={20} color="#FFD9A0" />
@@ -161,6 +193,7 @@ const st = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingBottom: 16, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, alignItems: 'center' },
   backBtn: { position: 'absolute', left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
+  clearBtn: { position: 'absolute', right: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
   headerCenter: { alignItems: 'center' },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: '#FFF' },
@@ -178,6 +211,6 @@ const st = StyleSheet.create({
   bubbleText: { fontSize: 14.5, lineHeight: 21 },
   thinkingBar: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginLeft: 14, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderWidth: 1 },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 9, paddingHorizontal: 14, paddingTop: 10, borderTopWidth: 1 },
-  input: { flex: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, maxHeight: 110 },
+  input: { flex: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, minHeight: 42, maxHeight: 110, textAlignVertical: 'center' },
   sendBtn: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
 });

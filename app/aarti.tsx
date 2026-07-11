@@ -11,6 +11,7 @@ import {
   type DevotionalCategory, type DevotionalItem,
 } from '../constants/devotional';
 import { getDeityImage } from '../constants/deityImages';
+import { Diya } from '../components/ui';
 
 export default function DevotionalScreen() {
   const { colors, isDark } = useTheme();
@@ -66,7 +67,7 @@ export default function DevotionalScreen() {
                     cachePolicy="disk"
                   />
                 ) : (
-                  <MaterialCommunityIcons name="candle" size={34} color={selected.color} />
+                  <Diya size={40} color={selected.color} />
                 )}
               </View>
             </View>
@@ -126,7 +127,11 @@ export default function DevotionalScreen() {
                 style={[st.tab, active && st.tabActive]}
                 onPress={() => setCategory(cat.key)}
               >
-                <MaterialCommunityIcons name={cat.icon as any} size={15} color={active ? '#D94F00' : 'rgba(255,255,255,0.8)'} />
+                {cat.icon === 'candle' ? (
+                  <Diya size={16} color={active ? '#D94F00' : 'rgba(255,255,255,0.8)'} />
+                ) : (
+                  <MaterialCommunityIcons name={cat.icon as any} size={15} color={active ? '#D94F00' : 'rgba(255,255,255,0.8)'} />
+                )}
                 <Text style={[st.tabText, { color: active ? '#D94F00' : 'rgba(255,255,255,0.9)' }]}>{cat.label}</Text>
               </TouchableOpacity>
             );
@@ -155,6 +160,8 @@ export default function DevotionalScreen() {
                   transition={220}
                   cachePolicy="disk"
                 />
+              ) : item.category === 'aarti' ? (
+                <Diya size={26} color={item.color} />
               ) : (
                 <MaterialCommunityIcons
                   name={DEVOTIONAL_CATEGORIES.find(c => c.key === item.category)?.icon as any}

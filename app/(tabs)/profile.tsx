@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, Image, Modal,
   Share, ActivityIndicator, Dimensions,
@@ -31,12 +31,35 @@ export default function ProfileScreen() {
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editGender, setEditGender] = useState<'male' | 'female' | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [usernameOpen, setUsernameOpen] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [postSort, setPostSort] = useState<'new' | 'old' | 'top'>('new');
+  const [viewPost, setViewPost] = useState<Post | null>(null);
+
+  // Year the user joined, from createdAt (Firestore Timestamp | Date | ms).
+  const memberSinceYear = useMemo(() => {
+    const c: any = profile?.createdAt;
+    try {
+      if (c?.toDate) return c.toDate().getFullYear();
+      if (c) return new Date(c).getFullYear();
+    } catch {}
+    return new Date().getFullYear();
+  }, [profile?.createdAt]);
+
+  // Client-side sort for the My Posts grid.
+  const sortedPosts = useMemo(() => {
+    const arr = [...myPosts];
+    const ts = (p: any) => (p.createdAt?.toDate ? p.createdAt.toDate().getTime() : new Date(p.createdAt || 0).getTime());
+    if (postSort === 'new') arr.sort((a, b) => ts(b) - ts(a));
+    else if (postSort === 'old') arr.sort((a, b) => ts(a) - ts(b));
+    else arr.sort((a: any, b: any) => (b.likeCount || 0) - (a.likeCount || 0));
+    return arr;
+  }, [myPosts, postSort]);
 
   // Load the user's own posts whenever the tab regains focus (so a new post
   // shows up without a manual refresh).
@@ -57,6 +80,7 @@ export default function ProfileScreen() {
     if (profile) {
       setEditName(profile.displayName || '');
       setEditBio(profile.bio || '');
+      setEditGender((profile as any).gender ?? null);
     }
   }, [profile]);
 
@@ -110,7 +134,7 @@ export default function ProfileScreen() {
   const saveEdit = async () => {
     setSavingEdit(true);
     try {
-      await updateProfile({ displayName: editName.trim() || 'Sadhak', bio: editBio.trim() });
+      await updateProfile({ displayName: editName.trim() || 'Sadhak', bio: editBio.trim(), gender: editGender } as any);
       setEditOpen(false);
     } catch (e: any) {
       dialog.alert('Could not save', String(e?.message || e).slice(0, 200));
@@ -163,20 +187,22 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Stats */}
+        {/* Stats — honest, no fake social graph */}
         <View style={styles.statsRow}>
           <View style={styles.stat}>
             <Text style={[styles.statNum, { color: colors.text }]}>{myPosts.length}</Text>
             <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Posts</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={[styles.statNum, { color: colors.text }]}>{profile?.location?.city ? '1' : '—'}</Text>
-            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Region</Text>
+            <Text style={[styles.statNum, { color: colors.text }]}>{memberSinceYear}</Text>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Since</Text>
           </View>
-          <View style={styles.stat}>
-            <Text style={[styles.statNum, { color: colors.text }]}>{isAdmin ? '★' : '🙏'}</Text>
-            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{isAdmin ? 'Admin' : 'Sadhak'}</Text>
-          </View>
+          {!!profile?.location?.city && (
+            <View style={styles.stat}>
+              <Ionicons name="location" size={19} color={colors.primary} />
+              <Text style={[styles.statLabel, { color: colors.textTertiary }]} numberOfLines={1}>{profile.location.city}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -208,15 +234,30 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: 10, marginTop: DS.space.lg }}>
+      <View style={{ marginTop: DS.space.lg }}>
         <Button title="Edit Profile" variant="secondary" size="md" icon="account-edit-outline" onPress={() => setEditOpen(true)} />
-        <Button title="Share App" variant="secondary" size="md" icon="share-variant-outline" onPress={shareApp} />
       </View>
 
       {/* ═══ My Posts grid ═══ */}
       <View style={styles.postsHeadRow}>
         <MaterialCommunityIcons name="grid" size={16} color={colors.text} />
         <Text style={[styles.postsHead, { color: colors.text }]}>My Posts</Text>
+        {myPosts.length > 0 && (
+          <View style={styles.sortChips}>
+            {([['new', 'New'], ['old', 'Oldest'], ['top', 'Top']] as const).map(([key, label]) => {
+              const active = postSort === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => setPostSort(key)}
+                  style={[styles.sortChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.cardBorder }]}
+                >
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: active ? '#FFF' : colors.textSecondary }}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       {loadingPosts ? (
@@ -232,12 +273,12 @@ export default function ProfileScreen() {
         </View>
       ) : (
         <View style={styles.postGrid}>
-          {myPosts.map((p) => (
+          {sortedPosts.map((p) => (
             <TouchableOpacity
               key={p.id}
               style={styles.gridCell}
               activeOpacity={0.85}
-              onPress={() => router.push('/feed')}
+              onPress={() => setViewPost(p)}
             >
               {p.imageUrl ? (
                 <Image source={{ uri: p.imageUrl }} style={styles.gridImg} />
@@ -270,6 +311,25 @@ export default function ProfileScreen() {
               placeholderTextColor={colors.textTertiary} multiline maxLength={150}
             />
             <Text style={[styles.charCount, { color: colors.textTertiary }]}>{editBio.length}/150</Text>
+
+            <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>GENDER</Text>
+            <Text style={[styles.fieldHint, { color: colors.textTertiary }]}>Used to personalise grooming guidance per shastra</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 6 }}>
+              {([['male', 'Male', 'gender-male'], ['female', 'Female', 'gender-female']] as const).map(([val, label, icon]) => {
+                const active = editGender === val;
+                return (
+                  <TouchableOpacity
+                    key={val}
+                    onPress={() => setEditGender(active ? null : val)}
+                    activeOpacity={0.8}
+                    style={[styles.genderChip, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary + '15' : colors.background }]}
+                  >
+                    <MaterialCommunityIcons name={icon} size={17} color={active ? colors.primary : colors.textSecondary} />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: active ? colors.primary : colors.text }}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
               <Button title="Cancel" variant="secondary" onPress={() => setEditOpen(false)} />
@@ -305,6 +365,31 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      {/* ═══ Post viewer ═══ */}
+      <Modal visible={!!viewPost} transparent animationType="fade" onRequestClose={() => setViewPost(null)}>
+        <View style={styles.postViewerOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setViewPost(null)} />
+          <View style={[styles.postViewerCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <View style={styles.postViewerHead}>
+              <Text style={[styles.postViewerName, { color: colors.text }]} numberOfLines={1}>{profile?.displayName || 'You'}</Text>
+              <TouchableOpacity onPress={() => setViewPost(null)} hitSlop={10}>
+                <Ionicons name="close" size={22} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+            {!!viewPost?.imageUrl && (
+              <Image source={{ uri: viewPost.imageUrl }} style={styles.postViewerImg} resizeMode="cover" />
+            )}
+            {!!viewPost?.text && (
+              <Text style={[styles.postViewerText, { color: colors.text }]}>{viewPost.text}</Text>
+            )}
+            <View style={styles.postViewerMeta}>
+              <Ionicons name="heart" size={15} color={colors.primary} />
+              <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '600' }}>{(viewPost as any)?.likeCount || 0}</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </Screen>
   );
 }
@@ -331,6 +416,17 @@ const styles = StyleSheet.create({
   badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100, borderWidth: 1 },
 
   postsHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 26, marginBottom: 12 },
+  fieldHint: { fontSize: 11.5, marginTop: -4, marginBottom: 8 },
+  genderChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
+  sortChips: { flexDirection: 'row', gap: 6, marginLeft: 'auto' },
+  sortChip: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 100, borderWidth: 1 },
+  postViewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', padding: 20 },
+  postViewerCard: { borderRadius: 20, borderWidth: 1, overflow: 'hidden', paddingBottom: 14 },
+  postViewerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
+  postViewerName: { flex: 1, fontSize: 15, fontWeight: '800' },
+  postViewerImg: { width: '100%', aspectRatio: 1 },
+  postViewerText: { fontSize: 15, lineHeight: 22, paddingHorizontal: 14, paddingTop: 12 },
+  postViewerMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingTop: 12 },
   postsHead: { fontSize: 15, fontWeight: '800' },
   postGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
   gridCell: { width: GRID_COL, height: GRID_COL, borderRadius: 8, overflow: 'hidden' },

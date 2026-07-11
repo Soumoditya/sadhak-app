@@ -18,7 +18,11 @@ Boundaries:
 - For medical, legal, financial or mental-health matters: give the dharmic perspective if relevant, but clearly advise consulting a qualified professional.
 - Do not make astrological predictions about a person's future; you may explain jyotish concepts.
 - Never invent scripture quotes. If unsure, say what is commonly taught and note the uncertainty.
-- Politely decline disrespectful or hateful requests about any community or faith.`;
+- Politely decline disrespectful or hateful requests about any community or faith.
+
+Formatting (IMPORTANT):
+- Reply in PLAIN TEXT only. Do NOT use Markdown — no asterisks for bold/italics, no "#" headings, no backticks, no tables.
+- For lists, use a simple hyphen "- " at the start of a line. Separate paragraphs with a blank line. Keep it clean and readable in a chat bubble.`;
 
 export interface AiMessage {
   role: 'user' | 'model';
@@ -59,7 +63,28 @@ export async function askSadhakAI(history: AiMessage[], userName?: string): Prom
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join('') || '';
   if (!text) throw new Error('Sadhak AI could not form a reply. Please rephrase your question.');
-  return text.trim();
+  return cleanMarkdown(text.trim());
+}
+
+/**
+ * Strip common Markdown so replies read cleanly in a chat bubble even if the
+ * model slips and emits **bold**, ### headings, `code`, etc. Safety net on top
+ * of the plain-text system instruction.
+ */
+export function cleanMarkdown(input: string): string {
+  if (!input) return input;
+  return input
+    .replace(/```[\s\S]*?```/g, (m) => m.replace(/```/g, '').trim()) // fenced code
+    .replace(/`([^`]+)`/g, '$1')             // inline code
+    .replace(/\*\*([^*]+)\*\*/g, '$1')        // bold
+    .replace(/\*([^*]+)\*/g, '$1')            // italics
+    .replace(/__([^_]+)__/g, '$1')            // bold underscore
+    .replace(/^#{1,6}\s+/gm, '')              // headings
+    .replace(/^\s*[-*+]\s+/gm, '• ')          // bullet markers → •
+    .replace(/^\s*>\s?/gm, '')                // blockquotes
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')   // links → text
+    .replace(/\n{3,}/g, '\n\n')               // collapse blank runs
+    .trim();
 }
 
 export const STARTER_QUESTIONS = [

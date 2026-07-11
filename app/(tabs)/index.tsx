@@ -7,7 +7,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { calculatePanchang } from '../../services/panchang';
 import { getDailyGroomingAdvice, getGroomingStatusColor } from '../../services/groomingRules';
-import { Screen, Card, Section } from '../../components/ui';
+import { Screen, Card, Section, Diya } from '../../components/ui';
 import { DS } from '../../constants/ds';
 
 // ─── Rotating shlokas (one per day) ──────────────────────────────────
@@ -56,9 +56,13 @@ export default function HomeScreen() {
   const shloka = SHLOKAS[today.getDate() % SHLOKAS.length];
   const firstName = profile?.displayName?.split(' ')[0] || 'Sadhak';
   const hour = today.getHours();
-  const timeGreeting = hour < 4 ? 'Shubh Ratri' : hour < 12 ? 'Shubh Prabhat' : hour < 16 ? 'Namaste' : hour < 19 ? 'Shubh Sandhya' : 'Shubh Ratri';
+  // Morning 4–11, afternoon 12–16 (Namaste), evening/Sandhya starts at dusk
+  // (17), night from 20. Fixes "Shubh Sandhya" showing at 4:32pm.
+  const timeGreeting = hour < 4 ? 'Shubh Ratri' : hour < 12 ? 'Shubh Prabhat' : hour < 17 ? 'Namaste' : hour < 20 ? 'Shubh Sandhya' : 'Shubh Ratri';
   const groomingColor = getGroomingStatusColor(grooming.overallStatus);
-  const groomingLabel = grooming.overallStatus === 'allowed' ? 'Shubh' : grooming.overallStatus === 'avoid' ? 'Caution' : 'Avoid';
+  // This pill is GROOMING guidance only (haircut/shave/nails per vaara) — not a
+  // verdict on the whole day. Labelled + scissors-iconed so it reads that way.
+  const groomingLabel = grooming.overallStatus === 'allowed' ? 'OK' : grooming.overallStatus === 'avoid' ? 'Caution' : 'Avoid';
 
   return (
     <Screen scroll tabbed edges={{ top: true, bottom: false }}>
@@ -93,7 +97,7 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View style={[s.statusPill, { backgroundColor: groomingColor + '18', borderColor: groomingColor + '35' }]}>
-            <View style={[s.statusDot, { backgroundColor: groomingColor }]} />
+            <MaterialCommunityIcons name="content-cut" size={11} color={groomingColor} />
             <Text style={[s.statusText, { color: groomingColor }]}>{groomingLabel}</Text>
           </View>
         </View>
@@ -135,7 +139,11 @@ export default function HomeScreen() {
               activeOpacity={0.85}
             >
               <View style={[s.quickIcon, { backgroundColor: a.color + '18' }]}>
-                <MaterialCommunityIcons name={a.icon as any} size={22} color={a.color} />
+                {a.icon === 'candle' ? (
+                  <Diya size={24} color={a.color} />
+                ) : (
+                  <MaterialCommunityIcons name={a.icon as any} size={22} color={a.color} />
+                )}
               </View>
               <Text style={[s.quickLabel, { color: colors.text }]}>{a.label}</Text>
             </TouchableOpacity>
@@ -151,8 +159,8 @@ export default function HomeScreen() {
         <Text style={[s.shlokaSrc, { color: colors.textTertiary }]}>— {shloka.source}</Text>
       </Card>
 
-      {/* ═══ 5. More modules (secondary) ═══ */}
-      <Section title="More">
+      {/* ═══ 5. Explore — full feature tiles ═══ */}
+      <Section title="Explore">
         <View style={s.moreGrid}>
           {MORE_MODULES.map((a) => (
             <TouchableOpacity
@@ -161,12 +169,14 @@ export default function HomeScreen() {
               onPress={() => router.push(a.route as any)}
               activeOpacity={0.85}
             >
-              {a.key === 'ai' ? (
-                <Ionicons name="sparkles" size={16} color={a.color} />
-              ) : (
-                <MaterialCommunityIcons name={a.icon as any} size={17} color={a.color} />
-              )}
-              <Text style={[s.moreLabel, { color: colors.text }]}>{a.label}</Text>
+              <View style={[s.moreIcon, { backgroundColor: a.color + '18' }]}>
+                {a.key === 'ai' ? (
+                  <Ionicons name="sparkles" size={22} color={a.color} />
+                ) : (
+                  <MaterialCommunityIcons name={a.icon as any} size={22} color={a.color} />
+                )}
+              </View>
+              <Text style={[s.moreLabel, { color: colors.text }]} numberOfLines={1}>{a.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -211,7 +221,8 @@ const s = StyleSheet.create({
   shlokaSrc: { fontSize: 11.5, fontWeight: '600', marginTop: 6 },
 
   // More grid
-  moreGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  moreItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1, minWidth: '31%' },
-  moreLabel: { fontSize: 13, fontWeight: '600' },
+  moreGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  moreItem: { width: '31%', flexGrow: 1, alignItems: 'center', paddingVertical: 16, borderRadius: DS.radius.lg, borderWidth: 1, gap: 8 },
+  moreIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  moreLabel: { fontSize: 12, fontWeight: '700' },
 });

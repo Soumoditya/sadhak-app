@@ -53,7 +53,7 @@ export default function LibraryScreen() {
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
   const { t } = useLanguage();
-  const { headerPaddingTop, tabContentPadding } = useLayoutInsets();
+  const { headerPaddingTop, tabContentPadding, bottomInset } = useLayoutInsets();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [books, setBooks] = useState<LibraryItem[]>([]);
@@ -212,6 +212,23 @@ export default function LibraryScreen() {
     } finally { setDownloadingId(null); }
   };
 
+  // Admin: remove a published book (long-press a card).
+  const deleteBook = (book: LibraryItem) => {
+    if (!isAdmin) return;
+    dialog.alert('Delete book?', `Remove "${book.title}" from the library? This cannot be undone.`, [
+      { text: 'Cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try {
+          await deleteDoc(doc(db, 'library', book.id));
+          setBooks((prev) => prev.filter((b) => b.id !== book.id));
+          dialog.alert('Deleted', `"${book.title}" was removed.`);
+        } catch (e: any) {
+          dialog.alert('Error', 'Could not delete the book.');
+        }
+      }},
+    ]);
+  };
+
   const formatFileSize = (bytes: number) => {
     if (!bytes) return '';
     if (bytes < 1024) return `${bytes} B`;
@@ -229,7 +246,7 @@ export default function LibraryScreen() {
 
     if (viewMode === 'grid') {
       return (
-        <TouchableOpacity style={[st.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} activeOpacity={0.7}>
+        <TouchableOpacity style={[st.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
           <View style={[st.gridIcon, { backgroundColor: cat.color + '12' }]}>
             <MaterialCommunityIcons name={cat.icon as any} size={32} color={cat.color} />
           </View>
@@ -247,7 +264,7 @@ export default function LibraryScreen() {
     }
 
     return (
-      <TouchableOpacity style={[st.bookCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} activeOpacity={0.7}>
+      <TouchableOpacity style={[st.bookCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
         <View style={[st.bookIcon, { backgroundColor: cat.color + '12' }]}>
           <MaterialCommunityIcons name={cat.icon as any} size={28} color={cat.color} />
         </View>
@@ -373,7 +390,7 @@ export default function LibraryScreen() {
       {/* Upload Modal */}
       <Modal visible={uploadModal} transparent animationType="slide">
         <View style={st.modalOverlay}>
-          <View style={[st.modalContent, { backgroundColor: colors.surface }]}>
+          <View style={[st.modalContent, { backgroundColor: colors.surface, paddingBottom: 24 + bottomInset }]}>
             <View style={st.modalHeader}>
               <Text style={[st.modalTitle, { color: colors.text }]}>{isAdmin ? 'Upload PDF' : 'Submit PDF for Review'}</Text>
               <TouchableOpacity onPress={() => setUploadModal(false)}>

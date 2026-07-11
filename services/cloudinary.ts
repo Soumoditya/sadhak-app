@@ -69,10 +69,11 @@ export async function uploadToCloudinary(
           // verified by direct API test ("Unknown API key" without it).
           api_key: CLOUDINARY_CONFIG.apiKey,
           folder,
-          // Force public delivery bucket so PDFs get a signature-less URL and
-          // don't return 401 when the reader tries to fetch them.
-          type: 'upload',
-          access_mode: 'public',
+          // NOTE: do NOT send `type`/`access_mode` here — Cloudinary rejects them
+          // on UNSIGNED uploads ("Type parameter is not allowed..."). Unsigned
+          // uploads already land in the public `upload` bucket by default. The
+          // PDF-delivery 401 is a dashboard security setting (allow PDF/ZIP
+          // delivery), handled on the read side by sanitizeCloudinaryPdfUrl.
         },
       });
 

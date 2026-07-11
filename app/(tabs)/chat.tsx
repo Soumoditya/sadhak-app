@@ -7,7 +7,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { db, rtdb, collection, getDocs, addDoc, serverTimestamp, ref, onValue, off } from '../../config/firebase';
-import { Screen, Card, Button } from '../../components/ui';
+import { Screen, Card, Button, Diya } from '../../components/ui';
 import { DS, useDsInsets } from '../../constants/ds';
 
 type ChatTab = 'rooms' | 'dms' | 'groups' | 'channels';
@@ -192,7 +192,11 @@ export default function CommunityScreen() {
             activeOpacity={0.75}
           >
             <View style={[s.roomIcon, { backgroundColor: item.color + '18' }]}>
-              <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
+              {item.icon === 'candle' ? (
+                <Diya size={22} color={item.color} />
+              ) : (
+                <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <View style={s.roomTop}>

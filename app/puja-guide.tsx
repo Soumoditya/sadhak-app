@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
 import { PUJA_GUIDES, type PujaGuide } from '../constants/pujaGuides';
+import { Diya } from '../components/ui';
 import { resolveDeityImage } from '../constants/deityImages';
 
 export default function PujaGuideScreen() {
@@ -104,7 +105,7 @@ export default function PujaGuideScreen() {
               style={[st.actionBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.cardBorder }]}
               onPress={() => router.push('/aarti')}
             >
-              <MaterialCommunityIcons name="candle" size={18} color={colors.primary} />
+              <Diya size={20} color={colors.primary} />
               <Text style={[st.actionBtnText, { color: colors.text }]}>Aarti & mantra</Text>
             </TouchableOpacity>
           </View>

@@ -32,9 +32,13 @@ export default function WallpapersScreen() {
   );
 
   // Download the full-size image into the app cache; returns a local file:// URI.
+  // Wikimedia rejects requests without a descriptive User-Agent (HTTP 403), so
+  // we send one per their policy: https://meta.wikimedia.org/wiki/User-Agent_policy
   const downloadToCache = async (w: Wallpaper): Promise<string> => {
     const target = `${FileSystem.cacheDirectory}wallpaper-${w.id}.jpg`;
-    const res = await FileSystem.downloadAsync(w.url, target);
+    const res = await FileSystem.downloadAsync(w.url, target, {
+      headers: { 'User-Agent': 'SadhakApp/1.6 (Hindu companion app; soumodityapramanik@gmail.com)' },
+    });
     if (res.status !== 200) throw new Error(`Download failed (HTTP ${res.status}).`);
     return res.uri;
   };

@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, LayoutAnimation, Platform, UIManager, Linking } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { Header } from '../components/ui';
+import { useDsInsets } from '../constants/ds';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -93,6 +95,7 @@ const FAQ_SECTIONS: { title: string; icon: string; color: string; items: FAQItem
 
 export default function FAQScreen() {
   const { colors, isDark } = useTheme();
+  const { screenBottom } = useDsInsets();
   const [expandedSection, setExpandedSection] = useState<number | null>(0);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
@@ -108,7 +111,9 @@ export default function FAQScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header title="Help & FAQ" subtitle="Answers about Sadhak" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottom }}>
       {/* Hero */}
       <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
         <MaterialCommunityIcons name="help-circle-outline" size={40} color={colors.primary} />
@@ -192,9 +197,10 @@ export default function FAQScreen() {
         </View>
       </View>
 
-      <Text style={[styles.version, { color: colors.textTertiary }]}>Sadhak v1.0.0 • Made with 🙏 in India</Text>
+      <Text style={[styles.version, { color: colors.textTertiary }]}>Sadhak v1.6.0 • Made with 🙏 in India</Text>
       <View style={{ height: 40 }} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
