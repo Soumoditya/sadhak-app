@@ -38,6 +38,10 @@ function buildHtml(userLat: number, userLon: number, pins: MapPin[], isDark: boo
   .pin>span{transform:rotate(45deg);font-size:14px}
   .udot{width:16px;height:16px;border-radius:50%;background:#2E7DF6;border:3px solid #fff;box-shadow:0 0 0 4px rgba(46,125,246,.25)}
   .leaflet-control-attribution{display:none}
+  /* Theme the zoom +/- controls so they don't glare white on the dark map */
+  .leaflet-bar a,.leaflet-bar a:link{background:${isDark ? '#171C24' : '#FFFFFF'};color:${isDark ? '#E8E6E1' : '#222222'};border-bottom-color:${isDark ? '#2A3140' : '#DDDDDD'}}
+  .leaflet-bar a:hover{background:${isDark ? '#212833' : '#F4F4F4'}}
+  .leaflet-bar{border:1px solid ${isDark ? '#2A3140' : '#DDDDDD'};box-shadow:0 2px 8px rgba(0,0,0,.35)}
 </style></head><body>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

@@ -32,7 +32,7 @@ function timeAgo(createdAt: any): string {
 export default function FeedScreen() {
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
-  const { headerPaddingTop, backBtnTop, screenBottomPadding } = useLayoutInsets();
+  const { headerPaddingTop, backBtnTop, screenBottomPadding, bottomInset } = useLayoutInsets();
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -281,14 +281,14 @@ export default function FeedScreen() {
       <Modal visible={!!commentsFor} transparent animationType="slide" onRequestClose={() => setCommentsFor(null)}>
         <KeyboardAvoidingView
           style={styles.sheetOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setCommentsFor(null)} />
           <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
             <View style={styles.sheetHeaderRow}>
               <Text style={[styles.sheetTitle, { color: colors.text }]}>
-                {comments.length > 0 ? `${comments.length} Comments` : 'Comments'}
+                {comments.length > 0 ? `${comments.length} Comment${comments.length === 1 ? '' : 's'}` : 'Comments'}
               </Text>
               <TouchableOpacity onPress={() => setCommentsFor(null)} hitSlop={10}>
                 <Ionicons name="close" size={22} color={colors.textTertiary} />
@@ -323,7 +323,7 @@ export default function FeedScreen() {
                 </View>
               )}
             />
-            <View style={[styles.commentInputRow, { borderTopColor: colors.divider, backgroundColor: colors.surface }]}>
+            <View style={[styles.commentInputRow, { borderTopColor: colors.divider, backgroundColor: colors.surface, paddingBottom: 12 + bottomInset }]}>
               <TextInput
                 style={[styles.commentInput, { color: colors.text, backgroundColor: colors.background }]}
                 placeholder="Write a comment…"

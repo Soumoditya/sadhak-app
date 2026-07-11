@@ -124,8 +124,11 @@ export default function AskScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : insets.top + 56}
+        // Android: rely on native windowSoftInputMode=adjustResize. The old
+        // behavior='height' + top-inset offset double-counted and left a large
+        // gap between the composer and keyboard after dismiss. iOS still needs padding.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {messages.length === 0 ? (
           <View style={st.emptyWrap}>

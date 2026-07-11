@@ -481,7 +481,10 @@ export default function TemplesScreen() {
               </TouchableOpacity>
             ))
           )}
-          <Text style={[st.credit, { color: colors.textTertiary }]}>🗺️ Data from OpenStreetMap contributors</Text>
+          <View style={st.creditRow}>
+            <MaterialCommunityIcons name="map-outline" size={12} color={colors.textTertiary} />
+            <Text style={[st.credit, { color: colors.textTertiary }]}>Data from OpenStreetMap contributors</Text>
+          </View>
         </ScrollView>
       )}
 
@@ -607,5 +610,6 @@ const st = StyleSheet.create({
   emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
   retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, marginTop: 8 },
 
-  credit: { textAlign: 'center', fontSize: 11, marginTop: 16, marginBottom: 20 },
+  creditRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 16, marginBottom: 20 },
+  credit: { textAlign: 'center', fontSize: 11 },
 });

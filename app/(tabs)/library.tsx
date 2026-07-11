@@ -238,10 +238,11 @@ export default function LibraryScreen() {
 
   const renderBookCard = ({ item }: { item: LibraryItem }) => {
     // Preset categories resolve to their chip; a custom category (any string not
-    // in CATEGORIES) shows its own label with the neutral "Other" icon/color.
+    // in CATEGORIES) keeps its own label but shows a proper book glyph (not the
+    // "···" dots that read as an unfinished placeholder).
     const preset = CATEGORIES.find(c => c.id === item.category);
     const other = CATEGORIES[CATEGORIES.length - 1];
-    const cat = preset || { ...other, name: item.category || other.name };
+    const cat = preset || { ...other, name: item.category || other.name, icon: 'book-outline' };
     const isDownloading = downloadingId === item.id;
 
     if (viewMode === 'grid') {

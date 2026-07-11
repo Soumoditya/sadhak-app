@@ -12,6 +12,7 @@ import {
 } from '../constants/devotional';
 import { getDeityImage } from '../constants/deityImages';
 import { Diya } from '../components/ui';
+import { DS } from '../constants/ds';
 
 export default function DevotionalScreen() {
   const { colors, isDark } = useTheme();
@@ -201,10 +202,10 @@ const st = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16, borderWidth: 1, gap: 12 },
   cardIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   cardIconImage: { width: '100%', height: '100%', borderRadius: 14 },
-  cardInfo: { flex: 1 },
-  cardTitle: { fontSize: 15, fontWeight: '700' },
-  cardTitleHi: { fontSize: 13.5, lineHeight: 20, fontWeight: '600', marginTop: 2 },
-  cardDeity: { fontSize: 11.5, marginTop: 2 },
+  cardInfo: { flex: 1, justifyContent: 'center' },
+  cardTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  cardTitleHi: { fontSize: DS.type.deva.title.size, lineHeight: DS.type.deva.title.lineHeight, fontWeight: '600', marginTop: 1 },
+  cardDeity: { fontSize: 11.5, lineHeight: 15, marginTop: 3 },
   playBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
 
   // Old header (kept for reference — now unused). New hero below.
@@ -218,13 +219,13 @@ const st = StyleSheet.create({
   emblemCore: { width: 88, height: 88, borderRadius: 44, borderWidth: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   emblemImage: { width: '100%', height: '100%', borderRadius: 44 },
   detailTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center', paddingHorizontal: 12 },
-  detailTitleHi: { fontSize: 17, lineHeight: 26, fontWeight: '600', marginTop: 6, textAlign: 'center' },
+  detailTitleHi: { fontSize: DS.type.deva.heroTitle.size, lineHeight: DS.type.deva.heroTitle.lineHeight, fontWeight: '600', marginTop: 6, textAlign: 'center' },
   detailDeity: { fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 8 },
   listenBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 100, marginTop: 20 },
   listenBtnText: { fontSize: 14.5, fontWeight: '800', color: '#FFF' },
 
   lyricsCard: { marginHorizontal: 16, marginTop: 16, borderRadius: 18, padding: 20, borderWidth: 1 },
-  lyricsText: { fontSize: 17.5, lineHeight: 34, fontWeight: '500' },
+  lyricsText: { fontSize: DS.type.deva.lyric.size, lineHeight: DS.type.deva.lyric.lineHeight, fontWeight: '500' },
   meaningCard: { marginHorizontal: 16, marginTop: 12, borderRadius: 16, padding: 16, borderWidth: 1 },
   meaningHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   meaningLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2 },

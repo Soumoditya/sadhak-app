@@ -397,13 +397,12 @@ export default function CalendarScreen() {
                 <Text style={{ color: colors.textTertiary, fontSize: 16 }}>  {selectedDate.getFullYear()}</Text>
               </Text>
             </View>
+            {/* Grooming badge — scissors + OK/Caution/Avoid, identical to Home so
+                it clearly reads as grooming guidance (not a verdict on the day). */}
             <View style={[st.statusBadge, { backgroundColor: groomingColor + '14', borderColor: groomingColor + '3D' }]}>
-              <MaterialCommunityIcons
-                name={selectedGrooming.overallStatus === 'allowed' ? 'check-decagram' : selectedGrooming.overallStatus === 'avoid' ? 'alert-decagram' : 'close-octagon'}
-                size={16} color={groomingColor}
-              />
+              <MaterialCommunityIcons name="content-cut" size={14} color={groomingColor} />
               <Text style={[st.statusBadgeText, { color: groomingColor }]}>
-                {selectedGrooming.overallStatus === 'allowed' ? 'Shubh' : selectedGrooming.overallStatus === 'avoid' ? 'Caution' : 'Avoid'}
+                {selectedGrooming.overallStatus === 'allowed' ? 'OK' : selectedGrooming.overallStatus === 'avoid' ? 'Caution' : 'Avoid'}
               </Text>
             </View>
           </View>
@@ -511,11 +510,11 @@ export default function CalendarScreen() {
               <Text style={[st.actionBtnText, { color: colors.primary }]}>{hasNote ? 'Edit Note' : 'Add Note'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[st.actionBtn, { backgroundColor: colors.ekadashi + '12', borderColor: colors.ekadashi + '30' }]}
+              style={[st.actionBtn, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}
               onPress={openReminderSheet}
             >
-              <MaterialCommunityIcons name={existingReminder ? 'bell-check' : 'bell-plus-outline'} size={17} color={colors.ekadashi} />
-              <Text style={[st.actionBtnText, { color: colors.ekadashi }]}>
+              <MaterialCommunityIcons name={existingReminder ? 'bell-check' : 'bell-plus-outline'} size={17} color={colors.primary} />
+              <Text style={[st.actionBtnText, { color: colors.primary }]}>
                 {existingReminder ? `Reminds ${existingReminder.time}` : 'Reminder'}
               </Text>
             </TouchableOpacity>

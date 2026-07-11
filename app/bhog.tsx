@@ -144,7 +144,7 @@ export default function BhogScreen() {
           <Ionicons name="search" size={17} color="rgba(255,255,255,0.85)" />
           <TextInput
             style={st.searchInput}
-            placeholder="Dish, occasion or ingredient (e.g. sabudana)…"
+            placeholder="Search dish, occasion, ingredient…"
             placeholderTextColor="rgba(255,255,255,0.7)"
             value={query}
             onChangeText={setQuery}

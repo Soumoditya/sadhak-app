@@ -35,7 +35,7 @@ const MORE_MODULES = [
   { key: 'bhog', label: 'Satvik Bhog', icon: 'food-variant', color: '#2D6A4F', route: '/bhog' },
   { key: 'wallpaper', label: 'Wallpapers', icon: 'image-multiple-outline', color: '#0EA5E9', route: '/wallpapers' },
   { key: 'notes', label: 'Notes', icon: 'note-edit-outline', color: '#37474F', route: '/notes' },
-  { key: 'feed', label: 'Explore', icon: 'compass', color: '#F59E0B', route: '/feed' },
+  { key: 'feed', label: 'Feed', icon: 'compass', color: '#F59E0B', route: '/feed' },
 ];
 
 export default function HomeScreen() {
@@ -159,8 +159,8 @@ export default function HomeScreen() {
         <Text style={[s.shlokaSrc, { color: colors.textTertiary }]}>— {shloka.source}</Text>
       </Card>
 
-      {/* ═══ 5. Explore — full feature tiles ═══ */}
-      <Section title="Explore">
+      {/* ═══ 5. More — full feature tiles ═══ */}
+      <Section title="More">
         <View style={s.moreGrid}>
           {MORE_MODULES.map((a) => (
             <TouchableOpacity

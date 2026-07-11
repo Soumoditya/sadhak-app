@@ -4,6 +4,7 @@ import {
   Share, ActivityIndicator, Dimensions,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -26,6 +27,7 @@ export default function ProfileScreen() {
   const { profile, isGuest, isAdmin, updateProfile, user } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
+  const insets = useSafeAreaInsets();
 
   const [uploadingPfp, setUploadingPfp] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -213,7 +215,10 @@ export default function ProfileScreen() {
           <Text style={[styles.handle, { color: colors.textTertiary }]}>@{profile?.username || 'set-username'}</Text>
         </TouchableOpacity>
         {!!profile?.bio && <Text style={[styles.bio, { color: colors.textSecondary }]}>{profile.bio}</Text>}
-        <View style={styles.badgeRow}>
+        {/* Only render the badge row when there's a badge to show (location now
+            lives in the stat row above, so no duplicate badge here). */}
+        {(isAdmin || isGuest) && (
+          <View style={styles.badgeRow}>
             {isAdmin && (
               <View style={[styles.badge, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B55' }]}>
                 <MaterialCommunityIcons name="shield-crown" size={11} color="#F59E0B" />
@@ -225,13 +230,8 @@ export default function ProfileScreen() {
                 <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '800' }}>Guest</Text>
               </View>
             )}
-          {profile?.location?.city && (
-            <View style={[styles.badge, { backgroundColor: colors.info + '18' || '#1565C018', borderColor: colors.info + '55' || '#1565C055' }]}>
-              <Ionicons name="location-outline" size={11} color={colors.info || '#1565C0'} />
-              <Text style={{ color: colors.info || '#1565C0', fontSize: 11, fontWeight: '700' }}>{profile.location.city}</Text>
-            </View>
-          )}
-        </View>
+          </View>
+        )}
       </View>
 
       <View style={{ marginTop: DS.space.lg }}>
@@ -295,7 +295,7 @@ export default function ProfileScreen() {
       {/* ═══ Edit Profile Modal ═══ */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: 28 + insets.bottom }]}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
             <Text style={[styles.sheetTitle, { color: colors.text }]}>Edit profile</Text>
 
@@ -342,7 +342,7 @@ export default function ProfileScreen() {
       {/* ═══ Username Modal ═══ */}
       <Modal visible={usernameOpen} transparent animationType="slide" onRequestClose={() => setUsernameOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: 28 + insets.bottom }]}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
             <Text style={[styles.sheetTitle, { color: colors.text }]}>Set username</Text>
             <Text style={[styles.sheetSub, { color: colors.textSecondary }]}>

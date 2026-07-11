@@ -13,6 +13,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { Header } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
 import { WALLPAPERS, WALLPAPER_CATEGORIES, type Wallpaper } from '../constants/wallpapers';
+import { setWallpaper as nativeSetWallpaper, isWallpaperModuleAvailable, type WallpaperTarget } from '../modules/sadhak-wallpaper';
 
 const { width } = Dimensions.get('window');
 const GAP = 12;
@@ -61,10 +62,10 @@ export default function WallpapersScreen() {
     }
   };
 
-  // Android: hand the image to the system "Set as wallpaper" chooser via
-  // ACTION_ATTACH_DATA. No custom native module — Android's own UI does the set,
-  // so the user picks home / lock / both.
-  const setAsWallpaper = async (w: Wallpaper) => {
+  // Apply the wallpaper. Primary path = our WallpaperManager native module
+  // (reliable on OEM skins). Fallback = ACTION_ATTACH_DATA system chooser for
+  // builds where the native module isn't linked yet.
+  const applyWallpaper = async (w: Wallpaper, target: WallpaperTarget) => {
     if (Platform.OS !== 'android') {
       dialog.alert('Android only', 'One-tap wallpaper setting is available on Android. On iOS, save to gallery and set it from Photos.');
       return;
@@ -72,18 +73,35 @@ export default function WallpapersScreen() {
     try {
       setBusy('set');
       const uri = await downloadToCache(w);
-      const contentUri = await FileSystem.getContentUriAsync(uri);
-      await IntentLauncher.startActivityAsync('android.intent.action.ATTACH_DATA', {
-        data: contentUri,
-        flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-        type: 'image/jpeg',
-        extra: { mimeType: 'image/jpeg' },
-      });
+      if (isWallpaperModuleAvailable()) {
+        await nativeSetWallpaper(uri, target);
+        dialog.alert('Wallpaper set', `"${w.title}" is now your ${target === 'both' ? 'home & lock' : target} screen.`, undefined, { tone: 'success' });
+      } else {
+        // Fallback: let the system's own cropper/chooser handle it.
+        const contentUri = await FileSystem.getContentUriAsync(uri);
+        await IntentLauncher.startActivityAsync('android.intent.action.ATTACH_DATA', {
+          data: contentUri,
+          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+          type: 'image/jpeg',
+          extra: { mimeType: 'image/jpeg' },
+        });
+      }
     } catch (e: any) {
       dialog.alert('Could not set wallpaper', String(e?.message || e).slice(0, 160));
     } finally {
       setBusy(null);
     }
+  };
+
+  // Ask which screen(s) to apply to, then set.
+  const setAsWallpaper = (w: Wallpaper) => {
+    if (Platform.OS !== 'android') { applyWallpaper(w, 'both'); return; }
+    dialog.alert('Set wallpaper', `Apply "${w.title}" to:`, [
+      { text: 'Home screen', onPress: () => applyWallpaper(w, 'home') },
+      { text: 'Lock screen', onPress: () => applyWallpaper(w, 'lock') },
+      { text: 'Both', onPress: () => applyWallpaper(w, 'both') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   return (
@@ -116,6 +134,7 @@ export default function WallpapersScreen() {
               placeholder={{ blurhash: w.blurhash }}
               style={st.tileImg}
               contentFit="cover"
+              contentPosition="top"
               transition={220}
               cachePolicy="disk"
             />
@@ -134,7 +153,9 @@ export default function WallpapersScreen() {
               source={{ uri: preview.url }}
               placeholder={{ blurhash: preview.blurhash }}
               style={StyleSheet.absoluteFill}
-              contentFit="cover"
+              // 'contain' so the whole painting is visible in preview (deity not
+              // cropped). The wallpaper is still applied full-bleed by the system.
+              contentFit="contain"
               transition={220}
               cachePolicy="disk"
             />

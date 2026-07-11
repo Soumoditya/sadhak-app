@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, Animated, Easing } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
 
@@ -45,6 +46,7 @@ const TONE_ICON: Record<DialogTone, keyof typeof MaterialCommunityIcons.glyphMap
 
 export function DialogProvider({ children }: { children: React.ReactNode }) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [opts, setOpts] = useState<DialogOptions | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
@@ -129,7 +131,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
           <Animated.View
             style={[
               styles.sheet,
-              { backgroundColor: colors.surfaceElevated, transform: [{ translateY: slideTranslate }] },
+              { backgroundColor: colors.surfaceElevated, paddingBottom: 20 + insets.bottom, transform: [{ translateY: slideTranslate }] },
             ]}
           >
             {/* Grabber handle — makes it feel like a sheet, not a system alert */}

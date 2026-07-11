@@ -1,0 +1,7 @@
+{
+  "name": "sadhak-wallpaper",
+  "version": "0.1.0",
+  "description": "Local Expo module: set device wallpaper via WallpaperManager (Android).",
+  "main": "index.ts",
+  "private": true
+}

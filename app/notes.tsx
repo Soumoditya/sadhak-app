@@ -4,6 +4,7 @@ import {
   Modal, Alert, Dimensions, Platform, Animated, KeyboardAvoidingView,
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from "../contexts/DialogContext";
@@ -89,6 +90,7 @@ function useUndoRedo(initial: string) {
 export default function NotesScreen() {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const dialog = useDialog();
   const { t } = useLanguage();
   const [notes, setNotes] = useState<Note[]>([]);
@@ -764,8 +766,8 @@ export default function NotesScreen() {
       </Modal>
 
       <Modal visible={showMoreActions} transparent animationType="fade">
-        <TouchableOpacity style={st.moreOverlay} activeOpacity={1} onPress={() => setShowMoreActions(false)}>
-          <View style={[st.moreSheet, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity style={[st.moreOverlay, { paddingTop: insets.top + 56 }]} activeOpacity={1} onPress={() => setShowMoreActions(false)}>
+          <View style={[st.moreSheet, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             {[
               { icon: 'content-duplicate', label: 'Duplicate', action: () => { if (editingNote) { duplicateNote(editingNote); setShowEditor(false); } setShowMoreActions(false); } },
               { icon: 'archive-outline', label: 'Archive', action: () => { if (editingNote) { archiveNote(editingNote); setShowEditor(false); } setShowMoreActions(false); } },
@@ -875,8 +877,8 @@ const st = StyleSheet.create({
   selectedLabels: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 20, paddingBottom: 40 },
 
   // More actions
-  moreOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' },
-  moreSheet: { width: 260, borderRadius: 16, padding: 8, elevation: 10 },
+  moreOverlay: { flex: 1, justifyContent: 'flex-start', alignItems: 'flex-end', paddingRight: 12, backgroundColor: 'rgba(0,0,0,0.4)' },
+  moreSheet: { width: 220, borderRadius: 16, borderWidth: 1, padding: 8, elevation: 10 },
   moreItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 10 },
   moreItemText: { fontSize: 15, fontWeight: '600' },
 });

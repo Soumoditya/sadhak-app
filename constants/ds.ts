@@ -27,6 +27,15 @@ export const DS = {
     overline: { size: 11, lineHeight: 14, weight: '700' as const, letterSpacing: 1.2 },
     // Button
     button: { size: 15, lineHeight: 20, weight: '700' as const, letterSpacing: 0.2 },
+    // ─── DEVANAGARI ───
+    // Devanagari glyphs carry top matras (ि ी े ै ो ौ) and stacked conjuncts, so
+    // they need ~1.5–1.9× line-height or they clip/read cramped next to Latin.
+    // Use these for ANY Hindi/Sanskrit text so the treatment never drifts.
+    deva: {
+      title: { size: 15, lineHeight: 24, weight: '600' as const },     // list-row Hindi title
+      heroTitle: { size: 17, lineHeight: 28, weight: '600' as const }, // detail hero Hindi
+      lyric: { size: 17.5, lineHeight: 34, weight: '500' as const },   // aarti/mantra lyrics
+    },
   },
   // ─── ELEVATION ───
   elevation: {
