@@ -43,7 +43,8 @@ Write-Host "     pushed to GitHub." -ForegroundColor Green
 Write-Host "3/3  Writing a local zip snapshot..." -ForegroundColor Cyan
 $backupDir = Join-Path $env:USERPROFILE "Documents\Sadhak-Backups"
 New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
-$version = (Get-Content package.json | ConvertFrom-Json).version
+# The real app version lives in app.json (package.json stays at 1.0.0).
+$version = (Get-Content app.json | ConvertFrom-Json).expo.version
 $zipName = "sadhak-app-v$version-" + (Get-Date -Format "yyyyMMdd-HHmm") + ".zip"
 $zipPath = Join-Path $backupDir $zipName
 # git archive = a clean snapshot of your source (no node_modules/android bloat).
