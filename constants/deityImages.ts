@@ -15,6 +15,8 @@ const WIDTH = 800;
 const wm = (filename: string): string =>
   `${FILE_BASE}${encodeURIComponent(filename)}?width=${WIDTH}`;
 
+import { CUSTOM_DEITIES } from './customImages.generated';
+
 export interface DeityImage {
   /** Wikimedia Commons stable URL (public domain). */
   url: string;
@@ -22,6 +24,25 @@ export interface DeityImage {
   blurhash: string;
   /** Attribution — surface once, quietly, in the About screen. */
   credit: string;
+  /** Owner's own bundled image (require id) if they dropped one in
+   *  assets/custom/deities/. When set, screens use this instead of `url`. */
+  local?: number;
+}
+
+// Short filename-key the owner uses for their own image (assets/custom/deities/<key>.jpg).
+const DEITY_CUSTOM_KEY: Record<string, string> = {
+  'Lord Vishnu': 'vishnu', 'Lord Shiva': 'shiva', 'Lord Ganesha': 'ganesha',
+  'Lord Hanuman': 'hanuman', 'Goddess Lakshmi': 'lakshmi', 'Goddess Durga': 'durga',
+  'Lord Krishna': 'krishna', 'Goddess Saraswati': 'saraswati', 'Savitr (Surya)': 'surya',
+  'Shani Dev': 'shani',
+};
+
+// Attach the owner's custom image (if present) to a registry entry.
+function withCustom(key: string, img: DeityImage | undefined): DeityImage | null {
+  if (!img) return null;
+  const ck = DEITY_CUSTOM_KEY[key];
+  const local = ck ? CUSTOM_DEITIES[ck] : undefined;
+  return local ? { ...img, local } : img;
 }
 
 // Warm oil-painting placeholders. These are close enough to Ravi Varma's
@@ -89,7 +110,7 @@ export const DEITY_IMAGES: Record<string, DeityImage> = {
  * Used by screens whose data already uses the canonical names (aarti).
  */
 export function getDeityImage(deity: string): DeityImage | null {
-  return DEITY_IMAGES[deity] ?? null;
+  return withCustom(deity, DEITY_IMAGES[deity]);
 }
 
 // Keyword → registry-key map, so screens that use looser names
@@ -113,9 +134,9 @@ const KEYWORD_TO_KEY: Array<[RegExp, string]> = [
  */
 export function resolveDeityImage(deity: string): DeityImage | null {
   if (!deity) return null;
-  if (DEITY_IMAGES[deity]) return DEITY_IMAGES[deity];
+  if (DEITY_IMAGES[deity]) return withCustom(deity, DEITY_IMAGES[deity]);
   for (const [re, key] of KEYWORD_TO_KEY) {
-    if (re.test(deity)) return DEITY_IMAGES[key];
+    if (re.test(deity)) return withCustom(key, DEITY_IMAGES[key]);
   }
   return null;
 }

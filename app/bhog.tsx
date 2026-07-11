@@ -51,7 +51,7 @@ export default function BhogScreen() {
             {heroImg ? (
               <View style={st.dHeroImgWrap}>
                 <ExpoImage
-                  source={{ uri: heroImg.url }}
+                  source={heroImg.local ?? { uri: heroImg.url }}
                   placeholder={{ blurhash: heroImg.blurhash }}
                   style={st.dHeroImg}
                   contentFit="cover"
@@ -175,7 +175,7 @@ export default function BhogScreen() {
             <View style={[st.cardIcon, { backgroundColor: r.color + '14' }]}>
               {img ? (
                 <ExpoImage
-                  source={{ uri: img.url }}
+                  source={img.local ?? { uri: img.url }}
                   placeholder={{ blurhash: img.blurhash }}
                   style={st.cardIconImg}
                   contentFit="cover"

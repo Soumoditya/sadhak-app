@@ -12,7 +12,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { Header } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
-import { WALLPAPERS, WALLPAPER_CATEGORIES, type Wallpaper } from '../constants/wallpapers';
+import { Asset } from 'expo-asset';
+import { getWallpapers, WALLPAPER_CATEGORIES, type Wallpaper } from '../constants/wallpapers';
 import { setWallpaper as nativeSetWallpaper, isWallpaperModuleAvailable, type WallpaperTarget } from '../modules/sadhak-wallpaper';
 
 const { width } = Dimensions.get('window');
@@ -27,15 +28,21 @@ export default function WallpapersScreen() {
   const [preview, setPreview] = useState<Wallpaper | null>(null);
   const [busy, setBusy] = useState<null | 'save' | 'set'>(null);
 
+  const all = useMemo(() => getWallpapers(), []);
   const list = useMemo(
-    () => (cat === 'all' ? WALLPAPERS : WALLPAPERS.filter(w => w.category === cat)),
-    [cat],
+    () => (cat === 'all' ? all : all.filter(w => w.category === cat)),
+    [cat, all],
   );
 
-  // Download the full-size image into the app cache; returns a local file:// URI.
-  // Wikimedia rejects requests without a descriptive User-Agent (HTTP 403), so
-  // we send one per their policy: https://meta.wikimedia.org/wiki/User-Agent_policy
+  // Return a local file:// URI for a wallpaper. Owner's bundled images resolve
+  // via expo-asset; remote ones download to cache. (Wikimedia rejects a blank
+  // User-Agent with 403, so we send a descriptive one per their policy.)
   const downloadToCache = async (w: Wallpaper): Promise<string> => {
+    if (w.local) {
+      const asset = Asset.fromModule(w.local);
+      await asset.downloadAsync();
+      return asset.localUri || asset.uri;
+    }
     const target = `${FileSystem.cacheDirectory}wallpaper-${w.id}.jpg`;
     const res = await FileSystem.downloadAsync(w.url, target, {
       headers: { 'User-Agent': 'SadhakApp/1.6 (Hindu companion app; soumodityapramanik@gmail.com)' },
@@ -130,7 +137,7 @@ export default function WallpapersScreen() {
         {list.map(w => (
           <TouchableOpacity key={w.id} activeOpacity={0.85} onPress={() => setPreview(w)} style={st.tile}>
             <ExpoImage
-              source={{ uri: w.thumb }}
+              source={w.local ?? { uri: w.thumb }}
               placeholder={{ blurhash: w.blurhash }}
               style={st.tileImg}
               contentFit="cover"
@@ -150,7 +157,7 @@ export default function WallpapersScreen() {
         <View style={st.previewWrap}>
           {preview && (
             <ExpoImage
-              source={{ uri: preview.url }}
+              source={preview.local ?? { uri: preview.url }}
               placeholder={{ blurhash: preview.blurhash }}
               style={StyleSheet.absoluteFill}
               // 'contain' so the whole painting is visible in preview (deity not

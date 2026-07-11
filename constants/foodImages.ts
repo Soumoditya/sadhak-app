@@ -12,10 +12,14 @@ const WIDTH = 600;
 const wm = (filename: string): string =>
   `${FILE_BASE}${encodeURIComponent(filename)}?width=${WIDTH}`;
 
+import { CUSTOM_FOOD } from './customImages.generated';
+
 export interface FoodImage {
   url: string;
   blurhash: string;
   credit: string;
+  /** Owner's own image (require id) if dropped in assets/custom/food/<recipe-id>.jpg. */
+  local?: number;
 }
 
 // Warm food-photo placeholder blurhashes (approximate; disk-cached after first view).
@@ -36,5 +40,8 @@ export const FOOD_IMAGES: Record<string, FoodImage> = {
 };
 
 export function getFoodImage(recipeId: string): FoodImage | null {
-  return FOOD_IMAGES[recipeId] ?? null;
+  const img = FOOD_IMAGES[recipeId];
+  if (!img) return null;
+  const local = CUSTOM_FOOD[recipeId];
+  return local ? { ...img, local } : img;
 }

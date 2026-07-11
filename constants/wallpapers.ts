@@ -9,16 +9,20 @@ const FILE_BASE = 'https://commons.wikimedia.org/wiki/Special:FilePath/';
 const wm = (filename: string, width = 1080): string =>
   `${FILE_BASE}${encodeURIComponent(filename)}?width=${width}`;
 
+import { CUSTOM_WALLPAPERS } from './customImages.generated';
+
 export interface Wallpaper {
   id: string;
   title: string;
-  category: 'deity' | 'temple' | 'nature';
+  category: 'deity' | 'temple' | 'nature' | 'mine';
   /** Full-size download URL (1080px). */
   url: string;
   /** Smaller URL for the grid thumbnail. */
   thumb: string;
   blurhash: string;
   credit: string;
+  /** Owner's own bundled image (require id) if dropped in assets/custom/wallpapers/. */
+  local?: number;
 }
 
 const WARM = 'L6PZfSjE.AyE_3t7t7R**0o#DgR4';
@@ -93,7 +97,33 @@ export const WALLPAPERS: Wallpaper[] = [
 
 export const WALLPAPER_CATEGORIES: Array<{ key: 'all' | Wallpaper['category']; label: string; icon: string }> = [
   { key: 'all', label: 'All', icon: 'view-grid-outline' },
+  { key: 'mine', label: 'Mine', icon: 'heart-outline' },
   { key: 'deity', label: 'Deities', icon: 'account-star-outline' },
   { key: 'temple', label: 'Temples', icon: 'temple-hindu' },
   { key: 'nature', label: 'Nature', icon: 'image-filter-hdr' },
 ];
+
+// Build the full wallpaper list: the owner's own images first (any file dropped
+// into assets/custom/wallpapers/), then the curated ones. A custom file whose
+// name matches a built-in id (e.g. "krishna.jpg") replaces that built-in image.
+function titleCase(key: string): string {
+  return key.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function getWallpapers(): Wallpaper[] {
+  const customKeys = Object.keys(CUSTOM_WALLPAPERS);
+  // Override built-ins that share an id with a dropped file.
+  const merged = WALLPAPERS.map((w) =>
+    CUSTOM_WALLPAPERS[w.id] ? { ...w, local: CUSTOM_WALLPAPERS[w.id], category: 'mine' as const } : w,
+  );
+  // Brand-new wallpapers for custom files that don't match a built-in id.
+  const builtinIds = new Set(WALLPAPERS.map((w) => w.id));
+  const fresh: Wallpaper[] = customKeys
+    .filter((k) => !builtinIds.has(k))
+    .map((k) => ({
+      id: k, title: titleCase(k), category: 'mine' as const,
+      url: '', thumb: '', blurhash: WARM, credit: 'Your image',
+      local: CUSTOM_WALLPAPERS[k],
+    }));
+  return [...fresh, ...merged];
+}

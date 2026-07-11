@@ -60,7 +60,7 @@ export default function DevotionalScreen() {
               <View style={[st.emblemCore, { backgroundColor: colors.surfaceElevated, borderColor: selected.color + '55' }]}>
                 {deityImg ? (
                   <ExpoImage
-                    source={{ uri: deityImg.url }}
+                    source={deityImg.local ?? { uri: deityImg.url }}
                     placeholder={{ blurhash: deityImg.blurhash }}
                     style={st.emblemImage}
                     contentFit="cover"
@@ -154,7 +154,7 @@ export default function DevotionalScreen() {
             <View style={[st.cardIcon, { backgroundColor: item.color + '18', borderColor: item.color + '55', borderWidth: 1 }]}>
               {img ? (
                 <ExpoImage
-                  source={{ uri: img.url }}
+                  source={img.local ?? { uri: img.url }}
                   placeholder={{ blurhash: img.blurhash }}
                   style={st.cardIconImage}
                   contentFit="cover"

@@ -34,7 +34,7 @@ export default function PujaGuideScreen() {
             {heroImg ? (
               <View style={st.dHeroImgWrap}>
                 <ExpoImage
-                  source={{ uri: heroImg.url }}
+                  source={heroImg.local ?? { uri: heroImg.url }}
                   placeholder={{ blurhash: heroImg.blurhash }}
                   style={st.dHeroImg}
                   contentFit="cover"
@@ -149,7 +149,7 @@ export default function PujaGuideScreen() {
             <View style={[st.cardIcon, { backgroundColor: g.color + '14', borderColor: g.color + '44', borderWidth: img ? 1 : 0 }]}>
               {img ? (
                 <ExpoImage
-                  source={{ uri: img.url }}
+                  source={img.local ?? { uri: img.url }}
                   placeholder={{ blurhash: img.blurhash }}
                   style={st.cardIconImg}
                   contentFit="cover"
