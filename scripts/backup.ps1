@@ -1,57 +1,63 @@
-# Sadhak — one-command backup.
-# Commits everything, pushes to GitHub (your private cloud backup), and writes a
+# Sadhak - backup (manual OR automatic).
+# Commits any changes, pushes to GitHub (private cloud backup), and writes a
 # timestamped local zip snapshot to Documents\Sadhak-Backups.
 #
-# HOW TO RUN (from the project folder, in PowerShell):
+# MANUAL (from the project folder, in PowerShell):
 #     .\scripts\backup.ps1 "what you changed"
-# or just:
-#     .\scripts\backup.ps1
+# AUTOMATIC: a login launcher runs this for you every time you sign in, so you
+# never have to think about it.
 #
-# You can also right-click this file > "Run with PowerShell".
+# Offline-safe: with no internet it still commits + zips locally and skips the
+# upload (the next run pushes everything).
 
 param(
-  [string]$Message = ""
+  [string]$Message = "",
+  [switch]$Quiet
 )
 
-$ErrorActionPreference = "Stop"
+function Say($text, $color = "Gray") { if (-not $Quiet) { Write-Host $text -ForegroundColor $color } }
 
-# Move to the project root (the folder above this /scripts folder), so it works
-# no matter where you run it from.
+# Work from the project root (folder above /scripts), whatever the caller's dir.
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 
 $stamp = Get-Date -Format "yyyy-MM-dd HH:mm"
-if ([string]::IsNullOrWhiteSpace($Message)) {
-  $Message = "backup: $stamp"
-}
+if ([string]::IsNullOrWhiteSpace($Message)) { $Message = "auto-backup: $stamp" }
 
-Write-Host "1/3  Saving your changes (commit)..." -ForegroundColor Cyan
-git add -A
-# Only commit if there is something to commit (avoids an error on a clean repo).
+# 1) Commit any changes (skip cleanly if nothing changed).
+Say "1/3  Saving changes (commit)..." "Cyan"
+git add -A 2>$null
 $pending = git status --porcelain
 if ($pending) {
   git commit -m $Message | Out-Null
-  Write-Host "     committed: $Message" -ForegroundColor Green
+  Say "     committed: $Message" "Green"
 } else {
-  Write-Host "     nothing new to commit." -ForegroundColor DarkGray
+  Say "     nothing new to commit." "DarkGray"
 }
 
-Write-Host "2/3  Uploading to GitHub (cloud backup)..." -ForegroundColor Cyan
-git push origin master
-Write-Host "     pushed to GitHub." -ForegroundColor Green
+# 2) Push to GitHub - never let an offline moment fail the whole backup.
+Say "2/3  Uploading to GitHub..." "Cyan"
+git push origin master 2>&1 | Out-Null
+if ($LASTEXITCODE -eq 0) {
+  Say "     pushed to GitHub." "Green"
+} else {
+  Say "     could not push (offline?) - will push next time." "Yellow"
+}
 
-Write-Host "3/3  Writing a local zip snapshot..." -ForegroundColor Cyan
+# 3) Local zip snapshot (clean source only, no node_modules/android bloat).
+Say "3/3  Writing local zip snapshot..." "Cyan"
 $backupDir = Join-Path $env:USERPROFILE "Documents\Sadhak-Backups"
 New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
-# The real app version lives in app.json (package.json stays at 1.0.0).
-$version = (Get-Content app.json | ConvertFrom-Json).expo.version
+$version = (Get-Content app.json -Raw | ConvertFrom-Json).expo.version
 $zipName = "sadhak-app-v$version-" + (Get-Date -Format "yyyyMMdd-HHmm") + ".zip"
 $zipPath = Join-Path $backupDir $zipName
-# git archive = a clean snapshot of your source (no node_modules/android bloat).
 git archive --format=zip -o $zipPath HEAD
-Write-Host "     saved: $zipPath" -ForegroundColor Green
+Say "     saved: $zipPath" "Green"
 
-Write-Host ""
-Write-Host "Done. Your work is backed up in TWO places:" -ForegroundColor Green
-Write-Host "  - GitHub (private): github.com/Soumoditya/sadhak-app"
-Write-Host "  - Local zip: $backupDir"
+# Keep only the 24 most recent zips so months of auto-runs do not fill the disk.
+Get-ChildItem $backupDir -Filter "sadhak-app-v*.zip" |
+  Sort-Object LastWriteTime -Descending | Select-Object -Skip 24 |
+  Remove-Item -Force -ErrorAction SilentlyContinue
+
+Say ""
+Say "Backed up: GitHub (private) + $backupDir" "Green"
