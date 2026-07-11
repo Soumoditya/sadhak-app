@@ -1,29 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, Image, Modal,
-  Share, Linking, ActivityIndicator,
+  Share, ActivityIndicator, Dimensions,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
-import { useLanguage, SUPPORTED_LANGUAGES, type LanguageCode } from '../../contexts/LanguageContext';
-import { db, auth, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { useLanguage, SUPPORTED_LANGUAGES } from '../../contexts/LanguageContext';
+import { db, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
 import { uploadToCloudinary } from '../../services/cloudinary';
-import { sendTestNotification } from '../../services/notifications';
-import { APP_VERSION, WEBSITE_URL } from '../../constants/appInfo';
-import { Screen, Card, Button, SettingsRow } from '../../components/ui';
+import { getUserPosts, type Post } from '../../services/posts';
+import { WEBSITE_URL } from '../../constants/appInfo';
+import { Screen, Card, Button } from '../../components/ui';
 import { DS } from '../../constants/ds';
 
+const { width: SCREEN_W } = Dimensions.get('window');
+const GRID_GAP = 3;
+const GRID_COL = (SCREEN_W - 20 * 2 - GRID_GAP * 2) / 3;
+
 export default function ProfileScreen() {
-  const { profile, isGuest, isAdmin, logout, updateProfile, user, deleteAccount } = useAuth();
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { profile, isGuest, isAdmin, updateProfile, user } = useAuth();
+  const { colors } = useTheme();
   const dialog = useDialog();
-  const { t, language, setLanguage } = useLanguage();
 
   const [uploadingPfp, setUploadingPfp] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -33,7 +35,23 @@ export default function ProfileScreen() {
   const [usernameOpen, setUsernameOpen] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [checkingUsername, setCheckingUsername] = useState(false);
-  const [languageOpen, setLanguageOpen] = useState(false);
+  const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+
+  // Load the user's own posts whenever the tab regains focus (so a new post
+  // shows up without a manual refresh).
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (!user?.uid) { setLoadingPosts(false); return; }
+      setLoadingPosts(true);
+      getUserPosts(user.uid)
+        .then((posts) => { if (active) setMyPosts(posts); })
+        .catch(() => {})
+        .finally(() => { if (active) setLoadingPosts(false); });
+      return () => { active = false; };
+    }, [user?.uid]),
+  );
 
   useEffect(() => {
     if (profile) {
@@ -99,31 +117,6 @@ export default function ProfileScreen() {
     } finally { setSavingEdit(false); }
   };
 
-  // ─── Settings ───────────────────────────────────────────
-  const updateSetting = async (key: string, value: boolean) => {
-    const s = { ...(profile?.settings || {}), [key]: value };
-    await updateProfile({ settings: s } as any);
-  };
-
-  const handleLogout = () => {
-    dialog.alert('Sign out', 'You will need to sign in again to access your account.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: logout },
-    ]);
-  };
-
-  const handleDeleteAccount = () => {
-    dialog.alert('Delete account?', 'This permanently deletes your account and all data. This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete forever', style: 'destructive', onPress: () => {
-        dialog.alert('Are you absolutely sure?', 'Last chance — this is permanent.', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Yes, delete', style: 'destructive', onPress: deleteAccount },
-        ]);
-      }},
-    ]);
-  };
-
   const shareApp = async () => {
     try {
       await Share.share({
@@ -132,37 +125,24 @@ export default function ProfileScreen() {
     } catch {}
   };
 
-  const rateApp = () => {
-    dialog.alert(
-      'Coming to Play Store',
-      "Sadhak isn't on the Play Store yet. Until then, sharing with fellow sadhaks helps the most. 🙏",
-      [{ text: 'Share instead', onPress: shareApp }, { text: 'OK', style: 'cancel' }],
-      { tone: 'info' },
-    );
-  };
-
-  const changePassword = () => {
-    const em = profile?.email;
-    if (!em) { dialog.alert('No email', 'Guest accounts have no password.', undefined, { tone: 'info' }); return; }
-    dialog.alert('Change password', `We'll email a secure reset link to ${em}.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Send link', onPress: async () => {
-        try {
-          await sendPasswordResetEmail(auth, em);
-          dialog.alert('Sent', 'Check your inbox and spam folder.', undefined, { tone: 'success' });
-        } catch { dialog.alert('Failed', 'Try again later.'); }
-      }},
-    ]);
-  };
-
   const initials = (profile?.displayName || 'S').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
-  const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === language);
-  const s = profile?.settings || ({} as any);
 
   return (
-    <Screen scroll tabbed edges={{ top: false, bottom: false }}>
+    <Screen scroll tabbed edges={{ top: true, bottom: false }}>
 
-      {/* ═══ Identity ═══ */}
+      {/* ═══ Top bar: title + settings gear ═══ */}
+      <View style={styles.topBar}>
+        <Text style={[styles.screenTitle, { color: colors.text }]}>Profile</Text>
+        <TouchableOpacity
+          onPress={() => router.push('/settings' as any)}
+          style={[styles.gearBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+          hitSlop={8}
+        >
+          <Ionicons name="settings-outline" size={20} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+
+      {/* ═══ Identity: avatar + stats (Instagram-style) ═══ */}
       <View style={styles.identityRow}>
         <TouchableOpacity onPress={pickAndUploadPfp} activeOpacity={0.8}>
           <View style={styles.avatarWrap}>
@@ -182,12 +162,32 @@ export default function ProfileScreen() {
             </View>
           </View>
         </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: DS.space.lg }}>
-          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{profile?.displayName || 'Sadhak'}</Text>
-          <TouchableOpacity onPress={() => setUsernameOpen(true)} hitSlop={4}>
-            <Text style={[styles.handle, { color: colors.textTertiary }]}>@{profile?.username || 'set-username'}</Text>
-          </TouchableOpacity>
-          <View style={styles.badgeRow}>
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.stat}>
+            <Text style={[styles.statNum, { color: colors.text }]}>{myPosts.length}</Text>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Posts</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={[styles.statNum, { color: colors.text }]}>{profile?.location?.city ? '1' : '—'}</Text>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Region</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={[styles.statNum, { color: colors.text }]}>{isAdmin ? '★' : '🙏'}</Text>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{isAdmin ? 'Admin' : 'Sadhak'}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Name + handle + bio */}
+      <View style={{ marginTop: DS.space.md }}>
+        <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{profile?.displayName || 'Sadhak'}</Text>
+        <TouchableOpacity onPress={() => setUsernameOpen(true)} hitSlop={4}>
+          <Text style={[styles.handle, { color: colors.textTertiary }]}>@{profile?.username || 'set-username'}</Text>
+        </TouchableOpacity>
+        {!!profile?.bio && <Text style={[styles.bio, { color: colors.textSecondary }]}>{profile.bio}</Text>}
+        <View style={styles.badgeRow}>
             {isAdmin && (
               <View style={[styles.badge, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B55' }]}>
                 <MaterialCommunityIcons name="shield-crown" size={11} color="#F59E0B" />
@@ -199,13 +199,12 @@ export default function ProfileScreen() {
                 <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '800' }}>Guest</Text>
               </View>
             )}
-            {profile?.location?.city && (
-              <View style={[styles.badge, { backgroundColor: colors.info + '18' || '#1565C018', borderColor: colors.info + '55' || '#1565C055' }]}>
-                <Ionicons name="location-outline" size={11} color={colors.info || '#1565C0'} />
-                <Text style={{ color: colors.info || '#1565C0', fontSize: 11, fontWeight: '700' }}>{profile.location.city}</Text>
-              </View>
-            )}
-          </View>
+          {profile?.location?.city && (
+            <View style={[styles.badge, { backgroundColor: colors.info + '18' || '#1565C018', borderColor: colors.info + '55' || '#1565C055' }]}>
+              <Ionicons name="location-outline" size={11} color={colors.info || '#1565C0'} />
+              <Text style={{ color: colors.info || '#1565C0', fontSize: 11, fontWeight: '700' }}>{profile.location.city}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -214,88 +213,43 @@ export default function ProfileScreen() {
         <Button title="Share App" variant="secondary" size="md" icon="share-variant-outline" onPress={shareApp} />
       </View>
 
-      {/* ═══ Preferences ═══ */}
-      <SectionLabel label="Preferences" />
-      <Card padded={false} style={{ overflow: 'hidden' }}>
-        <SettingsRow icon="theme-light-dark" iconColor="#F59E0B" label="Dark Mode" right="switch" switchValue={isDark} onSwitchChange={toggleTheme} />
-        <Divider />
-        <SettingsRow icon="translate" iconColor="#1565C0" label="App Language" detail={langInfo?.nativeName} onPress={() => setLanguageOpen(true)} />
-      </Card>
+      {/* ═══ My Posts grid ═══ */}
+      <View style={styles.postsHeadRow}>
+        <MaterialCommunityIcons name="grid" size={16} color={colors.text} />
+        <Text style={[styles.postsHead, { color: colors.text }]}>My Posts</Text>
+      </View>
 
-      {/* ═══ Notifications ═══ */}
-      <SectionLabel label="Notifications" />
-      <Card padded={false} style={{ overflow: 'hidden' }}>
-        <SettingsRow icon="bell-outline" iconColor="#D94F00" label="Spiritual reminders" right="switch" switchValue={s.notifications !== false} onSwitchChange={(v) => updateSetting('notifications', v)} />
-        <Divider />
-        <SettingsRow icon="content-cut" iconColor="#2D6A4F" label="Grooming alerts" right="switch" switchValue={s.groomingReminders !== false} onSwitchChange={(v) => updateSetting('groomingReminders', v)} />
-        <Divider />
-        <SettingsRow icon="party-popper" iconColor="#DC2626" label="Festival alerts" right="switch" switchValue={s.festivalReminders !== false} onSwitchChange={(v) => updateSetting('festivalReminders', v)} />
-        <Divider />
-        <SettingsRow icon="moon-waning-crescent" iconColor="#7C3AED" label="Ekadashi alerts" right="switch" switchValue={s.ekadashiReminders !== false} onSwitchChange={(v) => updateSetting('ekadashiReminders', v)} />
-        <Divider />
-        <SettingsRow icon="bell-ring-outline" iconColor={colors.textSecondary} label="Send test notification" onPress={sendTestNotification} />
-      </Card>
-
-      {/* ═══ Privacy ═══ */}
-      {!isGuest && (
-        <>
-          <SectionLabel label="Privacy" />
-          <Card padded={false} style={{ overflow: 'hidden' }}>
-            <SettingsRow icon="eye-outline" iconColor="#1565C0" label="Show profile in community" right="switch" switchValue={s.showProfileInCommunity !== false} onSwitchChange={(v) => updateSetting('showProfileInCommunity', v)} />
-            <Divider />
-            <SettingsRow icon="message-outline" iconColor="#2D6A4F" label="Allow direct messages" right="switch" switchValue={s.allowDMs !== false} onSwitchChange={(v) => updateSetting('allowDMs', v)} />
-          </Card>
-        </>
+      {loadingPosts ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
+      ) : myPosts.length === 0 ? (
+        <View style={styles.emptyPosts}>
+          <MaterialCommunityIcons name="image-multiple-outline" size={40} color={colors.textTertiary} />
+          <Text style={[styles.emptyPostsText, { color: colors.textSecondary }]}>You haven't posted yet.</Text>
+          <TouchableOpacity onPress={() => router.push('/create-post')} style={[styles.emptyPostsBtn, { backgroundColor: colors.primary }]}>
+            <MaterialCommunityIcons name="plus" size={16} color="#FFF" />
+            <Text style={styles.emptyPostsBtnText}>Create your first post</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.postGrid}>
+          {myPosts.map((p) => (
+            <TouchableOpacity
+              key={p.id}
+              style={styles.gridCell}
+              activeOpacity={0.85}
+              onPress={() => router.push('/feed')}
+            >
+              {p.imageUrl ? (
+                <Image source={{ uri: p.imageUrl }} style={styles.gridImg} />
+              ) : (
+                <View style={[styles.gridText, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.gridTextBody, { color: colors.textSecondary }]} numberOfLines={4}>{p.text || '—'}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
       )}
-
-      {/* ═══ Support & About ═══ */}
-      <SectionLabel label="Support" />
-      <Card padded={false} style={{ overflow: 'hidden' }}>
-        <SettingsRow icon="star-outline" iconColor="#FFB300" label="Rate Sadhak" onPress={rateApp} />
-        <Divider />
-        <SettingsRow icon="web" iconColor="#38BDF8" label="Visit website" onPress={() => Linking.openURL(WEBSITE_URL).catch(() => {})} />
-        <Divider />
-        <SettingsRow icon="email-outline" iconColor="#EA580C" label="Contact & feedback" onPress={() => router.push('/contact')} />
-        <Divider />
-        <SettingsRow icon="help-circle-outline" iconColor="#7C3AED" label="FAQ & help" onPress={() => router.push('/faq')} />
-      </Card>
-
-      <SectionLabel label="About" />
-      <Card padded={false} style={{ overflow: 'hidden' }}>
-        <SettingsRow icon="information-outline" iconColor={colors.textSecondary} label="About Sadhak" onPress={() => router.push('/about')} />
-        <Divider />
-        <SettingsRow icon="shield-outline" iconColor={colors.textSecondary} label="Privacy Policy" onPress={() => router.push('/privacy')} />
-        <Divider />
-        <SettingsRow icon="file-document-outline" iconColor={colors.textSecondary} label="Terms & Conditions" onPress={() => router.push('/terms')} />
-        <Divider />
-        <SettingsRow icon="format-list-bulleted" iconColor={colors.textSecondary} label="Changelog" detail={`v${APP_VERSION}`} onPress={() => router.push('/changelog')} />
-      </Card>
-
-      {/* ═══ Account ═══ */}
-      <SectionLabel label="Account" />
-      <Card padded={false} style={{ overflow: 'hidden' }}>
-        {!isGuest && (
-          <>
-            <SettingsRow icon="lock-reset" iconColor="#A78BFA" label="Change password" onPress={changePassword} />
-            <Divider />
-          </>
-        )}
-        {isAdmin && (
-          <>
-            <SettingsRow icon="shield-crown-outline" iconColor="#D94F00" label="Admin Panel" onPress={() => router.push('/admin' as any)} />
-            <Divider />
-          </>
-        )}
-        <SettingsRow icon="logout" iconColor="#EF4444" label="Sign out" onPress={handleLogout} />
-        {!isGuest && (
-          <>
-            <Divider />
-            <SettingsRow icon="trash-can-outline" label="Delete account" danger onPress={handleDeleteAccount} />
-          </>
-        )}
-      </Card>
-
-      <Text style={[styles.versionText, { color: colors.textTertiary }]}>Sadhak v{APP_VERSION}</Text>
 
       {/* ═══ Edit Profile Modal ═══ */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
@@ -351,61 +305,43 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* ═══ Language Modal ═══ */}
-      <Modal visible={languageOpen} transparent animationType="slide" onRequestClose={() => setLanguageOpen(false)}>
-        <View style={styles.sheetOverlay}>
-          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
-            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
-            <Text style={[styles.sheetTitle, { color: colors.text }]}>App language</Text>
-            <View style={{ marginTop: 8, maxHeight: 380 }}>
-              {SUPPORTED_LANGUAGES.map((lang) => {
-                const active = language === lang.code;
-                return (
-                  <TouchableOpacity
-                    key={lang.code}
-                    onPress={() => { setLanguage(lang.code as LanguageCode); setLanguageOpen(false); }}
-                    style={[styles.langRow, { backgroundColor: active ? colors.primary + '15' : 'transparent' }]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.text, fontSize: 15, fontWeight: '700' }}>{lang.nativeName}</Text>
-                      <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 1 }}>{lang.name}</Text>
-                    </View>
-                    {active && <Ionicons name="checkmark" size={20} color={colors.primary} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
     </Screen>
   );
 }
 
-// ─── Local helpers ───────────────────────────────────────────
-function SectionLabel({ label }: { label: string }) {
-  const { colors } = useTheme();
-  return (
-    <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>{label.toUpperCase()}</Text>
-  );
-}
-function Divider() {
-  const { colors } = useTheme();
-  return <View style={[styles.divider, { backgroundColor: colors.divider }]} />;
-}
-
 const styles = StyleSheet.create({
-  identityRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 14 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6 },
+  screenTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
+  gearBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+
+  identityRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 16 },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 78, height: 78, borderRadius: 39 },
+  avatar: { width: 84, height: 84, borderRadius: 42 },
   pfpEdit: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#0B0E13' },
-  name: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+
+  statsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around', marginLeft: 12 },
+  stat: { alignItems: 'center' },
+  statNum: { fontSize: 20, fontWeight: '800' },
+  statLabel: { fontSize: 12, marginTop: 2 },
+
+  name: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   handle: { fontSize: 13.5, marginTop: 2 },
-  badgeRow: { flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' },
+  bio: { fontSize: 14, lineHeight: 20, marginTop: 6 },
+  badgeRow: { flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100, borderWidth: 1 },
 
-  sectionLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginTop: 24, marginBottom: 8, marginLeft: 4 },
+  postsHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 26, marginBottom: 12 },
+  postsHead: { fontSize: 15, fontWeight: '800' },
+  postGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  gridCell: { width: GRID_COL, height: GRID_COL, borderRadius: 8, overflow: 'hidden' },
+  gridImg: { width: '100%', height: '100%' },
+  gridText: { flex: 1, borderWidth: 1, borderRadius: 8, padding: 8, justifyContent: 'center' },
+  gridTextBody: { fontSize: 11, lineHeight: 15 },
+  emptyPosts: { alignItems: 'center', paddingVertical: 34, gap: 10 },
+  emptyPostsText: { fontSize: 13.5 },
+  emptyPostsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 11, borderRadius: 100, marginTop: 4 },
+  emptyPostsBtnText: { color: '#FFF', fontSize: 13.5, fontWeight: '800' },
+
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
   versionText: { fontSize: 11.5, textAlign: 'center', marginTop: 24, marginBottom: 8 },
 

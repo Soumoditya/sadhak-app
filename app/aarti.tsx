@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
@@ -9,6 +10,7 @@ import {
   DEVOTIONAL_CATEGORIES, getDevotionalByCategory,
   type DevotionalCategory, type DevotionalItem,
 } from '../constants/devotional';
+import { getDeityImage } from '../constants/deityImages';
 
 export default function DevotionalScreen() {
   const { colors, isDark } = useTheme();
@@ -33,6 +35,7 @@ export default function DevotionalScreen() {
 
   // ─── Detail view ───
   if (selected) {
+    const deityImg = getDeityImage(selected.deity);
     return (
       <View style={[st.container, { backgroundColor: colors.background }]}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottomPadding }}>
@@ -47,12 +50,24 @@ export default function DevotionalScreen() {
               <Ionicons name="arrow-back" size={20} color={colors.text} />
             </TouchableOpacity>
 
-            {/* Emblem: dark ambient panel with the deity color as a soft ring + glow */}
+            {/* Emblem: dark ambient panel with a soft radial glow behind
+                the deity painting (or the candle fallback if no image). */}
             <View style={st.emblemWrap}>
-              <View style={[st.emblemGlow, { backgroundColor: selected.color, opacity: 0.16 }]} />
-              <View style={[st.emblemRing, { borderColor: selected.color + '55' }]} />
+              <View style={[st.emblemGlow, { backgroundColor: selected.color, opacity: 0.18 }]} />
+              <View style={[st.emblemRing, { borderColor: selected.color + '66' }]} />
               <View style={[st.emblemCore, { backgroundColor: colors.surfaceElevated, borderColor: selected.color + '55' }]}>
-                <MaterialCommunityIcons name="candle" size={34} color={selected.color} />
+                {deityImg ? (
+                  <ExpoImage
+                    source={{ uri: deityImg.url }}
+                    placeholder={{ blurhash: deityImg.blurhash }}
+                    style={st.emblemImage}
+                    contentFit="cover"
+                    transition={280}
+                    cachePolicy="disk"
+                  />
+                ) : (
+                  <MaterialCommunityIcons name="candle" size={34} color={selected.color} />
+                )}
               </View>
             </View>
 
@@ -120,18 +135,32 @@ export default function DevotionalScreen() {
       </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.list, { paddingBottom: screenBottomPadding }]}>
-        {items.map((item) => (
+        {items.map((item) => {
+          const img = getDeityImage(item.deity);
+          return (
           <TouchableOpacity
             key={item.id}
             style={[st.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             onPress={() => setSelected(item)}
             activeOpacity={0.7}
           >
-            <View style={[st.cardIcon, { backgroundColor: item.color + '15' }]}>
-              <MaterialCommunityIcons
-                name={DEVOTIONAL_CATEGORIES.find(c => c.key === item.category)?.icon as any}
-                size={24} color={item.color}
-              />
+            {/* Deity avatar with a thin colored ring, or the category icon fallback */}
+            <View style={[st.cardIcon, { backgroundColor: item.color + '18', borderColor: item.color + '55', borderWidth: 1 }]}>
+              {img ? (
+                <ExpoImage
+                  source={{ uri: img.url }}
+                  placeholder={{ blurhash: img.blurhash }}
+                  style={st.cardIconImage}
+                  contentFit="cover"
+                  transition={220}
+                  cachePolicy="disk"
+                />
+              ) : (
+                <MaterialCommunityIcons
+                  name={DEVOTIONAL_CATEGORIES.find(c => c.key === item.category)?.icon as any}
+                  size={22} color={item.color}
+                />
+              )}
             </View>
             <View style={st.cardInfo}>
               <Text style={[st.cardTitle, { color: colors.text }]}>{item.title}</Text>
@@ -142,7 +171,8 @@ export default function DevotionalScreen() {
               <MaterialCommunityIcons name="play" size={20} color={item.color} />
             </TouchableOpacity>
           </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -162,10 +192,11 @@ const st = StyleSheet.create({
 
   list: { padding: 16, gap: 8 },
   card: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16, borderWidth: 1, gap: 12 },
-  cardIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  cardIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  cardIconImage: { width: '100%', height: '100%', borderRadius: 14 },
   cardInfo: { flex: 1 },
   cardTitle: { fontSize: 15, fontWeight: '700' },
-  cardTitleHi: { fontSize: 13.5, fontWeight: '600', marginTop: 1 },
+  cardTitleHi: { fontSize: 13.5, lineHeight: 20, fontWeight: '600', marginTop: 2 },
   cardDeity: { fontSize: 11.5, marginTop: 2 },
   playBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
 
@@ -177,9 +208,10 @@ const st = StyleSheet.create({
   emblemWrap: { width: 112, height: 112, alignItems: 'center', justifyContent: 'center', marginTop: 18, marginBottom: 18 },
   emblemGlow: { position: 'absolute', width: 160, height: 160, borderRadius: 80 },
   emblemRing: { position: 'absolute', width: 112, height: 112, borderRadius: 56, borderWidth: 1 },
-  emblemCore: { width: 88, height: 88, borderRadius: 44, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  emblemCore: { width: 88, height: 88, borderRadius: 44, borderWidth: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  emblemImage: { width: '100%', height: '100%', borderRadius: 44 },
   detailTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center', paddingHorizontal: 12 },
-  detailTitleHi: { fontSize: 17, fontWeight: '600', marginTop: 6, textAlign: 'center' },
+  detailTitleHi: { fontSize: 17, lineHeight: 26, fontWeight: '600', marginTop: 6, textAlign: 'center' },
   detailDeity: { fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 8 },
   listenBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 100, marginTop: 20 },
   listenBtnText: { fontSize: 14.5, fontWeight: '800', color: '#FFF' },

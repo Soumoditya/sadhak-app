@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import {
   initializeAuth,
-  getReactNativePersistence,
   signInAnonymously,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -67,6 +66,11 @@ const app = initializeApp(firebaseConfig);
 // USE initializeAuth with AsyncStorage persistence — this is THE fix for
 // "auto logout on app restart". getAuth() defaults to in-memory persistence
 // in React Native, so the session is lost when the app is closed.
+//
+// NOTE: firebase-js-sdk v12 ships getReactNativePersistence at runtime but
+// dropped it from the published TS types (known upstream issue). Pull it via
+// require so the type-checker doesn't fail while runtime behaviour is unchanged.
+const { getReactNativePersistence } = require('firebase/auth');
 const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage),
 });

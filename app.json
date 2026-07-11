@@ -2,13 +2,13 @@
   "expo": {
     "name": "Sadhak",
     "slug": "sadhak-app",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sadhak",
     "userInterfaceStyle": "automatic",
     "android": {
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#0B0E13",
         "foregroundImage": "./assets/images/adaptive-foreground.png"
@@ -75,7 +75,16 @@
         "expo-document-picker",
         {}
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-image",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Sadhak saves wallpapers to your gallery.",
+          "savePhotosPermission": "Sadhak saves wallpapers to your gallery.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

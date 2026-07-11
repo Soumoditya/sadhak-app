@@ -29,10 +29,11 @@ const QUICK_ACTIONS = [
 ];
 
 const MORE_MODULES = [
-  { key: 'ai', label: 'Sadhak AI', icon: 'sparkles', color: '#D94F00', route: '/ai' },
-  { key: 'vastu', label: 'Vastu', icon: 'compass-outline', color: '#7C3AED', route: '/vastu' },
-  { key: 'puja', label: 'Puja Guide', icon: 'flower-tulip', color: '#DC2626', route: '/puja' },
+  { key: 'ai', label: 'Sadhak AI', icon: 'sparkles', color: '#D94F00', route: '/ask' },
+  { key: 'vastu', label: 'Vastu', icon: 'compass-outline', color: '#7C3AED', route: '/compass' },
+  { key: 'puja', label: 'Puja Guide', icon: 'flower-tulip', color: '#DC2626', route: '/puja-guide' },
   { key: 'bhog', label: 'Satvik Bhog', icon: 'food-variant', color: '#2D6A4F', route: '/bhog' },
+  { key: 'wallpaper', label: 'Wallpapers', icon: 'image-multiple-outline', color: '#0EA5E9', route: '/wallpapers' },
   { key: 'notes', label: 'Notes', icon: 'note-edit-outline', color: '#37474F', route: '/notes' },
   { key: 'feed', label: 'Explore', icon: 'compass', color: '#F59E0B', route: '/feed' },
 ];
@@ -60,7 +61,7 @@ export default function HomeScreen() {
   const groomingLabel = grooming.overallStatus === 'allowed' ? 'Shubh' : grooming.overallStatus === 'avoid' ? 'Caution' : 'Avoid';
 
   return (
-    <Screen scroll tabbed edges={{ top: false, bottom: false }}>
+    <Screen scroll tabbed edges={{ top: true, bottom: false }}>
 
       {/* ═══ 1. Header — greeting + avatar ═══ */}
       <View style={s.header}>

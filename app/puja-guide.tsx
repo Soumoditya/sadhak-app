@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
 import { PUJA_GUIDES, type PujaGuide } from '../constants/pujaGuides';
+import { resolveDeityImage } from '../constants/deityImages';
 
 export default function PujaGuideScreen() {
   const { colors, isDark } = useTheme();
@@ -20,6 +22,7 @@ export default function PujaGuideScreen() {
 
   // ─── Detail ───
   if (guide) {
+    const heroImg = resolveDeityImage(guide.deity);
     return (
       <View style={[st.container, { backgroundColor: colors.background }]}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottomPadding }}>
@@ -27,7 +30,20 @@ export default function PujaGuideScreen() {
             <TouchableOpacity style={st.dBack} onPress={() => setGuide(null)} hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color="#FFF" />
             </TouchableOpacity>
-            <MaterialCommunityIcons name={guide.icon as any} size={36} color="#FFD700" />
+            {heroImg ? (
+              <View style={st.dHeroImgWrap}>
+                <ExpoImage
+                  source={{ uri: heroImg.url }}
+                  placeholder={{ blurhash: heroImg.blurhash }}
+                  style={st.dHeroImg}
+                  contentFit="cover"
+                  transition={280}
+                  cachePolicy="disk"
+                />
+              </View>
+            ) : (
+              <MaterialCommunityIcons name={guide.icon as any} size={36} color="#FFD700" />
+            )}
             <Text style={st.dTitle}>{guide.deity}</Text>
             <Text style={st.dTitleHi}>{guide.deityHi}</Text>
             <View style={st.dDayChip}>
@@ -120,21 +136,35 @@ export default function PujaGuideScreen() {
       </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.grid, { paddingBottom: screenBottomPadding }]}>
-        {PUJA_GUIDES.map((g) => (
+        {PUJA_GUIDES.map((g) => {
+          const img = resolveDeityImage(g.deity);
+          return (
           <TouchableOpacity
             key={g.id}
             style={[st.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             onPress={() => setGuide(g)}
             activeOpacity={0.75}
           >
-            <View style={[st.cardIcon, { backgroundColor: g.color + '14' }]}>
-              <MaterialCommunityIcons name={g.icon as any} size={26} color={g.color} />
+            <View style={[st.cardIcon, { backgroundColor: g.color + '14', borderColor: g.color + '44', borderWidth: img ? 1 : 0 }]}>
+              {img ? (
+                <ExpoImage
+                  source={{ uri: img.url }}
+                  placeholder={{ blurhash: img.blurhash }}
+                  style={st.cardIconImg}
+                  contentFit="cover"
+                  transition={220}
+                  cachePolicy="disk"
+                />
+              ) : (
+                <MaterialCommunityIcons name={g.icon as any} size={26} color={g.color} />
+              )}
             </View>
             <Text style={[st.cardTitle, { color: colors.text }]} numberOfLines={1}>{g.deity.replace('Lord ', '').replace('Goddess ', '').replace('Maa ', '')}</Text>
             <Text style={[st.cardHi, { color: g.color }]}>{g.deityHi}</Text>
             <Text style={[st.cardDay, { color: colors.textTertiary }]} numberOfLines={1}>{g.day}</Text>
           </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -171,12 +201,15 @@ const st = StyleSheet.create({
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 16, gap: 10 },
   card: { flexBasis: '47%', flexGrow: 1, alignItems: 'center', padding: 16, borderRadius: 18, borderWidth: 1 },
-  cardIcon: { width: 54, height: 54, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  cardIcon: { width: 54, height: 54, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 8, overflow: 'hidden' },
+  cardIconImg: { width: '100%', height: '100%', borderRadius: 16 },
   cardTitle: { fontSize: 14.5, fontWeight: '800' },
   cardHi: { fontSize: 13, fontWeight: '600', marginTop: 1 },
   cardDay: { fontSize: 10.5, marginTop: 4 },
 
   dHeader: { paddingBottom: 22, alignItems: 'center', borderBottomLeftRadius: 26, borderBottomRightRadius: 26 },
+  dHeroImgWrap: { width: 92, height: 92, borderRadius: 46, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)', overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.15)' },
+  dHeroImg: { width: '100%', height: '100%', borderRadius: 46 },
   dBack: { position: 'absolute', left: 16, top: 0, marginTop: 0, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   dTitle: { fontSize: 21, fontWeight: '800', color: '#FFF', marginTop: 8 },
   dTitleHi: { fontSize: 15, color: '#FFD700', marginTop: 2 },

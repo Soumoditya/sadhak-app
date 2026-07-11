@@ -5,6 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from "../contexts/DialogContext";
 import { LinearGradient } from 'expo-linear-gradient';
+import { Header } from '../components/ui';
+import { useDsInsets } from '../constants/ds';
 import { db, collection, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, setDoc, serverTimestamp } from '../config/firebase';
 
 interface Submission {
@@ -24,6 +26,7 @@ interface Submission {
 export default function AdminScreen() {
   const { isAdmin, profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { screenBottom } = useDsInsets();
   const dialog = useDialog();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,15 +114,20 @@ export default function AdminScreen() {
 
   if (!isAdmin) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <MaterialCommunityIcons name="shield-lock-outline" size={64} color={colors.textTertiary} />
-        <Text style={[styles.noAccess, { color: colors.textSecondary }]}>Admin access required</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="Admin Panel" />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <MaterialCommunityIcons name="shield-lock-outline" size={64} color={colors.textTertiary} />
+          <Text style={[styles.noAccess, { color: colors.textSecondary }]}>Admin access required</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header title="Admin Panel" subtitle="Review queue & library" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottom }}>
       {/* Stats */}
       <View style={styles.statsRow}>
         {[
@@ -180,7 +188,8 @@ export default function AdminScreen() {
         ))
       )}
       <View style={{ height: 40 }} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

@@ -67,7 +67,7 @@ export default function TabLayout() {
           bottom: tabBarBottom,
           left: Spacing.lg,
           right: Spacing.lg,
-          backgroundColor: isDark ? 'rgba(20, 25, 33, 0.985)' : 'rgba(255, 255, 255, 0.985)',
+          backgroundColor: isDark ? '#141921' : '#FFFFFF',
           borderRadius: BorderRadius.xxl,
           borderTopWidth: 0,
           borderWidth: 1,
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   activeIndicator: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 24,
   },
 });

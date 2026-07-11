@@ -11,7 +11,7 @@ import { useDialog } from "../../contexts/DialogContext";
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, serverTimestamp } from '../../config/firebase';
-import { uploadToCloudinary } from '../../services/cloudinary';
+import { uploadToCloudinary, sanitizeCloudinaryPdfUrl } from '../../services/cloudinary';
 import * as DocumentPicker from 'expo-document-picker';
 // SDK 56: documentDirectory/downloadAsync live in the legacy API entry point.
 import * as FileSystem from 'expo-file-system/legacy';
@@ -62,6 +62,7 @@ export default function LibraryScreen() {
   const [uploadModal, setUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadData, setUploadData] = useState({ title: '', author: '', category: 'other', description: '' });
+  const [customCat, setCustomCat] = useState('');
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [sortMode, setSortMode] = useState<SortMode>('newest');
@@ -138,14 +139,40 @@ export default function LibraryScreen() {
       dialog.alert('Error', 'Please select a PDF and enter a title');
       return;
     }
+    if (uploadData.category === 'custom' && !customCat.trim()) {
+      dialog.alert('Error', 'Enter a name for your custom category.');
+      return;
+    }
+    // A custom category stores the typed label directly; presets store their id.
+    const finalCategory = uploadData.category === 'custom' ? customCat.trim() : uploadData.category;
     try {
       setUploading(true);
       const cloudResult = await uploadToCloudinary(selectedFile.uri, 'sadhak/library', 'raw');
+
+      // Preflight: verify the Cloudinary URL is publicly reachable BEFORE saving
+      // to Firestore. Cloudinary accounts that haven't enabled PDF delivery
+      // return 401 here — surface it now so we never publish a book that will
+      // 401 for every reader downstream.
+      const preflightUrl = sanitizeCloudinaryPdfUrl(cloudResult.secure_url);
+      try {
+        const head = await fetch(preflightUrl, { method: 'HEAD' });
+        if (head.status === 401 || head.status === 403) {
+          throw new Error(
+            'Cloudinary is blocking PDF delivery for this account (HTTP ' + head.status +
+            '). Enable it once in your Cloudinary dashboard → Settings → Security → allow delivery of PDF and ZIP files, then upload again.',
+          );
+        }
+      } catch (e: any) {
+        // Network failure during preflight is not fatal — keep publishing and
+        // let the reader handle it. Only auth failures abort.
+        if (/401|403|blocking PDF/i.test(String(e?.message))) throw e;
+      }
+
       const collectionName = isAdmin ? 'library' : 'library_submissions';
       await addDoc(collection(db, collectionName), {
         title: uploadData.title.trim(), author: uploadData.author.trim() || 'Unknown',
-        category: uploadData.category, description: uploadData.description.trim(),
-        cloudinaryUrl: cloudResult.secure_url, cloudinaryPublicId: cloudResult.public_id,
+        category: finalCategory, description: uploadData.description.trim(),
+        cloudinaryUrl: preflightUrl, cloudinaryPublicId: cloudResult.public_id,
         fileSize: cloudResult.bytes, uploadedBy: user?.uid, uploadedAt: serverTimestamp(),
         downloadCount: 0, ...(isAdmin ? {} : { status: 'pending_review' }),
       });
@@ -153,6 +180,7 @@ export default function LibraryScreen() {
       setUploadModal(false);
       setSelectedFile(null);
       setUploadData({ title: '', author: '', category: 'other', description: '' });
+      setCustomCat('');
       if (isAdmin) fetchBooks();
     } catch (error: any) {
       // Show the REAL reason (Cloudinary message / network detail) so failures
@@ -192,7 +220,11 @@ export default function LibraryScreen() {
   };
 
   const renderBookCard = ({ item }: { item: LibraryItem }) => {
-    const cat = CATEGORIES.find(c => c.id === item.category) || CATEGORIES[CATEGORIES.length - 1];
+    // Preset categories resolve to their chip; a custom category (any string not
+    // in CATEGORIES) shows its own label with the neutral "Other" icon/color.
+    const preset = CATEGORIES.find(c => c.id === item.category);
+    const other = CATEGORIES[CATEGORIES.length - 1];
+    const cat = preset || { ...other, name: item.category || other.name };
     const isDownloading = downloadingId === item.id;
 
     if (viewMode === 'grid') {
@@ -274,13 +306,19 @@ export default function LibraryScreen() {
 
       {/* Sort */}
       <View style={st.sortRow}>
-        {(['newest', 'title', 'popular'] as SortMode[]).map(mode => (
-          <TouchableOpacity key={mode} style={[st.sortChip, { backgroundColor: sortMode === mode ? colors.primary : colors.surface, borderColor: sortMode === mode ? colors.primary : colors.border }]} onPress={() => setSortMode(mode)}>
-            <Text style={[st.sortText, { color: sortMode === mode ? '#FFF' : colors.textSecondary }]}>
-              {mode === 'newest' ? '🕐 Newest' : mode === 'title' ? '🔤 A-Z' : '🔥 Popular'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {([
+          { mode: 'newest' as SortMode, label: 'Newest', icon: 'clock-outline' },
+          { mode: 'title' as SortMode, label: 'A-Z', icon: 'sort-alphabetical-ascending' },
+          { mode: 'popular' as SortMode, label: 'Popular', icon: 'fire' },
+        ]).map(({ mode, label, icon }) => {
+          const active = sortMode === mode;
+          return (
+            <TouchableOpacity key={mode} style={[st.sortChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]} onPress={() => setSortMode(mode)}>
+              <MaterialCommunityIcons name={icon as any} size={14} color={active ? '#FFF' : colors.textSecondary} />
+              <Text style={[st.sortText, { color: active ? '#FFF' : colors.textSecondary }]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Categories */}
@@ -362,11 +400,26 @@ export default function LibraryScreen() {
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
-                <TouchableOpacity key={cat.id} style={[st.catSelect, { backgroundColor: uploadData.category === cat.id ? cat.color : colors.background, borderColor: cat.color }]} onPress={() => setUploadData({ ...uploadData, category: cat.id })}>
+                <TouchableOpacity key={cat.id} style={[st.catSelect, { backgroundColor: uploadData.category === cat.id ? cat.color : colors.background, borderColor: cat.color }]} onPress={() => { setCustomCat(''); setUploadData({ ...uploadData, category: cat.id }); }}>
                   <Text style={[st.catSelectText, { color: uploadData.category === cat.id ? '#FFF' : cat.color }]}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}
+              <TouchableOpacity style={[st.catSelect, { backgroundColor: customCat.trim() ? colors.primary : colors.background, borderColor: colors.primary }]} onPress={() => setUploadData({ ...uploadData, category: 'custom' })}>
+                <MaterialCommunityIcons name="plus" size={13} color={customCat.trim() ? '#FFF' : colors.primary} />
+                <Text style={[st.catSelectText, { color: customCat.trim() ? '#FFF' : colors.primary }]}>Custom</Text>
+              </TouchableOpacity>
             </ScrollView>
+
+            {uploadData.category === 'custom' && (
+              <TextInput
+                style={[st.modalInput, { color: colors.text, borderColor: colors.primary, backgroundColor: colors.background }]}
+                placeholder="Custom category name (e.g. Sant Sahitya)"
+                placeholderTextColor={colors.textTertiary}
+                value={customCat}
+                onChangeText={setCustomCat}
+                maxLength={40}
+              />
+            )}
 
             <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, height: 80, textAlignVertical: 'top' }]} placeholder="Description (optional)" placeholderTextColor={colors.textTertiary} value={uploadData.description} onChangeText={t => setUploadData({ ...uploadData, description: t })} multiline numberOfLines={3} />
 
@@ -442,7 +495,7 @@ const st = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14 },
 
   sortRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 10, gap: 6 },
-  sortChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  sortChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   sortText: { fontSize: 12, fontWeight: '600' },
 
   // flexGrow:0 + capped height — without it the horizontal ScrollView stretches
@@ -492,7 +545,7 @@ const st = StyleSheet.create({
   filePicker: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 14, padding: 20, alignItems: 'center', gap: 6, marginBottom: 14 },
   filePickerTitle: { fontSize: 14, fontWeight: '600' },
   modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 48, fontSize: 15, marginBottom: 12 },
-  catSelect: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, borderWidth: 1, marginRight: 6 },
+  catSelect: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, borderWidth: 1, marginRight: 6 },
   catSelectText: { fontSize: 11, fontWeight: '600' },
   uploadBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderRadius: 14, height: 52 },
   uploadBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },

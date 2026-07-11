@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, BackHandler } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
 import { BHOG_RECIPES, type BhogRecipe } from '../constants/recipes';
+import { getFoodImage } from '../constants/foodImages';
 
 export default function BhogScreen() {
   const { colors, isDark } = useTheme();
@@ -38,6 +40,7 @@ export default function BhogScreen() {
 
   // ─── Detail ───
   if (recipe) {
+    const heroImg = getFoodImage(recipe.id);
     return (
       <View style={[st.container, { backgroundColor: colors.background }]}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottomPadding }}>
@@ -45,7 +48,20 @@ export default function BhogScreen() {
             <TouchableOpacity style={st.dBack} onPress={() => setRecipe(null)} hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color="#FFF" />
             </TouchableOpacity>
-            <MaterialCommunityIcons name={recipe.icon as any} size={34} color="#FFD700" />
+            {heroImg ? (
+              <View style={st.dHeroImgWrap}>
+                <ExpoImage
+                  source={{ uri: heroImg.url }}
+                  placeholder={{ blurhash: heroImg.blurhash }}
+                  style={st.dHeroImg}
+                  contentFit="cover"
+                  transition={280}
+                  cachePolicy="disk"
+                />
+              </View>
+            ) : (
+              <MaterialCommunityIcons name={recipe.icon as any} size={34} color="#FFD700" />
+            )}
             <Text style={st.dTitle}>{recipe.name}</Text>
             <Text style={st.dTitleHi}>{recipe.nameHi}</Text>
             <View style={st.dMeta}>
@@ -147,7 +163,9 @@ export default function BhogScreen() {
             Nothing matches "{query}" — try an ingredient like "makhana".
           </Text>
         )}
-        {filtered.map((r) => (
+        {filtered.map((r) => {
+          const img = getFoodImage(r.id);
+          return (
           <TouchableOpacity
             key={r.id}
             style={[st.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
@@ -155,7 +173,18 @@ export default function BhogScreen() {
             activeOpacity={0.75}
           >
             <View style={[st.cardIcon, { backgroundColor: r.color + '14' }]}>
-              <MaterialCommunityIcons name={r.icon as any} size={24} color={r.color} />
+              {img ? (
+                <ExpoImage
+                  source={{ uri: img.url }}
+                  placeholder={{ blurhash: img.blurhash }}
+                  style={st.cardIconImg}
+                  contentFit="cover"
+                  transition={200}
+                  cachePolicy="disk"
+                />
+              ) : (
+                <MaterialCommunityIcons name={r.icon as any} size={24} color={r.color} />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[st.cardTitle, { color: colors.text }]}>{r.name} <Text style={{ color: r.color, fontSize: 13 }}>{r.nameHi}</Text></Text>
@@ -166,7 +195,8 @@ export default function BhogScreen() {
               <Text style={[st.timeText, { color: colors.textSecondary }]}>{r.time}</Text>
             </View>
           </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -186,13 +216,16 @@ const st = StyleSheet.create({
 
   list: { padding: 16, gap: 8 },
   card: { flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, borderWidth: 1, gap: 12 },
-  cardIcon: { width: 46, height: 46, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  cardIcon: { width: 46, height: 46, borderRadius: 13, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  cardIconImg: { width: '100%', height: '100%', borderRadius: 13 },
   cardTitle: { fontSize: 14.5, fontWeight: '800' },
   cardMeta: { fontSize: 11.5, marginTop: 2 },
   timeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
   timeText: { fontSize: 10.5, fontWeight: '600' },
 
   dHeader: { paddingBottom: 20, alignItems: 'center', borderBottomLeftRadius: 26, borderBottomRightRadius: 26 },
+  dHeroImgWrap: { width: 120, height: 120, borderRadius: 24, borderWidth: 3, borderColor: 'rgba(255,255,255,0.55)', overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.12)' },
+  dHeroImg: { width: '100%', height: '100%', borderRadius: 24 },
   dBack: { position: 'absolute', left: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   dTitle: { fontSize: 21, fontWeight: '800', color: '#FFF', marginTop: 8 },
   dTitleHi: { fontSize: 15, color: '#FFD700', marginTop: 2 },

@@ -40,6 +40,8 @@ export default function FeedScreen() {
 
   const [term, setTerm] = useState('');
   const [searching, setSearching] = useState(false);
+  // Fullscreen image viewer
+  const [viewImage, setViewImage] = useState<string | null>(null);
   // Comments sheet
   const [commentsFor, setCommentsFor] = useState<Post | null>(null);
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -146,7 +148,11 @@ export default function FeedScreen() {
 
         {!!item.text && <Text style={[styles.body, { color: colors.text }]}>{item.text}</Text>}
 
-        {!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.postImage} resizeMode="cover" />}
+        {!!item.imageUrl && (
+          <TouchableOpacity activeOpacity={0.9} onPress={() => setViewImage(item.imageUrl!)}>
+            <Image source={{ uri: item.imageUrl }} style={styles.postImage} resizeMode="cover" />
+          </TouchableOpacity>
+        )}
 
         {item.hashtags.length > 0 && (
           <View style={styles.tagRow}>
@@ -338,12 +344,26 @@ export default function FeedScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ═══ Fullscreen image viewer ═══ */}
+      <Modal visible={!!viewImage} transparent animationType="fade" onRequestClose={() => setViewImage(null)}>
+        <View style={styles.imageViewer}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setViewImage(null)} />
+          {viewImage && <Image source={{ uri: viewImage }} style={styles.imageViewerImg} resizeMode="contain" />}
+          <TouchableOpacity style={styles.imageViewerClose} onPress={() => setViewImage(null)} hitSlop={12}>
+            <Ionicons name="close" size={26} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  imageViewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', justifyContent: 'center', alignItems: 'center' },
+  imageViewerImg: { width: '100%', height: '80%' },
+  imageViewerClose: { position: 'absolute', top: 48, right: 20, width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center', alignItems: 'center' },
   header: { paddingBottom: 14, paddingHorizontal: 20, borderBottomLeftRadius: 22, borderBottomRightRadius: 22 },
   backBtn: { position: 'absolute', left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: '#FFF', textAlign: 'center', marginBottom: 12 },

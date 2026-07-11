@@ -14,6 +14,7 @@ import { rtdb, ref, push, set, onValue, off, rtServerTimestamp, limitToLast, rtQ
 import { remove } from 'firebase/database';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
+import { uploadToCloudinary } from '../services/cloudinary';
 
 const GIPHY_API_KEY = 'wAKLYXMGICxFXZ3CZvycYzxk876dQDMM';
 const { width } = Dimensions.get('window');
@@ -58,8 +59,9 @@ export default function ChatRoomScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [othersTyping, setOthersTyping] = useState<string[]>([]);
   const [viewMedia, setViewMedia] = useState<{ url: string; kind: 'gif' | 'image' } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const flatListRef = useRef<FlatList>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendBtnAnim = useRef(new Animated.Value(0)).current;
 
   // Animate send button
@@ -217,7 +219,14 @@ export default function ChatRoomScreen() {
       });
       if (result.canceled || !result.assets?.[0]) return;
 
-      const uri = result.assets[0].uri;
+      const localUri = result.assets[0].uri;
+      // CRITICAL: upload to Cloudinary first. Saving the local file:// URI meant
+      // media showed only on the sender's device and vanished after cache clear —
+      // everyone else (and the sender, later) saw a broken image.
+      setUploadingImage(true);
+      const uploaded = await uploadToCloudinary(localUri, 'sadhak/chat', 'image');
+      const remoteUrl = uploaded.secure_url;
+
       const newMsgRef = push(ref(rtdb, `messages/${roomId}`));
       await set(newMsgRef, {
         text: '',
@@ -225,13 +234,15 @@ export default function ChatRoomScreen() {
         senderName: profile?.displayName || 'Sadhak',
         senderPfp: profile?.profilePicUrl || null,
         type: 'image',
-        imageUrl: uri,
+        imageUrl: remoteUrl,
         timestamp: Date.now(),
       });
 
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      dialog.alert('Upload failed', String(e?.message || e).slice(0, 200));
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -488,11 +499,17 @@ export default function ChatRoomScreen() {
 
         {/* Input Bar */}
         <View style={[styles.inputBar, { backgroundColor: colors.surface, borderColor: colors.border, paddingBottom: 8 + insets.bottom }]}>
-          <TouchableOpacity style={styles.attachBtn} onPress={sendImage}>
-            <MaterialCommunityIcons name="image-outline" size={24} color={colors.textTertiary} />
+          <TouchableOpacity style={styles.attachBtn} onPress={sendImage} disabled={uploadingImage}>
+            {uploadingImage ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <MaterialCommunityIcons name="image-outline" size={24} color={colors.textTertiary} />
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.attachBtn} onPress={() => setShowGiphy(true)}>
-            <MaterialCommunityIcons name="gif" size={26} color={colors.textTertiary} />
+            <View style={[styles.gifBadge, { borderColor: colors.textTertiary }]}>
+              <Text style={[styles.gifBadgeText, { color: colors.textTertiary }]}>GIF</Text>
+            </View>
           </TouchableOpacity>
           <TextInput
             style={[styles.input, { color: colors.text, backgroundColor: isDark ? colors.surfaceElevated : '#F5F5F5' }]}
@@ -620,6 +637,8 @@ const styles = StyleSheet.create({
   replyBarText: { fontSize: 12 },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 8, paddingVertical: 8, borderTopWidth: 0.5, gap: 4 },
   attachBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  gifBadge: { borderWidth: 1.5, borderRadius: 5, paddingHorizontal: 4, paddingVertical: 1 },
+  gifBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
   input: { flex: 1, minHeight: 36, maxHeight: 100, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 15 },
   sendBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   giphyContainer: { flex: 1, paddingTop: 50 },
