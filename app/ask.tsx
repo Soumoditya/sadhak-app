@@ -11,7 +11,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useLayoutInsets } from '../constants/layout';
+import { useLocalSearchParams } from 'expo-router';
 import { askSadhakAI, STARTER_QUESTIONS, type AiMessage } from '../services/ai';
+import { loadNatal, chartSummary } from '../services/jyotish';
 
 const AI_HISTORY_KEY = 'sadhak_ai_history';
 
@@ -21,14 +23,22 @@ interface ChatItem extends AiMessage {
 }
 
 export default function AskScreen() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
   const { headerPaddingTop, backBtnTop, bottomInset, insets } = useLayoutInsets();
+  const astroMode = useLocalSearchParams().astro === '1';
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
+  const [astroCtx, setAstroCtx] = useState<string | undefined>(undefined);
   const listRef = useRef<FlatList>(null);
+
+  // In astro mode, load the user's real chart so the AI answers from it.
+  useEffect(() => {
+    if (!astroMode || !user?.uid) return;
+    loadNatal(user.uid).then((n) => { if (n?.kundli) setAstroCtx(chartSummary(n.kundli)); }).catch(() => {});
+  }, [astroMode, user?.uid]);
 
   // Load saved chat history on mount so the conversation persists across visits.
   useEffect(() => {
@@ -65,6 +75,7 @@ export default function AskScreen() {
       const reply = await askSadhakAI(
         nextHistory.map(({ role, text }) => ({ role, text })),
         profile?.displayName?.split(' ')[0],
+        astroMode ? astroCtx : undefined,
       );
       setMessages((prev) => [...prev, { id: `m${Date.now()}`, role: 'model', text: reply }]);
     } catch (e: any) {

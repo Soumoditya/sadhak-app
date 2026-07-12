@@ -29,11 +29,17 @@ export interface AiMessage {
   text: string;
 }
 
-export async function askSadhakAI(history: AiMessage[], userName?: string): Promise<string> {
+export async function askSadhakAI(history: AiMessage[], userName?: string, chartContext?: string): Promise<string> {
   const contents = history.slice(-12).map((m) => ({
     role: m.role,
     parts: [{ text: m.text }],
   }));
+
+  // When the user opens "chat about my chart", we pass a compact summary of their
+  // real natal placements so the AI reads the actual chart, not generic advice.
+  const astro = chartContext
+    ? `\n\nThe user's authentic Vedic birth chart (sidereal, Lahiri — treat as exact fact):\n${chartContext}\nWhen they ask about themselves/their life/astrology, ground answers in THIS chart. Interpretations are guidance, not guaranteed prediction; be warm and never fatalistic.`
+    : '';
 
   const res = await fetch(GEMINI_URL, {
     method: 'POST',
@@ -42,7 +48,7 @@ export async function askSadhakAI(history: AiMessage[], userName?: string): Prom
     },
     body: JSON.stringify({
       systemInstruction: {
-        parts: [{ text: SYSTEM_PROMPT + (userName ? `\n\nThe user's name is ${userName}.` : '') }],
+        parts: [{ text: SYSTEM_PROMPT + (userName ? `\n\nThe user's name is ${userName}.` : '') + astro }],
       },
       contents,
       // Flash "thinking" consumes output budget before visible text — 1024 was

@@ -5,6 +5,7 @@
 import { db, doc, getDoc, setDoc, serverTimestamp } from '../config/firebase';
 
 const ENGINE_URL = 'https://sadhak-app.vercel.app/api/jyotish';
+const PREDICT_URL = 'https://sadhak-app.vercel.app/api/jyotish-predict';
 
 export interface BirthInput {
   date: string;      // 'YYYY-MM-DD'
@@ -91,4 +92,44 @@ export async function loadNatal(uid: string): Promise<{ birth: BirthInput; kundl
   } catch {
     return null;
   }
+}
+
+export type PredictionPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export interface Prediction {
+  period: PredictionPeriod; date: string; transitSummary?: string;
+  overview?: string; goodFor?: string[]; avoid?: string[]; doToday?: string[];
+  remedies?: string[]; transit?: string; lucky?: { color?: string; number?: string; direction?: string };
+}
+
+/** Fetch a fresh prediction (transits + AI interpretation) for a period. */
+export async function getPrediction(kundli: Kundli, period: PredictionPeriod, name?: string): Promise<Prediction> {
+  const res = await fetch(PREDICT_URL, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kundli, period, name }),
+  });
+  const text = await res.text();
+  if (!res.ok) { let m = text; try { m = JSON.parse(text).error || text; } catch {} throw new Error(String(m).slice(0, 160)); }
+  return JSON.parse(text) as Prediction;
+}
+
+/** Today's daily guidance, cached per-day in Firestore so it's computed once/day. */
+export async function getCachedDaily(uid: string, kundli: Kundli, name?: string): Promise<Prediction> {
+  const today = new Date().toISOString().slice(0, 10);
+  const ref = doc(db, 'users', uid, 'jyotish', `daily-${today}`);
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists()) return snap.data() as Prediction;
+  } catch {}
+  const p = await getPrediction(kundli, 'daily', name);
+  try { await setDoc(ref, p as any); } catch {}
+  return p;
+}
+
+/** Compact one-line-per-fact summary of the chart, fed to the AI as context. */
+export function chartSummary(k: Kundli): string {
+  const planets = k.planets.map((p) => `${p.name} in ${p.sign} h${p.house}${p.retro ? '(R)' : ''}${p.dignity && p.dignity !== '—' && p.dignity !== 'Neutral' ? ` [${p.dignity}]` : ''}`).join(', ');
+  const dasha = k.dasha ? `Current dasha: ${k.dasha.current.maha} maha / ${k.dasha.current.antar} antar.` : '';
+  const yogas = k.yogas && k.yogas.length ? `Yogas: ${k.yogas.map((y) => y.name).join(', ')}.` : '';
+  const dosha = k.doshas ? `Doshas: Mangal ${k.doshas.mangal.present ? 'yes' : 'no'}, Kaal Sarp ${k.doshas.kaalSarp.present ? 'yes' : 'no'}, Sade Sati ${k.doshas.sadeSati.present ? k.doshas.sadeSati.phase : 'no'}.` : '';
+  return `Lagna ${k.basics.lagna}. Moon rashi ${k.basics.rashi}, Nakshatra ${k.basics.nakshatra} pada ${k.basics.pada} (gana ${k.basics.gana}, nadi ${k.basics.nadi}, yoni ${k.basics.yoni}). Planets: ${planets}. ${dasha} ${yogas} ${dosha}`.trim();
 }

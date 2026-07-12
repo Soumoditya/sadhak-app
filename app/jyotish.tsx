@@ -11,8 +11,10 @@ import { useDialog } from '../contexts/DialogContext';
 import { Header } from '../components/ui';
 import { useDsInsets, DS } from '../constants/ds';
 import NorthChart from '../components/charts/NorthChart';
+import { router } from 'expo-router';
 import {
-  computeAndSaveKundli, loadNatal, type BirthInput, type Kundli,
+  computeAndSaveKundli, loadNatal, getCachedDaily, getPrediction,
+  type BirthInput, type Kundli, type Prediction, type PredictionPeriod,
 } from '../services/jyotish';
 
 export default function JyotishScreen() {
@@ -25,6 +27,9 @@ export default function JyotishScreen() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [chartTab, setChartTab] = useState<'d1' | 'd9' | 'd10' | 'moon'>('d1');
+  const [pred, setPred] = useState<Prediction | null>(null);
+  const [predPeriod, setPredPeriod] = useState<PredictionPeriod>('daily');
+  const [predLoading, setPredLoading] = useState(false);
 
   // ── Birth-form state (defaults; prefilled from the saved natal record) ──
   const [date, setDate] = useState<Date>(new Date(1995, 0, 1));
@@ -59,6 +64,31 @@ export default function JyotishScreen() {
     })();
     return () => { active = false; };
   }, [user?.uid]);
+
+  // Load today's guidance once the chart is available (cached per-day).
+  useEffect(() => {
+    if (!kundli || !user?.uid) return;
+    let active = true;
+    setPredLoading(true); setPredPeriod('daily');
+    getCachedDaily(user.uid, kundli, profile?.displayName?.split(' ')[0])
+      .then((p) => { if (active) setPred(p); })
+      .catch(() => {})
+      .finally(() => { if (active) setPredLoading(false); });
+    return () => { active = false; };
+  }, [kundli, user?.uid]);
+
+  const loadPeriod = async (period: PredictionPeriod) => {
+    if (!kundli) return;
+    setPredPeriod(period); setPredLoading(true);
+    try {
+      const p = period === 'daily' && user?.uid
+        ? await getCachedDaily(user.uid, kundli, profile?.displayName?.split(' ')[0])
+        : await getPrediction(kundli, period, profile?.displayName?.split(' ')[0]);
+      setPred(p);
+    } catch (e: any) {
+      dialog.alert('Could not load guidance', String(e?.message || e).slice(0, 160));
+    } finally { setPredLoading(false); }
+  };
 
   const pad = (n: number) => String(n).padStart(2, '0');
   const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -229,6 +259,56 @@ export default function JyotishScreen() {
           )}
         </View>
 
+        {/* Guidance (daily / weekly / monthly / yearly) */}
+        <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+          <Text style={[s.cardKicker, { color: colors.primary }]}>YOUR GUIDANCE</Text>
+          <View style={s.chartTabs}>
+            {(['daily', 'weekly', 'monthly', 'yearly'] as const).map((p) => {
+              const active = predPeriod === p;
+              return (
+                <TouchableOpacity key={p} onPress={() => loadPeriod(p)} disabled={predLoading}
+                  style={[s.chartTab, { backgroundColor: active ? colors.primary : 'transparent', borderColor: active ? colors.primary : colors.cardBorder }]}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: active ? '#FFF' : colors.textSecondary, textTransform: 'capitalize' }}>{p}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {predLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 18, gap: 8 }}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={{ color: colors.textTertiary, fontSize: 12 }}>Reading your transits…</Text>
+            </View>
+          ) : pred ? (
+            <View style={{ gap: 12 }}>
+              {!!pred.overview && <Text style={{ color: colors.text, fontSize: 14, lineHeight: 21 }}>{pred.overview}</Text>}
+              {!!pred.goodFor?.length && <GuideList title="Good for" icon="check-circle-outline" color={colors.tulsiGreen || '#2D6A4F'} items={pred.goodFor} colors={colors} />}
+              {!!pred.avoid?.length && <GuideList title="Best to avoid" icon="close-circle-outline" color={colors.festival || '#DC2626'} items={pred.avoid} colors={colors} />}
+              {!!pred.doToday?.length && <GuideList title="Do" icon="star-four-points-outline" color={colors.primary} items={pred.doToday} colors={colors} />}
+              {!!pred.remedies?.length && <GuideList title="Remedies" icon="flower-tulip-outline" color="#7C3AED" items={pred.remedies} colors={colors} />}
+              {!!pred.transit && <Text style={{ color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, fontStyle: 'italic' }}>Transit: {pred.transit}</Text>}
+              {!!pred.lucky && (
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                  {pred.lucky.color ? <View style={[s.luckyChip, { borderColor: colors.cardBorder }]}><Text style={{ color: colors.textSecondary, fontSize: 11.5 }}>Colour · {pred.lucky.color}</Text></View> : null}
+                  {pred.lucky.number ? <View style={[s.luckyChip, { borderColor: colors.cardBorder }]}><Text style={{ color: colors.textSecondary, fontSize: 11.5 }}>Number · {pred.lucky.number}</Text></View> : null}
+                  {pred.lucky.direction ? <View style={[s.luckyChip, { borderColor: colors.cardBorder }]}><Text style={{ color: colors.textSecondary, fontSize: 11.5 }}>Direction · {pred.lucky.direction}</Text></View> : null}
+                </View>
+              )}
+              <Text style={{ color: colors.textTertiary, fontSize: 10.5, lineHeight: 15 }}>Guidance grounded in your exact chart & today's transits — reflective, not a guarantee.</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Chat about my chart */}
+        <TouchableOpacity onPress={() => router.push('/ask?astro=1')} activeOpacity={0.85}
+          style={[s.astroChat, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '35' }]}>
+          <MaterialCommunityIcons name="creation" size={20} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.text, fontSize: 14.5, fontWeight: '800' }}>Chat about your chart</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Ask Sadhak AI anything — it reads your kundli.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         {/* Basics */}
         <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <Text style={[s.cardKicker, { color: colors.primary }]}>YOUR BIRTH DETAILS</Text>
@@ -327,6 +407,23 @@ export default function JyotishScreen() {
   );
 }
 
+function GuideList({ title, icon, color, items, colors }: { title: string; icon: any; color: string; items: string[]; colors: any }) {
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <MaterialCommunityIcons name={icon} size={14} color={color} />
+        <Text style={{ color, fontSize: 12, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' }}>{title}</Text>
+      </View>
+      {items.map((it, i) => (
+        <View key={i} style={{ flexDirection: 'row', gap: 7, paddingLeft: 2, marginBottom: 2 }}>
+          <Text style={{ color, fontSize: 13 }}>•</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 19, flex: 1 }}>{it}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '800', letterSpacing: 1, marginTop: 18, marginBottom: 8 },
   field: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 52 },
@@ -356,4 +453,6 @@ const s = StyleSheet.create({
   dashaLord: { fontSize: 13.5 },
   dashaSpan: { fontSize: 12.5 },
   doshaDot: { width: 9, height: 9, borderRadius: 5 },
+  luckyChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, borderWidth: 1 },
+  astroChat: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
 });
