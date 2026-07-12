@@ -30,6 +30,7 @@ const QUICK_ACTIONS = [
 
 const MORE_MODULES = [
   { key: 'ai', label: 'Sadhak AI', icon: 'sparkles', color: '#D94F00', route: '/ask' },
+  { key: 'jyotish', label: 'Jyotish', icon: 'star-four-points', color: '#C49A2C', route: '/jyotish' },
   { key: 'vastu', label: 'Vastu', icon: 'compass-outline', color: '#7C3AED', route: '/compass' },
   { key: 'puja', label: 'Puja Guide', icon: 'flower-tulip', color: '#DC2626', route: '/puja-guide' },
   { key: 'bhog', label: 'Satvik Bhog', icon: 'food-variant', color: '#2D6A4F', route: '/bhog' },

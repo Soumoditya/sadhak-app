@@ -33,6 +33,13 @@ export interface UserProfile {
     lng: number;
     timezone: string;
   } | null;
+  // NOTE: sensitive Vedic birth details (DOB/time/place) are NOT stored here —
+  // the profile doc is community-readable, so they live only in the owner-only
+  // subcollection users/{uid}/jyotish/natal (see services/jyotish.ts). We keep
+  // just a flag so the UI knows a chart exists.
+  hasBirthChart?: boolean;
+  // One-time consent to store profile + astro + usage data (app improvement / research).
+  dataConsent?: boolean;
   role: 'user' | 'admin';
   isGuest: boolean;
   profilePicUrl: string | null;
@@ -150,6 +157,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       gender: null,
       marriageStatus: null,
       location: null,
+      hasBirthChart: false,
+      dataConsent: false,
       role: 'user',
       isGuest,
       profilePicUrl: firebaseUser.photoURL,
