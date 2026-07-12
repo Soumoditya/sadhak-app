@@ -1,9 +1,9 @@
 // Sadhak AI — Gemini-powered spiritual companion.
-// NOTE: the key ships in the client for now (fine for testing / small scale on
-// the free tier). Before large-scale Play Store distribution, move this behind
-// a tiny proxy (Firebase Function / Vercel edge) so the key can be rotated.
-const GEMINI_KEY = 'AQ.Ab8RN6IQgVdmLPZZtxZNASMXW0B_rYl7rTMDANduDP597WmiCA';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
+// The Gemini API key is NOT in the app anymore. Requests go through our own
+// serverless proxy (sadhak-web repo → api/gemini.js on Vercel), which holds the
+// key in its environment. The app sends the same request body; the proxy adds
+// the key server-side and returns Gemini's response verbatim.
+const GEMINI_URL = 'https://sadhak-app.vercel.app/api/gemini';
 
 const SYSTEM_PROMPT = `You are "Sadhak AI", the in-app spiritual companion of Sadhak — a Hindu daily-practice app (Panchang, calendar, temples, aarti, japa, sacred library).
 
@@ -39,7 +39,6 @@ export async function askSadhakAI(history: AiMessage[], userName?: string): Prom
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-goog-api-key': GEMINI_KEY,
     },
     body: JSON.stringify({
       systemInstruction: {
