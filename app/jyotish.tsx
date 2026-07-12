@@ -16,6 +16,8 @@ import {
   computeAndSaveKundli, loadNatal, getCachedDaily, getPrediction,
   type BirthInput, type Kundli, type Prediction, type PredictionPeriod,
 } from '../services/jyotish';
+import { exportKundliPdf } from '../services/jyotishPdf';
+import { scheduleDailyAstroReminder, cancelDailyAstroReminder, getAstroReminder } from '../services/notifications';
 
 export default function JyotishScreen() {
   const { user, profile, updateProfile } = useAuth();
@@ -30,6 +32,11 @@ export default function JyotishScreen() {
   const [pred, setPred] = useState<Prediction | null>(null);
   const [predPeriod, setPredPeriod] = useState<PredictionPeriod>('daily');
   const [predLoading, setPredLoading] = useState(false);
+  const [savedBirth, setSavedBirth] = useState<BirthInput | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [remOn, setRemOn] = useState(false);
+  const [remTime, setRemTime] = useState<Date>(() => { const d = new Date(); d.setHours(7, 0, 0, 0); return d; });
+  const [showRemPicker, setShowRemPicker] = useState(false);
 
   // ── Birth-form state (defaults; prefilled from the saved natal record) ──
   const [date, setDate] = useState<Date>(new Date(1995, 0, 1));
@@ -59,11 +66,32 @@ export default function JyotishScreen() {
       if (!user?.uid) { setLoading(false); setEditing(true); return; }
       const natal = await loadNatal(user.uid);
       if (!active) return;
-      if (natal) { prefill(natal.birth); setKundli(natal.kundli); } else { setEditing(true); }
+      if (natal) { prefill(natal.birth); setKundli(natal.kundli); setSavedBirth(natal.birth); } else { setEditing(true); }
       setLoading(false);
     })();
     return () => { active = false; };
   }, [user?.uid]);
+
+  // Load the saved daily-reminder time (if any).
+  useEffect(() => {
+    getAstroReminder().then((r) => {
+      if (r) { setRemOn(true); const d = new Date(); d.setHours(r.hour, r.minute, 0, 0); setRemTime(d); }
+    }).catch(() => {});
+  }, []);
+
+  const toggleReminder = async () => {
+    try {
+      if (remOn) { await cancelDailyAstroReminder(); setRemOn(false); }
+      else { await scheduleDailyAstroReminder(remTime.getHours(), remTime.getMinutes()); setRemOn(true); }
+    } catch (e: any) { dialog.alert('Reminder', String(e?.message || e).slice(0, 160)); }
+  };
+
+  const downloadPdf = async () => {
+    if (!kundli) return;
+    try { setPdfBusy(true); await exportKundliPdf(kundli, savedBirth, profile?.displayName); }
+    catch (e: any) { dialog.alert('PDF failed', String(e?.message || e).slice(0, 160)); }
+    finally { setPdfBusy(false); }
+  };
 
   // Load today's guidance once the chart is available (cached per-day).
   useEffect(() => {
@@ -122,7 +150,7 @@ export default function JyotishScreen() {
       // subcollection (inside computeAndSaveKundli), NOT on the public profile.
       const k = await computeAndSaveKundli(user!.uid, birth);
       await updateProfile({ hasBirthChart: true } as any); // non-sensitive flag
-      setKundli(k);
+      setKundli(k); setSavedBirth(birth);
       setEditing(false);
     } catch (e: any) {
       dialog.alert('Could not save', String(e?.message || e).slice(0, 160));
@@ -309,6 +337,36 @@ export default function JyotishScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </TouchableOpacity>
 
+        {/* Daily reminder + PDF */}
+        <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <MaterialCommunityIcons name="bell-ring-outline" size={19} color={colors.primary} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={{ color: colors.text, fontSize: 14.5, fontWeight: '700' }}>Daily guidance reminder</Text>
+              <TouchableOpacity onPress={() => setShowRemPicker(true)} disabled={!remOn}>
+                <Text style={{ color: remOn ? colors.primary : colors.textTertiary, fontSize: 12.5, marginTop: 1 }}>
+                  {remOn ? `Every day at ${remTime.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })} · tap to change` : 'Off'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={toggleReminder} style={[s.switch, { backgroundColor: remOn ? colors.primary : colors.cardBorder }]}>
+              <View style={[s.switchKnob, { alignSelf: remOn ? 'flex-end' : 'flex-start' }]} />
+            </TouchableOpacity>
+          </View>
+          {showRemPicker && (
+            <DateTimePicker value={remTime} mode="time" onChange={async (e, d) => {
+              setShowRemPicker(Platform.OS === 'ios');
+              if (d) { setRemTime(d); if (remOn) { try { await scheduleDailyAstroReminder(d.getHours(), d.getMinutes()); } catch {} } }
+            }} />
+          )}
+          <View style={{ height: 1, backgroundColor: colors.cardBorder, marginVertical: 12 }} />
+          <TouchableOpacity onPress={downloadPdf} disabled={pdfBusy} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            {pdfBusy ? <ActivityIndicator size="small" color={colors.primary} /> : <MaterialCommunityIcons name="file-pdf-box" size={22} color={colors.primary} />}
+            <Text style={{ color: colors.text, fontSize: 14.5, fontWeight: '700', flex: 1 }}>Download PDF report</Text>
+            <Ionicons name="download-outline" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+
         {/* Basics */}
         <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <Text style={[s.cardKicker, { color: colors.primary }]}>YOUR BIRTH DETAILS</Text>
@@ -455,4 +513,6 @@ const s = StyleSheet.create({
   doshaDot: { width: 9, height: 9, borderRadius: 5 },
   luckyChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, borderWidth: 1 },
   astroChat: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
+  switch: { width: 44, height: 26, borderRadius: 13, padding: 3, justifyContent: 'center' },
+  switchKnob: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFF' },
 });

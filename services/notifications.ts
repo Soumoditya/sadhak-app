@@ -380,25 +380,67 @@ export async function scheduleHourlyNotifications(): Promise<void> {
   await AsyncStorage.setItem('lastNotifSchedule', now.toISOString());
 }
 
+// ── Daily personalised astrology reminder (user-set time) ──
+const ASTRO_REMINDER_KEY = 'sadhak_astro_reminder'; // stores "HH:MM" or absent
+
+export async function scheduleDailyAstroReminder(hour: number, minute: number): Promise<void> {
+  const ok = await requestNotificationPermissions();
+  if (!ok) throw new Error('Notifications are turned off for Sadhak. Enable them in system settings.');
+  await Notifications.cancelScheduledNotificationAsync('astro-daily').catch(() => {});
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'astro-daily',
+    content: {
+      title: '🔮 Your daily Jyotish guidance',
+      body: "Today's reading from your chart is ready — tap to see what's favourable and what to avoid.",
+      sound: 'default',
+      ...(Platform.OS === 'android' ? { channelId: 'sadhak-spiritual' } : {}),
+      data: { type: 'astro_daily', route: '/jyotish' },
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute } as any,
+  });
+  await AsyncStorage.setItem(ASTRO_REMINDER_KEY, `${hour}:${minute}`);
+}
+
+export async function cancelDailyAstroReminder(): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync('astro-daily').catch(() => {});
+  await AsyncStorage.removeItem(ASTRO_REMINDER_KEY);
+}
+
+export async function getAstroReminder(): Promise<{ hour: number; minute: number } | null> {
+  const v = await AsyncStorage.getItem(ASTRO_REMINDER_KEY);
+  if (!v) return null;
+  const [h, m] = v.split(':').map(Number);
+  return { hour: h, minute: m };
+}
+
+// Re-apply the astro reminder after the hourly batch wipes all schedules.
+async function reapplyAstroReminder(): Promise<void> {
+  const r = await getAstroReminder();
+  if (r) { try { await scheduleDailyAstroReminder(r.hour, r.minute); } catch {} }
+}
+
 // Re-schedule if needed (call on app open)
 export async function ensureNotificationsScheduled(): Promise<void> {
   try {
     const lastSchedule = await AsyncStorage.getItem('lastNotifSchedule');
     if (!lastSchedule) {
       await scheduleHourlyNotifications();
+      await reapplyAstroReminder();
       return;
     }
 
     const lastDate = new Date(lastSchedule);
     const hoursSince = (Date.now() - lastDate.getTime()) / (1000 * 60 * 60);
-    
+
     // Re-schedule if more than 24 hours since last schedule
     if (hoursSince > 24) {
       await scheduleHourlyNotifications();
+      await reapplyAstroReminder(); // hourly batch cancels all — restore the daily astro one
     }
   } catch (e) {
     console.error('Notification scheduling error:', e);
     await scheduleHourlyNotifications();
+    await reapplyAstroReminder();
   }
 }
 
