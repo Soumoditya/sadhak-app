@@ -34,6 +34,8 @@ const MORE_MODULES = [
   { key: 'vastu', label: 'Vastu', icon: 'compass-outline', color: '#7C3AED', route: '/compass' },
   { key: 'puja', label: 'Puja Guide', icon: 'flower-tulip', color: '#DC2626', route: '/puja-guide' },
   { key: 'bhog', label: 'Satvik Bhog', icon: 'food-variant', color: '#2D6A4F', route: '/bhog' },
+  { key: 'ayurveda', label: 'Ayurveda', icon: 'leaf', color: '#1B7A42', route: '/ayurveda' },
+  { key: 'wiki', label: 'Hindu Wiki', icon: 'book-education-outline', color: '#1565C0', route: '/wiki' },
   { key: 'wallpaper', label: 'Wallpapers', icon: 'image-multiple-outline', color: '#0EA5E9', route: '/wallpapers' },
   { key: 'notes', label: 'Notes', icon: 'note-edit-outline', color: '#37474F', route: '/notes' },
   { key: 'feed', label: 'Feed', icon: 'compass', color: '#F59E0B', route: '/feed' },

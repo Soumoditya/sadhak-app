@@ -308,6 +308,9 @@ export default function LibraryScreen() {
                 <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{submissions.length}</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity onPress={() => router.push('/wiki')} style={st.headerBtn}>
+              <MaterialCommunityIcons name="book-education-outline" size={20} color="#FFF" />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} style={st.headerBtn}>
               <MaterialCommunityIcons name={viewMode === 'grid' ? 'view-list-outline' : 'view-grid-outline'} size={20} color="#FFF" />
             </TouchableOpacity>

@@ -232,6 +232,8 @@ function RootLayoutInner() {
         <Stack.Screen name="play" options={{ headerShown: false }} />
         <Stack.Screen name="compass" options={{ headerShown: false }} />
         <Stack.Screen name="jyotish" options={{ headerShown: false }} />
+        <Stack.Screen name="ayurveda" options={{ headerShown: false }} />
+        <Stack.Screen name="wiki" options={{ headerShown: false }} />
         <Stack.Screen name="puja-guide" options={{ headerShown: false }} />
         <Stack.Screen name="bhog" options={{ headerShown: false }} />
         <Stack.Screen name="ask" options={{ headerShown: false }} />
