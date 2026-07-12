@@ -21,13 +21,26 @@ export interface GrahaPlacement {
   name: string; nameHi: string;
   lon: number; sign: string; signHi: string; signIndex: number; signLord: string;
   degree: number; nakshatra: string; nakshatraHi: string; nakshatraIndex: number;
-  pada: number; nakLord: string; retro: boolean; house: number;
+  pada: number; nakLord: string; retro: boolean; house: number; dignity?: string;
 }
 
+// A lighter placement used by divisional charts (only what the chart renders).
+export interface ChartPlacement { name: string; nameHi: string; sign: string; signIndex: number; retro: boolean; house: number; }
+export interface DivChart { lagnaSignIndex: number; planets: ChartPlacement[]; }
+
+export interface DashaPeriod { lord: string; start: string; end: string; years?: number; }
 export interface Kundli {
   meta: { ayanamsa: number; ayanamsaName: string; houseSystem: string; jd: number };
   lagna: GrahaPlacement;
   planets: GrahaPlacement[];
+  charts?: { d9: DivChart; d10: DivChart; moon: DivChart };
+  dasha?: { maha: DashaPeriod[]; current: { maha: string; antar: string; antarList: DashaPeriod[] } };
+  yogas?: Array<{ name: string; desc: string }>;
+  doshas?: {
+    mangal: { present: boolean; house: number };
+    kaalSarp: { present: boolean };
+    sadeSati: { present: boolean; phase: string | null; saturnSign: string };
+  };
   basics: {
     rashi: string; rashiHi: string; rashiLord: string;
     nakshatra: string; nakshatraHi: string; pada: number;

@@ -24,6 +24,7 @@ export default function JyotishScreen() {
   const [kundli, setKundli] = useState<Kundli | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [chartTab, setChartTab] = useState<'d1' | 'd9' | 'd10' | 'moon'>('d1');
 
   // ── Birth-form state (defaults; prefilled from the saved natal record) ──
   const [date, setDate] = useState<Date>(new Date(1995, 0, 1));
@@ -198,10 +199,34 @@ export default function JyotishScreen() {
         <TouchableOpacity onPress={() => setEditing(true)} hitSlop={8}><MaterialCommunityIcons name="pencil-outline" size={20} color={colors.textSecondary} /></TouchableOpacity>
       } />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
-        {/* D1 chart */}
+        {/* Charts — D1 / D9 / D10 / Moon */}
         <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder, alignItems: 'center' }]}>
-          <Text style={[s.cardKicker, { color: colors.primary }]}>LAGNA CHART · D1 (राशि)</Text>
-          <NorthChart kundli={kundli} size={300} colors={colors as any} />
+          <View style={s.chartTabs}>
+            {([
+              ['d1', 'D1 · राशि'], ['d9', 'D9 · नवांश'], ['d10', 'D10 · दशांश'], ['moon', 'चन्द्र'],
+            ] as const).map(([key, label]) => {
+              const active = chartTab === key;
+              const disabled = key !== 'd1' && !kundli.charts;
+              return (
+                <TouchableOpacity key={key} disabled={disabled} onPress={() => setChartTab(key)}
+                  style={[s.chartTab, { backgroundColor: active ? colors.primary : 'transparent', borderColor: active ? colors.primary : colors.cardBorder, opacity: disabled ? 0.4 : 1 }]}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: active ? '#FFF' : colors.textSecondary }}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={[s.chartSub, { color: colors.textTertiary }]}>
+            {chartTab === 'd1' ? 'Birth chart — overall life & body' : chartTab === 'd9' ? 'Navamsa — marriage, dharma & inner strength' : chartTab === 'd10' ? 'Dasamsa — career & profession' : 'Moon chart — mind & emotions'}
+          </Text>
+          {chartTab === 'd1' ? (
+            <NorthChart kundli={kundli} size={300} colors={colors as any} />
+          ) : (
+            <NorthChart
+              kundli={kundli} size={300} colors={colors as any}
+              planets={(chartTab === 'd9' ? kundli.charts!.d9 : chartTab === 'd10' ? kundli.charts!.d10 : kundli.charts!.moon).planets}
+              lagnaSignIndex={(chartTab === 'd9' ? kundli.charts!.d9 : chartTab === 'd10' ? kundli.charts!.d10 : kundli.charts!.moon).lagnaSignIndex}
+            />
+          )}
         </View>
 
         {/* Basics */}
@@ -218,19 +243,85 @@ export default function JyotishScreen() {
         {/* Planet positions */}
         <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <Text style={[s.cardKicker, { color: colors.primary }]}>GRAHA POSITIONS</Text>
-          {kundli.planets.map((p) => (
-            <View key={p.name} style={s.planetRow}>
-              <Text style={[s.planetName, { color: colors.text }]}>{p.name}{p.retro ? ' ↺' : ''}</Text>
-              <Text style={[s.planetPos, { color: colors.textSecondary }]}>{p.sign} {p.degree.toFixed(1)}°</Text>
-              <Text style={[s.planetHouse, { color: colors.textTertiary }]}>H{p.house}</Text>
-              <Text style={[s.planetNak, { color: colors.textTertiary }]} numberOfLines={1}>{p.nakshatra} {p.pada}</Text>
-            </View>
-          ))}
+          {kundli.planets.map((p) => {
+            const dig = p.dignity && p.dignity !== '—' && p.dignity !== 'Neutral' ? p.dignity : '';
+            const digColor = p.dignity === 'Exalted' || p.dignity === 'Own sign' ? (colors.tulsiGreen || '#2D6A4F') : p.dignity === 'Debilitated' ? (colors.error || '#DC2626') : colors.textTertiary;
+            return (
+              <View key={p.name} style={s.planetRow}>
+                <Text style={[s.planetName, { color: colors.text }]}>{p.name}{p.retro ? ' ↺' : ''}</Text>
+                <Text style={[s.planetPos, { color: colors.textSecondary }]}>{p.sign} {p.degree.toFixed(1)}°</Text>
+                <Text style={[s.planetHouse, { color: colors.textTertiary }]}>H{p.house}</Text>
+                {dig ? <Text style={[s.planetDig, { color: digColor }]} numberOfLines={1}>{dig}</Text>
+                  : <Text style={[s.planetNak, { color: colors.textTertiary }]} numberOfLines={1}>{p.nakshatra} {p.pada}</Text>}
+              </View>
+            );
+          })}
         </View>
 
-        <Text style={{ color: colors.textTertiary, fontSize: 11.5, textAlign: 'center', marginTop: 8, lineHeight: 17 }}>
-          Calculated with Swiss Ephemeris · Lahiri ayanamsa · whole-sign houses.{'\n'}More (D9, D10, dashas, yogas, predictions) coming next.
+        {/* Dasha */}
+        {kundli.dasha && (
+          <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Text style={[s.cardKicker, { color: colors.primary }]}>VIMSHOTTARI DASHA</Text>
+            <View style={[s.dashaNow, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}>
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Running now</Text>
+              <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800', marginTop: 2 }}>
+                {kundli.dasha.current.maha} Mahadasha · {kundli.dasha.current.antar} Antardasha
+              </Text>
+            </View>
+            {kundli.dasha.maha.map((m) => {
+              const running = m.lord === kundli.dasha!.current.maha;
+              return (
+                <View key={m.lord + m.start} style={s.dashaRow}>
+                  <Text style={[s.dashaLord, { color: running ? colors.primary : colors.text, fontWeight: running ? '800' : '600' }]}>{m.lord}</Text>
+                  <Text style={[s.dashaSpan, { color: colors.textTertiary }]}>{m.start.slice(0, 4)} – {m.end.slice(0, 4)}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Yogas */}
+        {kundli.yogas && (
+          <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Text style={[s.cardKicker, { color: colors.primary }]}>YOGAS IN YOUR CHART</Text>
+            {kundli.yogas.length === 0 ? (
+              <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>No major classical yogas from this curated set. Every chart still has its own strengths — see the dashas and planet dignities above.</Text>
+            ) : kundli.yogas.map((y) => (
+              <View key={y.name} style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <MaterialCommunityIcons name="star-four-points" size={13} color={colors.primary} />
+                  <Text style={{ color: colors.text, fontSize: 14, fontWeight: '800' }}>{y.name}</Text>
+                </View>
+                <Text style={{ color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 3 }}>{y.desc}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Doshas */}
+        {kundli.doshas && (
+          <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Text style={[s.cardKicker, { color: colors.primary }]}>DOSHA CHECK</Text>
+            {[
+              { label: 'Mangal (Kuja) Dosha', on: kundli.doshas.mangal.present, detail: kundli.doshas.mangal.present ? `Mars in house ${kundli.doshas.mangal.house}` : 'Not present' },
+              { label: 'Kaal Sarp Dosha', on: kundli.doshas.kaalSarp.present, detail: kundli.doshas.kaalSarp.present ? 'All planets between Rahu–Ketu' : 'Not present' },
+              { label: 'Sade Sati', on: kundli.doshas.sadeSati.present, detail: kundli.doshas.sadeSati.present ? `${kundli.doshas.sadeSati.phase} phase · Saturn in ${kundli.doshas.sadeSati.saturnSign}` : 'Not active now' },
+            ].map((d) => (
+              <View key={d.label} style={s.infoRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 }}>
+                  <View style={[s.doshaDot, { backgroundColor: d.on ? (colors.festival || '#DC2626') : (colors.tulsiGreen || '#2D6A4F') }]} />
+                  <Text style={[s.infoKey, { color: colors.text }]}>{d.label}</Text>
+                </View>
+                <Text style={[s.infoVal, { color: d.on ? (colors.festival || '#DC2626') : colors.textSecondary }]}>{d.detail}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <Text style={{ color: colors.textTertiary, fontSize: 11.5, textAlign: 'center', marginTop: 4, lineHeight: 17 }}>
+          Calculated with Swiss Ephemeris · Lahiri ayanamsa · whole-sign houses.
         </Text>
+
       </ScrollView>
     </View>
   );
@@ -256,4 +347,13 @@ const s = StyleSheet.create({
   planetPos: { fontSize: 13, flex: 1 },
   planetHouse: { fontSize: 12, width: 30 },
   planetNak: { fontSize: 11.5, width: 96, textAlign: 'right' },
+  planetDig: { fontSize: 11.5, width: 96, textAlign: 'right', fontWeight: '700' },
+  chartTabs: { flexDirection: 'row', gap: 6, marginBottom: 6, flexWrap: 'wrap', justifyContent: 'center' },
+  chartTab: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 100, borderWidth: 1 },
+  chartSub: { fontSize: 11.5, marginBottom: 12, textAlign: 'center' },
+  dashaNow: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 12 },
+  dashaRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
+  dashaLord: { fontSize: 13.5 },
+  dashaSpan: { fontSize: 12.5 },
+  doshaDot: { width: 9, height: 9, borderRadius: 5 },
 });

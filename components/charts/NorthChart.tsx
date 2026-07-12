@@ -1,6 +1,9 @@
 import React from 'react';
 import Svg, { Rect, Line, Text as SvgText, G } from 'react-native-svg';
-import type { Kundli, GrahaPlacement } from '../../services/jyotish';
+import type { Kundli } from '../../services/jyotish';
+
+// Minimal shape the chart needs (works for D1 grahas and divisional placements).
+type ChartGraha = { name: string; house: number; retro: boolean };
 
 // North-Indian diamond chart. The 12 HOUSE positions are fixed; the sign that
 // sits in each house rotates with the lagna. We draw the classic square + two
@@ -25,7 +28,7 @@ interface Props {
   kundli: Kundli;
   size?: number;
   /** Use a divisional chart's placements instead of D1 (planets already housed). */
-  planets?: GrahaPlacement[];
+  planets?: ChartGraha[];
   lagnaSignIndex?: number;
   accent?: string;
   colors: { text: string; textSecondary: string; primary: string; cardBorder: string; surface: string };
