@@ -72,19 +72,26 @@ export default function NorthChart({ kundli, size = 300, planets, lagnaSignIndex
               {rashiNum}
             </SvgText>
             {/* Planets in this house */}
-            {occupants.map((o, idx) => (
+            {occupants.map((o, idx) => {
+              // 1-2 grahas stack; 3+ go into two columns so a crowded house
+              // doesn't spill over the lines into its neighbours.
+              const cols = occupants.length > 2 ? 2 : 1;
+              const col = idx % cols, row = Math.floor(idx / cols);
+              const x = cols === 1 ? cx : cx + (col === 0 ? -12 : 12);
+              return (
               <SvgText
                 key={idx}
-                x={cx}
-                y={cy + 2 + idx * 13}
-                fontSize={12}
+                x={x}
+                y={cy + 2 + row * 13}
+                fontSize={occupants.length > 4 ? 10.5 : 12}
                 fontWeight="700"
                 fill={o.label === 'As' ? acc : colors.text}
                 textAnchor="middle"
               >
                 {o.label}{o.retro ? '↺' : ''}
               </SvgText>
-            ))}
+              );
+            })}
           </G>
         );
       })}

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  ActivityIndicator, Platform,
+  ActivityIndicator, Platform, BackHandler,
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -13,7 +13,7 @@ import { useDsInsets, DS } from '../constants/ds';
 import NorthChart from '../components/charts/NorthChart';
 import { router } from 'expo-router';
 import {
-  computeAndSaveKundli, loadNatal, getCachedDaily, getPrediction,
+  computeAndSaveKundli, computeKundli, saveKundli, loadNatal, getCachedDaily, getPrediction, KUNDLI_MAX_AGE_MS, localDateKey,
   type BirthInput, type Kundli, type Prediction, type PredictionPeriod,
 } from '../services/jyotish';
 import { exportKundliPdf } from '../services/jyotishPdf';
@@ -32,7 +32,9 @@ export default function JyotishScreen() {
   const [pred, setPred] = useState<Prediction | null>(null);
   const [predPeriod, setPredPeriod] = useState<PredictionPeriod>('daily');
   const [predLoading, setPredLoading] = useState(false);
+  const [predError, setPredError] = useState(false);
   const [savedBirth, setSavedBirth] = useState<BirthInput | null>(null);
+  const birthEdited = useRef(false); // set once the user saves new birth details
   const [pdfBusy, setPdfBusy] = useState(false);
   const [remOn, setRemOn] = useState(false);
   const [remTime, setRemTime] = useState<Date>(() => { const d = new Date(); d.setHours(7, 0, 0, 0); return d; });
@@ -68,6 +70,18 @@ export default function JyotishScreen() {
       if (!active) return;
       if (natal) { prefill(natal.birth); setKundli(natal.kundli); setSavedBirth(natal.birth); } else { setEditing(true); }
       setLoading(false);
+      // The running dasha + Sade Sati depend on today's date; refresh a stale
+      // cached chart quietly so they don't stay frozen at the first compute.
+      if (natal && (!natal.computedAt || Date.now() - natal.computedAt > KUNDLI_MAX_AGE_MS)) {
+        try {
+          const fresh = await computeKundli(natal.birth);
+          // Don't clobber a chart the user re-entered while this was in flight.
+          if (!birthEdited.current) {
+            await saveKundli(user.uid, natal.birth, fresh);
+            if (active && !birthEdited.current) setKundli(fresh);
+          }
+        } catch {}
+      }
     })();
     return () => { active = false; };
   }, [user?.uid]);
@@ -97,23 +111,32 @@ export default function JyotishScreen() {
   useEffect(() => {
     if (!kundli || !user?.uid) return;
     let active = true;
-    setPredLoading(true); setPredPeriod('daily');
+    setPredLoading(true); setPredPeriod('daily'); setPredError(false);
     getCachedDaily(user.uid, kundli, profile?.displayName?.split(' ')[0])
       .then((p) => { if (active) setPred(p); })
-      .catch(() => {})
+      .catch(() => { if (active) { setPred(null); setPredError(true); } })
       .finally(() => { if (active) setPredLoading(false); });
     return () => { active = false; };
   }, [kundli, user?.uid]);
 
+  // While editing an existing chart, back (header or hardware) cancels the edit
+  // instead of leaving the screen.
+  useEffect(() => {
+    if (!editing || !kundli) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setEditing(false); return true; });
+    return () => sub.remove();
+  }, [editing, kundli]);
+
   const loadPeriod = async (period: PredictionPeriod) => {
     if (!kundli) return;
-    setPredPeriod(period); setPredLoading(true);
+    setPredPeriod(period); setPredLoading(true); setPredError(false);
     try {
       const p = period === 'daily' && user?.uid
         ? await getCachedDaily(user.uid, kundli, profile?.displayName?.split(' ')[0])
         : await getPrediction(kundli, period, profile?.displayName?.split(' ')[0]);
       setPred(p);
     } catch (e: any) {
+      setPred(null); setPredError(true);
       dialog.alert('Could not load guidance', String(e?.message || e).slice(0, 160));
     } finally { setPredLoading(false); }
   };
@@ -140,15 +163,17 @@ export default function JyotishScreen() {
   };
 
   const saveBirth = async () => {
+    if (!user?.uid) { dialog.alert('Sign in needed', 'Please sign in to save your birth chart.'); return; }
     if (!coords) { dialog.alert('Set birth place', 'Tap "Locate" to pin your birth place on the map.'); return; }
     const tz = parseFloat(tzOffset);
     if (!Number.isFinite(tz) || tz < -12 || tz > 14) { dialog.alert('Timezone', 'Enter a valid timezone offset (e.g. 5.5 for India).'); return; }
     const birth: BirthInput = { date: dateStr, time: timeStr, hasTime, place: place.trim(), lat: coords.lat, lng: coords.lng, tzOffset: tz, gender };
     try {
       setSaving(true);
+      birthEdited.current = true;
       // Birth details are sensitive → saved only in the owner-only jyotish
       // subcollection (inside computeAndSaveKundli), NOT on the public profile.
-      const k = await computeAndSaveKundli(user!.uid, birth);
+      const k = await computeAndSaveKundli(user.uid, birth);
       await updateProfile({ hasBirthChart: true } as any); // non-sensitive flag
       setKundli(k); setSavedBirth(birth);
       setEditing(false);
@@ -161,7 +186,7 @@ export default function JyotishScreen() {
   if (editing || (!kundli && !loading)) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Header title="Your Birth Details" subtitle="Used to compute your authentic Vedic chart" />
+        <Header title="Your Birth Details" subtitle="Used to compute your authentic Vedic chart" onBack={kundli ? () => setEditing(false) : undefined} />
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
           <Text style={[s.label, { color: colors.textTertiary }]}>DATE OF BIRTH</Text>
           <TouchableOpacity style={[s.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} onPress={() => setShowDate(true)}>
@@ -248,8 +273,14 @@ export default function JyotishScreen() {
     ['Lagna (Ascendant)', b.lagna], ['Rashi (Moon sign)', `${b.rashi} · lord ${b.rashiLord}`],
     ['Nakshatra', `${b.nakshatra} · pada ${b.pada}`], ['Nakshatra lord', b.nakLord],
     ['Gana', b.gana], ['Nadi', b.nadi], ['Yoni', b.yoni], ['Deity', b.deity],
-    ['Ayanamsa', `${b.lagnaHi ? '' : ''}Lahiri ${kundli.meta.ayanamsa}°`],
+    ['Ayanamsa', `Lahiri ${Number(kundli.meta.ayanamsa).toFixed(2)}°`],
   ];
+  // Highlight the mahadasha running TODAY (the cached "current" can be stale).
+  const todayKey = localDateKey();
+  const runningMaha = kundli.dasha?.maha.find((m) => m.start <= todayKey && todayKey < m.end)?.lord ?? kundli.dasha?.current.maha;
+  const runningAntar = runningMaha === kundli.dasha?.current.maha
+    ? (kundli.dasha?.current.antarList?.find((a) => a.start <= todayKey && todayKey < a.end)?.lord ?? kundli.dasha?.current.antar)
+    : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -306,6 +337,11 @@ export default function JyotishScreen() {
               <ActivityIndicator color={colors.primary} />
               <Text style={{ color: colors.textTertiary, fontSize: 12 }}>Reading your transits…</Text>
             </View>
+          ) : predError && !pred ? (
+            <TouchableOpacity onPress={() => loadPeriod(predPeriod)} style={{ alignItems: 'center', paddingVertical: 16, gap: 6 }}>
+              <MaterialCommunityIcons name="refresh" size={20} color={colors.primary} />
+              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Couldn't load your guidance. Tap to retry.</Text>
+            </TouchableOpacity>
           ) : pred ? (
             <View style={{ gap: 12 }}>
               {!!pred.overview && <Text style={{ color: colors.text, fontSize: 14, lineHeight: 21 }}>{pred.overview}</Text>}
@@ -403,11 +439,11 @@ export default function JyotishScreen() {
             <View style={[s.dashaNow, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}>
               <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Running now</Text>
               <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800', marginTop: 2 }}>
-                {kundli.dasha.current.maha} Mahadasha · {kundli.dasha.current.antar} Antardasha
+                {runningMaha} Mahadasha{runningAntar ? ` · ${runningAntar} Antardasha` : ''}
               </Text>
             </View>
             {kundli.dasha.maha.map((m) => {
-              const running = m.lord === kundli.dasha!.current.maha;
+              const running = m.start <= todayKey && todayKey < m.end;
               return (
                 <View key={m.lord + m.start} style={s.dashaRow}>
                   <Text style={[s.dashaLord, { color: running ? colors.primary : colors.text, fontWeight: running ? '800' : '600' }]}>{m.lord}</Text>

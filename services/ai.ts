@@ -16,7 +16,7 @@ Your role:
 
 Boundaries:
 - For medical, legal, financial or mental-health matters: give the dharmic perspective if relevant, but clearly advise consulting a qualified professional.
-- Do not make astrological predictions about a person's future; you may explain jyotish concepts.
+- {{ASTRO_RULE}}
 - Never invent scripture quotes. If unsure, say what is commonly taught and note the uncertainty.
 - Politely decline disrespectful or hateful requests about any community or faith.
 
@@ -37,6 +37,11 @@ export async function askSadhakAI(history: AiMessage[], userName?: string, chart
 
   // When the user opens "chat about my chart", we pass a compact summary of their
   // real natal placements so the AI reads the actual chart, not generic advice.
+  // The default rule forbids personal predictions; in chart mode that would make
+  // the model refuse exactly what the user opened the chat for.
+  const astroRule = chartContext
+    ? 'You may interpret the user\'s own birth chart (given below) as reflective guidance, but never state future events as certain.'
+    : 'Do not make astrological predictions about a person\'s future; you may explain jyotish concepts.';
   const astro = chartContext
     ? `\n\nThe user's authentic Vedic birth chart (sidereal, Lahiri — treat as exact fact):\n${chartContext}\nWhen they ask about themselves/their life/astrology, ground answers in THIS chart. Interpretations are guidance, not guaranteed prediction; be warm and never fatalistic.`
     : '';
@@ -48,7 +53,7 @@ export async function askSadhakAI(history: AiMessage[], userName?: string, chart
     },
     body: JSON.stringify({
       systemInstruction: {
-        parts: [{ text: SYSTEM_PROMPT + (userName ? `\n\nThe user's name is ${userName}.` : '') + astro }],
+        parts: [{ text: SYSTEM_PROMPT.replace('{{ASTRO_RULE}}', astroRule) + (userName ? `\n\nThe user's name is ${userName}.` : '') + astro }],
       },
       contents,
       // Flash "thinking" consumes output budget before visible text — 1024 was

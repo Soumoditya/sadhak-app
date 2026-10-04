@@ -10,7 +10,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from "../contexts/DialogContext";
 import { useLanguage } from '../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { goBackOrHome } from '../components/ui/Header';
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, serverTimestamp } from '../config/firebase';
@@ -384,7 +384,7 @@ export default function NotesScreen() {
         style={st.header}
       >
         <View style={st.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={st.backBtn}>
+          <TouchableOpacity onPress={goBackOrHome} style={st.backBtn}>
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <Text style={st.headerTitle}>{t('feat.notes')}</Text>

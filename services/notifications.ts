@@ -347,19 +347,28 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 // Schedule hourly notifications (up to 64 — Android limit)
 export async function scheduleHourlyNotifications(): Promise<void> {
-  // Cancel all existing scheduled notifications
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  // Cancel ONLY the previous hourly batch. cancelAll would also wipe the
+  // user's own calendar/notes reminders and the daily Jyotish reminder.
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
+  await Promise.all(
+    scheduled
+      .filter((n) => (n.content?.data as any)?.type === 'spiritual_reminder')
+      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {})),
+  );
 
   const hasPermission = await requestNotificationPermissions();
   if (!hasPermission) return;
 
-  // Schedule notifications for the next 48 hours (48 unique messages)
+  // Schedule hourly notifications for the next 48 hours, skipping quiet hours
+  // (10 PM – 6 AM) so nobody is woken up by a high-priority alert at night.
   const now = new Date();
-  
+
   for (let i = 1; i <= 48; i++) {
-    const notif = await getUniqueNotification();
     const triggerDate = new Date(now.getTime() + i * 60 * 60 * 1000); // Every hour
-    
+    const hr = triggerDate.getHours();
+    if (hr >= 22 || hr < 6) continue;
+    const notif = await getUniqueNotification();
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: notif.title,
@@ -413,7 +422,8 @@ export async function getAstroReminder(): Promise<{ hour: number; minute: number
   return { hour: h, minute: m };
 }
 
-// Re-apply the astro reminder after the hourly batch wipes all schedules.
+// Make sure the daily astro reminder is still scheduled (e.g. after an app
+// update or the OS clearing alarms). Idempotent: reschedules the same id.
 async function reapplyAstroReminder(): Promise<void> {
   const r = await getAstroReminder();
   if (r) { try { await scheduleDailyAstroReminder(r.hour, r.minute); } catch {} }
@@ -435,7 +445,7 @@ export async function ensureNotificationsScheduled(): Promise<void> {
     // Re-schedule if more than 24 hours since last schedule
     if (hoursSince > 24) {
       await scheduleHourlyNotifications();
-      await reapplyAstroReminder(); // hourly batch cancels all — restore the daily astro one
+      await reapplyAstroReminder();
     }
   } catch (e) {
     console.error('Notification scheduling error:', e);

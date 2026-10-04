@@ -187,14 +187,29 @@ function RootLayoutInner() {
     requestFirstRunPermissions();
 
     // Deep-link: tapping a reminder/notification opens the relevant screen.
-    const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+    let lastHandled = '';
+    const openFrom = (resp: Notifications.NotificationResponse | null | undefined) => {
+      const key = `${resp?.notification?.request?.identifier}:${resp?.notification?.date}`;
+      if (!resp || key === lastHandled) return; // listener + cold-start lookup can both report the same tap
+      lastHandled = key;
       const route = resp?.notification?.request?.content?.data?.route as string | undefined;
       if (route) {
         try { router.push(route as any); } catch {}
       }
-    });
+    };
+    const sub = Notifications.addNotificationResponseReceivedListener(openFrom);
+    // Cold start: the listener above misses the tap that launched the app.
+    let coldStart: ReturnType<typeof setTimeout> | undefined;
+    Notifications.getLastNotificationResponseAsync()
+      .then((resp) => {
+        if (!resp) return;
+        coldStart = setTimeout(() => openFrom(resp), 400); // let the navigator mount
+        Notifications.clearLastNotificationResponseAsync().catch(() => {});
+      })
+      .catch(() => {});
     return () => {
       clearTimeout(t);
+      if (coldStart) clearTimeout(coldStart);
       sub.remove();
     };
   }, []);

@@ -32,7 +32,7 @@ export default function WikiScreen() {
     const c = WIKI_CATEGORIES.find((x) => x.key === article.category)!;
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Header title={article.title} subtitle={c.label} />
+        <Header title={article.title} subtitle={c.label} onBack={() => setArticle(null)} />
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
           {!!article.titleHi && <Text style={[st.artHi, { color: c.color }]}>{article.titleHi}</Text>}
           <Text style={[st.artBody, { color: colors.text }]}>{article.body}</Text>

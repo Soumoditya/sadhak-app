@@ -14,9 +14,18 @@ interface Props {
   subtitle?: string;
   back?: boolean;
   right?: React.ReactNode;
+  /** Custom back action (e.g. close an in-screen sub-view instead of leaving). */
+  onBack?: () => void;
 }
 
-export default function Header({ title, subtitle, back = true, right }: Props) {
+// Screens opened from a notification on a cold start have no history to go
+// back to; fall back to Home instead of a no-op/"GO_BACK not handled" error.
+export function goBackOrHome() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
+}
+
+export default function Header({ title, subtitle, back = true, right, onBack }: Props) {
   const { colors } = useTheme();
   const { insets } = useDsInsets();
   return (
@@ -24,7 +33,7 @@ export default function Header({ title, subtitle, back = true, right }: Props) {
       <View style={styles.row}>
         {back ? (
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={onBack || goBackOrHome}
             style={[styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             hitSlop={8}
           >

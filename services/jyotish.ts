@@ -74,24 +74,40 @@ export async function computeKundli(b: BirthInput): Promise<Kundli> {
 /** Compute + cache the kundli in Firestore under users/{uid}/jyotish/natal. */
 export async function computeAndSaveKundli(uid: string, b: BirthInput): Promise<Kundli> {
   const kundli = await computeKundli(b);
+  await saveKundli(uid, b, kundli);
+  return kundli;
+}
+
+/** Cache an already-computed kundli under users/{uid}/jyotish/natal. */
+export async function saveKundli(uid: string, b: BirthInput, kundli: Kundli): Promise<void> {
   await setDoc(
     doc(db, 'users', uid, 'jyotish', 'natal'),
     { birth: b, kundli, computedAt: serverTimestamp() },
     { merge: true },
   );
-  return kundli;
 }
 
 /** Load the saved natal record (birth details + cached kundli), owner-only. */
-export async function loadNatal(uid: string): Promise<{ birth: BirthInput; kundli: Kundli } | null> {
+export async function loadNatal(uid: string): Promise<{ birth: BirthInput; kundli: Kundli; computedAt: number | null } | null> {
   try {
     const snap = await getDoc(doc(db, 'users', uid, 'jyotish', 'natal'));
     if (!snap.exists()) return null;
     const d = snap.data() as any;
-    return d.kundli ? { birth: d.birth as BirthInput, kundli: d.kundli as Kundli } : null;
+    const computedAt = typeof d.computedAt?.toMillis === 'function' ? d.computedAt.toMillis() : null;
+    return d.kundli ? { birth: d.birth as BirthInput, kundli: d.kundli as Kundli, computedAt } : null;
   } catch {
     return null;
   }
+}
+
+// The running dasha and Sade Sati are time-dependent, so a cached kundli goes
+// stale. Recompute it in the background once it is older than this.
+export const KUNDLI_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** Local calendar date as 'YYYY-MM-DD' (toISOString() is UTC: wrong day before 5:30 AM IST). */
+export function localDateKey(d = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 export type PredictionPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -114,14 +130,20 @@ export async function getPrediction(kundli: Kundli, period: PredictionPeriod, na
 
 /** Today's daily guidance, cached per-day in Firestore so it's computed once/day. */
 export async function getCachedDaily(uid: string, kundli: Kundli, name?: string): Promise<Prediction> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateKey();
   const ref = doc(db, 'users', uid, 'jyotish', `daily-${today}`);
+  // Tie the cache to the chart it was made for, so editing birth details
+  // doesn't keep showing a reading made from the old chart.
+  const chartKey = `${kundli.meta?.jd ?? ''}|${kundli.lagna?.lon ?? ''}`;
   try {
     const snap = await getDoc(ref);
-    if (snap.exists()) return snap.data() as Prediction;
+    if (snap.exists()) {
+      const cached = snap.data() as Prediction & { chartKey?: string };
+      if (cached.chartKey === chartKey) return cached;
+    }
   } catch {}
   const p = await getPrediction(kundli, 'daily', name);
-  try { await setDoc(ref, p as any); } catch {}
+  try { await setDoc(ref, { ...p, chartKey } as any); } catch {}
   return p;
 }
 

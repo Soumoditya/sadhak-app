@@ -26,6 +26,34 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.9.1',
+    date: '2026-10-04',
+    title: 'Fixes & polish',
+    changes: [
+      'Calendar and note reminders are no longer wiped by the daily notification refresh',
+      'Hourly spiritual notifications now pause at night (10 PM to 6 AM)',
+      'Tapping a notification opens the right screen even when the app was closed',
+      'Jyotish: running dasha and Sade Sati stay current instead of freezing at first compute',
+      'Jyotish: daily guidance uses your local date and refreshes after editing birth details',
+      'Jyotish: back button cancels an edit; retry when guidance fails to load',
+      'Sadhak AI now actually reads your chart in "Chat about your chart"',
+      'Hindu Wiki: back button returns to the article list',
+      'Crowded houses in the birth chart no longer overlap',
+      'Removed unused microphone permission',
+    ],
+  },
+  {
+    version: '1.9.0',
+    date: '2026-07-13',
+    title: 'Jyotish, Ayurveda & Hindu Wiki',
+    changes: [
+      'Vedic birth chart (D1/D9/D10/Moon), dasha, yogas and doshas',
+      'Daily, weekly, monthly and yearly guidance + PDF kundli report',
+      'Ayurveda prakriti assessment',
+      'Hindu Wiki encyclopedia',
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-07-06',
     title: 'The Big One 🔱',
