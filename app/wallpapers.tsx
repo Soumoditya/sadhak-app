@@ -8,6 +8,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { remote, IMAGE_HEADERS } from '../constants/remoteImage';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { Header } from '../components/ui';
@@ -45,7 +46,7 @@ export default function WallpapersScreen() {
     }
     const target = `${FileSystem.cacheDirectory}wallpaper-${w.id}.jpg`;
     const res = await FileSystem.downloadAsync(w.url, target, {
-      headers: { 'User-Agent': 'SadhakApp/1.6 (Hindu companion app; soumodityapramanik@gmail.com)' },
+      headers: IMAGE_HEADERS,
     });
     if (res.status !== 200) throw new Error(`Download failed (HTTP ${res.status}).`);
     return res.uri;
@@ -137,7 +138,7 @@ export default function WallpapersScreen() {
         {list.map(w => (
           <TouchableOpacity key={w.id} activeOpacity={0.85} onPress={() => setPreview(w)} style={st.tile}>
             <ExpoImage
-              source={w.local ?? { uri: w.thumb }}
+              source={w.local ?? remote(w.thumb)}
               placeholder={{ blurhash: w.blurhash }}
               style={st.tileImg}
               contentFit="cover"
@@ -157,7 +158,7 @@ export default function WallpapersScreen() {
         <View style={st.previewWrap}>
           {preview && (
             <ExpoImage
-              source={preview.local ?? { uri: preview.url }}
+              source={preview.local ?? remote(preview.url)}
               placeholder={{ blurhash: preview.blurhash }}
               style={StyleSheet.absoluteFill}
               // 'contain' so the whole painting is visible in preview (deity not
@@ -205,7 +206,8 @@ export default function WallpapersScreen() {
 
 const st = StyleSheet.create({
   container: { flex: 1 },
-  catScroll: { maxHeight: 44, marginTop: 4 },
+  // Fixed, non-shrinking height: maxHeight alone let the grid below squeeze the chips in half.
+  catScroll: { height: 50, flexGrow: 0, flexShrink: 0, marginTop: 4 },
   catRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 34, borderRadius: 100, borderWidth: 1 },
   catText: { fontSize: 12.5, fontWeight: '700' },

@@ -3,11 +3,13 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, BackHa
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { remote } from '../constants/remoteImage';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
 import { BHOG_RECIPES, type BhogRecipe } from '../constants/recipes';
 import { getFoodImage } from '../constants/foodImages';
+import { Header } from '../components/ui';
 
 export default function BhogScreen() {
   const { colors, isDark } = useTheme();
@@ -51,7 +53,7 @@ export default function BhogScreen() {
             {heroImg ? (
               <View style={st.dHeroImgWrap}>
                 <ExpoImage
-                  source={heroImg.local ?? { uri: heroImg.url }}
+                  source={heroImg.local ?? remote(heroImg.url)}
                   placeholder={{ blurhash: heroImg.blurhash }}
                   style={st.dHeroImg}
                   contentFit="cover"
@@ -123,39 +125,31 @@ export default function BhogScreen() {
   // ─── List ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#2D6A4F', '#40916C']}
-        style={[st.header, { paddingTop: headerPaddingTop }]}
-      >
-        <View style={st.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={st.backBtn} hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color="#FFF" />
+      <Header
+        title="Satvik Bhog"
+        subtitle="सात्विक भोग · no onion, no garlic"
+        right={
+          <TouchableOpacity onPress={surpriseMe} style={[st.randomBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6}>
+            <MaterialCommunityIcons name="dice-5-outline" size={17} color={colors.primary} />
+            <Text style={[st.randomText, { color: colors.text }]}>Surprise me</Text>
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={st.headerTitle}>Satvik Bhog</Text>
-            <Text style={st.headerSub}>सात्विक भोग — no onion, no garlic</Text>
-          </View>
-          <TouchableOpacity onPress={surpriseMe} style={st.randomBtn} hitSlop={6}>
-            <MaterialCommunityIcons name="dice-5-outline" size={18} color="#FFF" />
-            <Text style={st.randomText}>Random</Text>
+        }
+      />
+      <View style={[st.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+        <Ionicons name="search" size={17} color={colors.textTertiary} />
+        <TextInput
+          style={[st.searchInput, { color: colors.text }]}
+          placeholder="Search dish, occasion, ingredient…"
+          placeholderTextColor={colors.textTertiary}
+          value={query}
+          onChangeText={setQuery}
+        />
+        {!!query && (
+          <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+            <Ionicons name="close-circle" size={17} color={colors.textTertiary} />
           </TouchableOpacity>
-        </View>
-        <View style={st.searchBar}>
-          <Ionicons name="search" size={17} color="rgba(255,255,255,0.85)" />
-          <TextInput
-            style={st.searchInput}
-            placeholder="Search dish, occasion, ingredient…"
-            placeholderTextColor="rgba(255,255,255,0.7)"
-            value={query}
-            onChangeText={setQuery}
-          />
-          {!!query && (
-            <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
-              <Ionicons name="close-circle" size={17} color="rgba(255,255,255,0.85)" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </LinearGradient>
+        )}
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.list, { paddingBottom: screenBottomPadding }]}>
         {filtered.length === 0 && (
@@ -175,7 +169,7 @@ export default function BhogScreen() {
             <View style={[st.cardIcon, { backgroundColor: r.color + '14' }]}>
               {img ? (
                 <ExpoImage
-                  source={img.local ?? { uri: img.url }}
+                  source={img.local ?? remote(img.url)}
                   placeholder={{ blurhash: img.blurhash }}
                   style={st.cardIconImg}
                   contentFit="cover"
@@ -209,10 +203,10 @@ const st = StyleSheet.create({
   backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 21, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  randomBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 100 },
-  randomText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 13, paddingHorizontal: 12, height: 42, marginTop: 12 },
-  searchInput: { flex: 1, color: '#FFF', fontSize: 13.5 },
+  randomBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 100 },
+  randomText: { fontSize: 12.5, fontWeight: '700' },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 44, marginHorizontal: 20, marginBottom: 4 },
+  searchInput: { flex: 1, fontSize: 14 },
 
   list: { padding: 16, gap: 8 },
   card: { flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, borderWidth: 1, gap: 12 },

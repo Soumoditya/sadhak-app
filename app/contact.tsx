@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert, Linking, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Header } from '../components/ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from "../contexts/DialogContext";
 import { useLanguage } from '../contexts/LanguageContext';
@@ -64,17 +65,7 @@ export default function ContactScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <LinearGradient
-          colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-          style={styles.header}
-        >
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <MaterialCommunityIcons name="message-text-outline" size={36} color="#FFD700" />
-          <Text style={styles.headerTitle}>{t('contact.title')}</Text>
-          <Text style={styles.headerSub}>We'd love to hear from you</Text>
-        </LinearGradient>
+        <Header title={t('contact.title')} subtitle="We'd love to hear from you" />
 
         {/* Contact Options */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>

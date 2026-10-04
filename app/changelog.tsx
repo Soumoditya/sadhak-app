@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Header } from '../components/ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { router } from 'expo-router';
@@ -14,17 +15,7 @@ export default function ChangelogScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <LinearGradient
-          colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-          style={styles.header}
-        >
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <MaterialCommunityIcons name="format-list-bulleted" size={36} color="#FFD700" />
-          <Text style={styles.headerTitle}>{t('changelog.title')}</Text>
-          <Text style={styles.headerSub}>Current: v{APP_VERSION}</Text>
-        </LinearGradient>
+        <Header title={t('changelog.title')} subtitle={`You're on v${APP_VERSION}`} />
 
         {CHANGELOG.map((entry, idx) => (
           <View key={entry.version} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>

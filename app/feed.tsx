@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
+import { Header } from '../components/ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLayoutInsets } from '../constants/layout';
 import {
@@ -219,31 +220,23 @@ export default function FeedScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-        style={[styles.header, { paddingTop: headerPaddingTop }]}
-      >
-        <TouchableOpacity style={[styles.backBtn, { top: backBtnTop }]} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Explore</Text>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color="rgba(255,255,255,0.85)" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search people, #topics, posts…"
-            placeholderTextColor="rgba(255,255,255,0.7)"
-            value={term}
-            onChangeText={setTerm}
-            returnKeyType="search"
-          />
-          {isSearchMode && (
-            <TouchableOpacity onPress={() => setTerm('')} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.85)" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </LinearGradient>
+      <Header title="Explore" subtitle="Posts from the Sadhak community" />
+      <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+        <Ionicons name="search" size={18} color={colors.textTertiary} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.text }]}
+          placeholder="Search people, #topics, posts…"
+          placeholderTextColor={colors.textTertiary}
+          value={term}
+          onChangeText={setTerm}
+          returnKeyType="search"
+        />
+        {isSearchMode && (
+          <TouchableOpacity onPress={() => setTerm('')} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {isSearchMode ? (
         renderSearch()
@@ -367,8 +360,8 @@ const styles = StyleSheet.create({
   header: { paddingBottom: 14, paddingHorizontal: 20, borderBottomLeftRadius: 22, borderBottomRightRadius: 22 },
   backBtn: { position: 'absolute', left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: '#FFF', textAlign: 'center', marginBottom: 12 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 14, paddingHorizontal: 12, height: 44 },
-  searchInput: { flex: 1, color: '#FFF', fontSize: 15 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 44, marginHorizontal: 20, marginBottom: 6 },
+  searchInput: { flex: 1, fontSize: 15 },
   card: { borderRadius: 16, borderWidth: 1, padding: 14 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   pfp: { width: 40, height: 40, borderRadius: 20 },

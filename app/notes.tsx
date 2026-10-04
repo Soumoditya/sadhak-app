@@ -10,7 +10,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from "../contexts/DialogContext";
 import { useLanguage } from '../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { goBackOrHome } from '../components/ui/Header';
+import { Header } from '../components/ui';
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, serverTimestamp } from '../config/firebase';
@@ -379,20 +379,15 @@ export default function NotesScreen() {
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
       {/* ── Header ── */}
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-        style={st.header}
-      >
-        <View style={st.headerRow}>
-          <TouchableOpacity onPress={goBackOrHome} style={st.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
+      <Header
+        title={t('feat.notes')}
+        subtitle="Personal notes, folders & reminders"
+        right={
+          <TouchableOpacity onPress={() => setIsGridView(!isGridView)} style={[st.viewToggle, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+            <MaterialCommunityIcons name={isGridView ? 'view-agenda-outline' : 'view-grid-outline'} size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={st.headerTitle}>{t('feat.notes')}</Text>
-          <TouchableOpacity onPress={() => setIsGridView(!isGridView)} style={st.viewToggle}>
-            <MaterialCommunityIcons name={isGridView ? 'view-agenda-outline' : 'view-grid-outline'} size={22} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+        }
+      />
 
       {/* ── Search ── */}
       <View style={[st.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -791,19 +786,19 @@ const st = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: '#FFF' },
-  viewToggle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  viewToggle: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
 
-  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, paddingHorizontal: 14, height: 42, borderRadius: 12, borderWidth: 1, gap: 8 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 0, paddingHorizontal: 14, height: 42, borderRadius: 12, borderWidth: 1, gap: 8 },
   searchInput: { flex: 1, fontSize: 14 },
 
   // flexGrow:0 + height cap — unconstrained horizontal ScrollViews stretch
   // their chips to fill the column (same bug the library had).
-  folderScroll: { flexGrow: 0, maxHeight: 50 },
-  folderRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  folderScroll: { flexGrow: 0, flexShrink: 0, height: 52 },
+  folderRow: { paddingHorizontal: 20, paddingVertical: 8, gap: 8, alignItems: 'center' },
   folderChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, height: 34, borderRadius: 17, borderWidth: 1 },
   folderText: { fontSize: 12, fontWeight: '600' },
 
-  scrollContent: { paddingHorizontal: 16 },
+  scrollContent: { paddingHorizontal: 20 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   notesGrid: { gap: 8 },

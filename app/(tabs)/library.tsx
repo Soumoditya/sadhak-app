@@ -295,28 +295,28 @@ export default function LibraryScreen() {
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#B33D00']} style={[st.header, { paddingTop: headerPaddingTop }]}>
+      <View style={[st.header, { paddingTop: headerPaddingTop + 4 }]}>
         <View style={st.headerRow}>
-          <View>
-            <Text style={st.headerTitle}>{t('lib.title')}</Text>
-            <Text style={st.headerSub}>{books.length} texts available</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[st.headerTitle, { color: colors.text }]}>{t('lib.title')}</Text>
+            <Text style={[st.headerSub, { color: colors.textTertiary }]}>{books.length} {books.length === 1 ? 'text' : 'texts'} · scriptures & books</Text>
           </View>
           <View style={st.headerActions}>
             {isAdmin && submissions.length > 0 && (
-              <TouchableOpacity style={[st.reviewBadge, { backgroundColor: '#EF444420' }]} onPress={() => setShowReviewQueue(true)}>
+              <TouchableOpacity style={[st.reviewBadge, { backgroundColor: '#EF444418' }]} onPress={() => setShowReviewQueue(true)}>
                 <MaterialCommunityIcons name="file-clock-outline" size={18} color="#EF4444" />
                 <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{submissions.length}</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={() => router.push('/wiki')} style={st.headerBtn}>
-              <MaterialCommunityIcons name="book-education-outline" size={20} color="#FFF" />
+            <TouchableOpacity onPress={() => router.push('/wiki')} style={[st.headerBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+              <MaterialCommunityIcons name="book-education-outline" size={20} color={colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} style={st.headerBtn}>
-              <MaterialCommunityIcons name={viewMode === 'grid' ? 'view-list-outline' : 'view-grid-outline'} size={20} color="#FFF" />
+            <TouchableOpacity onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} style={[st.headerBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+              <MaterialCommunityIcons name={viewMode === 'grid' ? 'view-list-outline' : 'view-grid-outline'} size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Search */}
       <View style={[st.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -504,30 +504,30 @@ const GRID_W = (Dimensions.get('window').width - 48 - 10) / 2;
 
 const st = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 18, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  header: { paddingBottom: 6, paddingHorizontal: 20 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  headerTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
+  headerSub: { fontSize: 13, marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: 8 },
-  headerBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  headerBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   reviewBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
 
-  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 14, paddingHorizontal: 14, height: 44, borderRadius: 12, borderWidth: 1, gap: 8 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 12, paddingHorizontal: 14, height: 44, borderRadius: 12, borderWidth: 1, gap: 8 },
   searchInput: { flex: 1, fontSize: 14 },
 
-  sortRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 10, gap: 6 },
+  sortRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 10, gap: 6 },
   sortChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   sortText: { fontSize: 12, fontWeight: '600' },
 
   // flexGrow:0 + capped height — without it the horizontal ScrollView stretches
   // in the flex column and the category chips render as giant full-height cards.
-  catScroll: { flexGrow: 0, maxHeight: 50 },
-  catRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  catScroll: { flexGrow: 0, flexShrink: 0, height: 52 },
+  catRow: { paddingHorizontal: 20, paddingVertical: 8, gap: 8, alignItems: 'center' },
   catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 34, borderRadius: 17, borderWidth: 1, gap: 5 },
   catText: { fontSize: 11, fontWeight: '600' },
 
   // List view
-  booksList: { paddingHorizontal: 16, paddingBottom: 100, gap: 8 },
+  booksList: { paddingHorizontal: 20, paddingBottom: 100, gap: 8 },
   bookCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16, borderWidth: 1, gap: 12 },
   bookIcon: { width: 52, height: 60, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   bookInfo: { flex: 1 },
@@ -542,7 +542,7 @@ const st = StyleSheet.create({
   dlBtn: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 
   // Grid view
-  gridList: { paddingHorizontal: 16, paddingBottom: 100, gap: 10 },
+  gridList: { paddingHorizontal: 20, paddingBottom: 100, gap: 10 },
   gridCard: { width: GRID_W, borderRadius: 16, padding: 14, borderWidth: 1 },
   gridIcon: { width: '100%' as any, height: 80, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
   gridTitle: { fontSize: 14, fontWeight: '700', lineHeight: 18 },

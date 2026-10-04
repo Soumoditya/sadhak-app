@@ -8,6 +8,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
+import { Header } from '../components/ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useLayoutInsets } from '../constants/layout';
@@ -112,26 +113,15 @@ export default function AskScreen() {
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-        style={[st.header, { paddingTop: headerPaddingTop }]}
-      >
-        <TouchableOpacity style={[st.backBtn, { top: backBtnTop }]} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        {messages.length > 0 && (
-          <TouchableOpacity style={[st.clearBtn, { top: backBtnTop }]} onPress={clearChat} hitSlop={8}>
-            <MaterialCommunityIcons name="broom" size={20} color="#FFF" />
+      <Header
+        title="Sadhak AI"
+        subtitle={astroMode ? 'Reading your birth chart' : 'Your spiritual companion · scripture-grounded'}
+        right={messages.length > 0 ? (
+          <TouchableOpacity onPress={clearChat} style={[st.clearBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={8}>
+            <MaterialCommunityIcons name="broom" size={19} color={colors.textSecondary} />
           </TouchableOpacity>
-        )}
-        <View style={st.headerCenter}>
-          <View style={st.headerTitleRow}>
-            <MaterialCommunityIcons name="creation" size={20} color="#FFD9A0" />
-            <Text style={st.headerTitle}>Sadhak AI</Text>
-          </View>
-          <Text style={st.headerSub}>Your spiritual companion · scripture-grounded</Text>
-        </View>
-      </LinearGradient>
+        ) : undefined}
+      />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -207,7 +197,7 @@ const st = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingBottom: 16, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, alignItems: 'center' },
   backBtn: { position: 'absolute', left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
-  clearBtn: { position: 'absolute', right: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
+  clearBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   headerCenter: { alignItems: 'center' },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: '#FFF' },

@@ -3,12 +3,14 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } fro
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { remote } from '../constants/remoteImage';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
 import { PUJA_GUIDES, type PujaGuide } from '../constants/pujaGuides';
 import { Diya } from '../components/ui';
 import { resolveDeityImage } from '../constants/deityImages';
+import { Header } from '../components/ui';
 
 export default function PujaGuideScreen() {
   const { colors, isDark } = useTheme();
@@ -34,7 +36,7 @@ export default function PujaGuideScreen() {
             {heroImg ? (
               <View style={st.dHeroImgWrap}>
                 <ExpoImage
-                  source={heroImg.local ?? { uri: heroImg.url }}
+                  source={heroImg.local ?? remote(heroImg.url)}
                   placeholder={{ blurhash: heroImg.blurhash }}
                   style={st.dHeroImg}
                   contentFit="cover"
@@ -121,20 +123,7 @@ export default function PujaGuideScreen() {
   // ─── Deity grid ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#8B1A1A', '#C62828']}
-        style={[st.header, { paddingTop: headerPaddingTop }]}
-      >
-        <View style={st.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={st.backBtn} hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color="#FFF" />
-          </TouchableOpacity>
-          <View>
-            <Text style={st.headerTitle}>Puja Guide</Text>
-            <Text style={st.headerSub}>किसकी पूजा करनी है? Choose the deity</Text>
-          </View>
-        </View>
-      </LinearGradient>
+      <Header title="Puja Guide" subtitle="किसकी पूजा करनी है? Choose the deity" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.grid, { paddingBottom: screenBottomPadding }]}>
         {PUJA_GUIDES.map((g) => {
@@ -149,7 +138,7 @@ export default function PujaGuideScreen() {
             <View style={[st.cardIcon, { backgroundColor: g.color + '14', borderColor: g.color + '44', borderWidth: img ? 1 : 0 }]}>
               {img ? (
                 <ExpoImage
-                  source={img.local ?? { uri: img.url }}
+                  source={img.local ?? remote(img.url)}
                   placeholder={{ blurhash: img.blurhash }}
                   style={st.cardIconImg}
                   contentFit="cover"

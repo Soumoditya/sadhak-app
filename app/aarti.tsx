@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } fro
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { remote } from '../constants/remoteImage';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
@@ -13,6 +14,7 @@ import {
 import { getDeityImage } from '../constants/deityImages';
 import { Diya } from '../components/ui';
 import { DS } from '../constants/ds';
+import { Header } from '../components/ui';
 
 export default function DevotionalScreen() {
   const { colors, isDark } = useTheme();
@@ -60,7 +62,7 @@ export default function DevotionalScreen() {
               <View style={[st.emblemCore, { backgroundColor: colors.surfaceElevated, borderColor: selected.color + '55' }]}>
                 {deityImg ? (
                   <ExpoImage
-                    source={deityImg.local ?? { uri: deityImg.url }}
+                    source={deityImg.local ?? remote(deityImg.url)}
                     placeholder={{ blurhash: deityImg.blurhash }}
                     style={st.emblemImage}
                     contentFit="cover"
@@ -104,41 +106,23 @@ export default function DevotionalScreen() {
   // ─── List view ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-        style={[st.header, { paddingTop: headerPaddingTop }]}
-      >
-        <View style={st.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={st.headerBack} hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color="#FFF" />
-          </TouchableOpacity>
-          <View>
-            <Text style={st.headerTitle}>Devotional Library</Text>
-            <Text style={st.headerSub}>Aarti · Chalisa · Mantra · Stotra</Text>
-          </View>
-        </View>
-
-        {/* Category tabs */}
-        <View style={st.tabs}>
-          {DEVOTIONAL_CATEGORIES.map((cat) => {
-            const active = category === cat.key;
-            return (
-              <TouchableOpacity
-                key={cat.key}
-                style={[st.tab, active && st.tabActive]}
-                onPress={() => setCategory(cat.key)}
-              >
-                {cat.icon === 'candle' ? (
-                  <Diya size={16} color={active ? '#D94F00' : 'rgba(255,255,255,0.8)'} />
-                ) : (
-                  <MaterialCommunityIcons name={cat.icon as any} size={15} color={active ? '#D94F00' : 'rgba(255,255,255,0.8)'} />
-                )}
-                <Text style={[st.tabText, { color: active ? '#D94F00' : 'rgba(255,255,255,0.9)' }]}>{cat.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </LinearGradient>
+      <Header title="Devotional Library" subtitle="Aarti · Chalisa · Mantra · Stotra" />
+      <View style={st.tabs}>
+        {DEVOTIONAL_CATEGORIES.map((cat) => {
+          const active = category === cat.key;
+          const fg = active ? '#FFF' : colors.textSecondary;
+          return (
+            <TouchableOpacity
+              key={cat.key}
+              style={[st.tab, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.cardBorder }]}
+              onPress={() => setCategory(cat.key)}
+            >
+              {cat.icon === 'candle' ? <Diya size={16} color={fg} /> : <MaterialCommunityIcons name={cat.icon as any} size={15} color={fg} />}
+              <Text style={[st.tabText, { color: fg }]}>{cat.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.list, { paddingBottom: screenBottomPadding }]}>
         {items.map((item) => {
@@ -154,7 +138,7 @@ export default function DevotionalScreen() {
             <View style={[st.cardIcon, { backgroundColor: item.color + '18', borderColor: item.color + '55', borderWidth: 1 }]}>
               {img ? (
                 <ExpoImage
-                  source={img.local ?? { uri: img.url }}
+                  source={img.local ?? remote(img.url)}
                   placeholder={{ blurhash: img.blurhash }}
                   style={st.cardIconImage}
                   contentFit="cover"
@@ -193,9 +177,8 @@ const st = StyleSheet.create({
   headerBack: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 21, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  tabs: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.14)' },
-  tabActive: { backgroundColor: '#FFF' },
+  tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginBottom: 4 },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 12, borderWidth: 1 },
   tabText: { fontSize: 12, fontWeight: '700' },
 
   list: { padding: 16, gap: 8 },

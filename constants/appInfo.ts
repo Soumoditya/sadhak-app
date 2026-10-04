@@ -26,6 +26,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.10.0',
+    date: '2026-10-04',
+    title: 'Compass, temples & a fresh look',
+    changes: [
+      'Vastu Compass rebuilt: tilt-corrected, true north, steady needle, hold reading',
+      'Nearby temples load in seconds and the map works again',
+      'Bhandaras have a date and time, expire on their own, and can be pinned anywhere',
+      'Panchang: browse any day, live "right now" muhurta, clearer timings',
+      'Deity paintings, wallpapers and food photos load reliably',
+      'Every screen redesigned to one clean, consistent style (light and dark)',
+      'Calendar dates now sit under the correct weekday',
+      'Notification switches in Settings now really work',
+      'Japa counter, Ayurveda quiz, Home and tab bar redesigned',
+    ],
+  },
+  {
     version: '1.9.1',
     date: '2026-10-04',
     title: 'Fixes & polish',

@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '../contexts/AuthContext';
+import { Header } from '../components/ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useLayoutInsets } from '../constants/layout';
@@ -84,22 +85,19 @@ export default function CreatePostScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-        style={[styles.header, { paddingTop: headerPaddingTop }]}
-      >
-        <TouchableOpacity style={[styles.backBtn, { top: backBtnTop }]} onPress={() => router.back()}>
-          <Ionicons name="close" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Post</Text>
-        <TouchableOpacity
-          style={[styles.postBtn, { opacity: canPost ? 1 : 0.5 }]}
-          disabled={!canPost}
-          onPress={submit}
-        >
-          {posting ? <ActivityIndicator color="#D94F00" size="small" /> : <Text style={styles.postBtnText}>Share</Text>}
-        </TouchableOpacity>
-      </LinearGradient>
+      <Header
+        title="New Post"
+        subtitle="Share with the community"
+        right={
+          <TouchableOpacity
+            style={[styles.postBtn, { backgroundColor: colors.primary, opacity: canPost ? 1 : 0.45 }]}
+            disabled={!canPost}
+            onPress={submit}
+          >
+            {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>Share</Text>}
+          </TouchableOpacity>
+        }
+      />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: screenBottomPadding }} keyboardShouldPersistTaps="handled">
@@ -166,8 +164,8 @@ const styles = StyleSheet.create({
   header: { paddingBottom: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
   backBtn: { position: 'absolute', left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
-  postBtn: { position: 'absolute', right: 16, bottom: 12, backgroundColor: '#FFF', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20 },
-  postBtnText: { color: '#D94F00', fontWeight: '800', fontSize: 14 },
+  postBtn: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20 },
+  postBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   avatar: { width: 42, height: 42, borderRadius: 21 },
   authorName: { fontSize: 15, fontWeight: '700' },
