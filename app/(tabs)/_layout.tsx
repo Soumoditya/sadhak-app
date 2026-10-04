@@ -1,11 +1,22 @@
 import { Tabs, Redirect } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, Animated, Pressable } from 'react-native';
-import { useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Pressable, type ColorValue } from 'react-native';
+import React, { useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { BorderRadius, Shadows, Spacing } from '../../constants/theme';
 import { useLayoutInsets, TAB_BAR_HEIGHT } from '../../constants/layout';
+
+// Icon + always-visible label: icon-only tabs made the sections hard to find.
+function TabIcon({ label, color, focused, children }: { label: string; color: ColorValue; focused: boolean; children: React.ReactNode }) {
+  return (
+    <View style={{ alignItems: 'center' }}>
+      {/* Fixed icon box so labels line up across icon families. */}
+      <View style={{ height: 24, justifyContent: 'center' }}>{children}</View>
+      <Text style={[styles.tabLabel, { color, fontWeight: focused ? '800' : '600' }]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
 
 // ─── Animated Tab Button ───────────────────────────────────────────────────
 function TabButton({ children, onPress, accessibilityState, colors }: any) {
@@ -88,11 +99,13 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
+            <TabIcon label="Home" color={color} focused={focused}>
             <MaterialCommunityIcons
               name={focused ? 'home' : 'home-outline'}
-              size={focused ? 26 : 24}
+              size={22}
               color={color}
             />
+          </TabIcon>
           ),
         }}
       />
@@ -101,11 +114,13 @@ export default function TabLayout() {
         options={{
           title: 'Calendar',
           tabBarIcon: ({ color, focused }) => (
+            <TabIcon label="Calendar" color={color} focused={focused}>
             <MaterialCommunityIcons
               name={focused ? 'calendar-month' : 'calendar-month-outline'}
-              size={focused ? 26 : 24}
+              size={22}
               color={color}
             />
+          </TabIcon>
           ),
         }}
       />
@@ -114,11 +129,13 @@ export default function TabLayout() {
         options={{
           title: 'Library',
           tabBarIcon: ({ color, focused }) => (
+            <TabIcon label="Library" color={color} focused={focused}>
             <MaterialCommunityIcons
               name={focused ? 'bookshelf' : 'book-outline'}
-              size={focused ? 26 : 24}
+              size={22}
               color={color}
             />
+          </TabIcon>
           ),
         }}
       />
@@ -127,11 +144,13 @@ export default function TabLayout() {
         options={{
           title: 'Chat',
           tabBarIcon: ({ color, focused }) => (
+            <TabIcon label="Chat" color={color} focused={focused}>
             <Ionicons
               name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
-              size={focused ? 26 : 24}
+              size={22}
               color={color}
             />
+          </TabIcon>
           ),
         }}
       />
@@ -140,11 +159,13 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
+            <TabIcon label="Profile" color={color} focused={focused}>
             <Ionicons
               name={focused ? 'person' : 'person-outline'}
-              size={focused ? 26 : 24}
+              size={22}
               color={color}
             />
+          </TabIcon>
           ),
         }}
       />
@@ -161,12 +182,17 @@ const styles = StyleSheet.create({
   tabButtonInner: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 64,
+    height: 52,
+    borderRadius: 16,
   },
   activeIndicator: {
     ...StyleSheet.absoluteFill,
-    borderRadius: 24,
+    borderRadius: 16,
+  },
+  tabLabel: {
+    fontSize: 10.5,
+    marginTop: 2,
+    letterSpacing: 0.2,
   },
 });

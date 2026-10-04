@@ -269,7 +269,7 @@ export default function JyotishScreen() {
                 style={[s.field, { marginTop: 10, borderColor: colors.cardBorder, backgroundColor: colors.surface, color: colors.text }]}
                 keyboardType="numbers-and-punctuation" value={tzOffset} onChangeText={setTzOffset} placeholder="e.g. 5.75 or -5" placeholderTextColor={colors.textTertiary}
               />
-              <Text style={{ color: colors.textTertiary, fontSize: 11.5, marginTop: 4 }}>Hours from UTC at the place of birth (Nepal 5.75, UK 0, New York -5).</Text>
+              <Text style={{ color: colors.textTertiary, fontSize: 11.5, lineHeight: 16, marginTop: 4 }}>Hours from UTC at the place of birth (Nepal 5.75, UK 0, New York -5).</Text>
             </>
           )}
 
