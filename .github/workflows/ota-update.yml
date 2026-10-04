@@ -4,8 +4,9 @@
 # and add it to this repo as a secret named EXPO_TOKEN
 # (GitHub → Settings → Secrets and variables → Actions → New repository secret).
 #
-# Runs on every push to main, or by hand from the Actions tab
-# ("Publish OTA update" → Run workflow → pick the branch).
+# Runs on every push to main (and to the redesign branch until it is merged),
+# or by hand from the Actions tab once this file is on main
+# ("Publish OTA update" → Run workflow).
 #
 # OTA only carries JavaScript and images. Phones accept an update only if it
 # was published with the same app "version" (app.json) as the APK they run,
@@ -21,7 +22,7 @@ on:
         required: false
         default: Sadhak update
   push:
-    branches: [main]
+    branches: [main, ccr-5f48682a-w1d2yg]
     paths-ignore:
       - '**.md'
       - '.github/**'
@@ -35,30 +36,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # Without the secret, skip (green, with a warning) instead of failing
+      # every push before the token is set up.
       - name: Check token
+        id: token
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::Add the EXPO_TOKEN repository secret first (see the top of this file)."
-            exit 1
+            echo "::warning::No EXPO_TOKEN repository secret yet, so nothing was published (see the top of this file)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
 
       - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
         with:
           node-version: 22
           cache: npm
 
       - uses: expo/expo-github-action@v8
+        if: steps.token.outputs.ok == 'true'
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
       - run: npm ci
+        if: steps.token.outputs.ok == 'true'
 
       - name: Publish to the production channel
+        if: steps.token.outputs.ok == 'true'
         env:
           MESSAGE: ${{ github.event.inputs.message || github.event.head_commit.message || 'Sadhak update' }}
         run: eas update --channel production --platform android --message "$MESSAGE" --non-interactive

@@ -56,7 +56,7 @@ From v1.11.0 the app has **expo-updates**. Changes to screens, text, design and 
 **Easiest: one click on GitHub (set up once)**
 1. expo.dev → Account settings → Access tokens → create a token.
 2. GitHub repo → Settings → Secrets and variables → Actions → New repository secret: name `EXPO_TOKEN`, paste the token.
-3. Actions tab → **Publish OTA update** → Run workflow → pick the branch → Run. It also runs by itself on every push to `main`.
+3. It runs by itself on every push to `main` (and to the current redesign branch). Once the workflow is on `main`, you can also run it by hand: Actions tab → **Publish OTA update** → Run workflow.
 
 **From a computer:** `npx eas-cli update --channel production --message "what changed"`
 
