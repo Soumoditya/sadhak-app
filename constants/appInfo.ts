@@ -26,6 +26,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    // Shipped over the air: the app version stays 1.12.0 so installed phones
+    // (runtime 1.12.0) accept it.
+    version: '1.12.0 · update 1',
+    date: '2026-10-04',
+    title: 'A new look, everywhere',
+    changes: [
+      'Theme and language switches on Home, every tab and every screen header',
+      'New Tools tab, and every tool right under Today on Home',
+      'Today card leads with the tithi, plus sunrise, sunset and Rahu Kaal at a glance',
+      'Coming up: the next festivals, Ekadashi, Purnima and Amavasya on Home',
+      'New type: a warm serif for titles and a classic Devanagari face for shlokas',
+      'One calm colour family for icons instead of mixed bright colours',
+      'Updates now install with one tap (Restart) instead of waiting for the next launch',
+    ],
+  },
+  {
     version: '1.12.0',
     date: '2026-10-04',
     title: 'Light mode, your language & a calmer look',

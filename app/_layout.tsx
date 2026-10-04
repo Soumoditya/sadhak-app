@@ -10,8 +10,13 @@ import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { LanguageProvider } from '../contexts/LanguageContext';
 import { DialogProvider } from '../contexts/DialogContext';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import { DS } from '../constants/ds';
+import { QuickSettingsProvider } from '../components/ui/QuickSettings';
 import { ensureNotificationsScheduled, applyNotificationPrefs, prefsFromProfile } from '../services/notifications';
 import { requestFirstRunPermissions } from '../services/firstRunPermissions';
+import { downloadPendingUpdate, applyUpdateNow } from '../services/appUpdates';
+import { useDialog } from '../contexts/DialogContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -72,7 +77,7 @@ function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
         </View>
         <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textSlide }], alignItems: 'center' }}>
           <Text style={[splashStyles.hindi, { color: colors.text }]}>साधक</Text>
-          <Text style={[splashStyles.appName, { color: colors.primary }]}>SADHAK</Text>
+          <Text style={[splashStyles.appName, { color: colors.primary }]}>Sadhak</Text>
           <Text style={[splashStyles.tagline, { color: colors.textTertiary }]}>Your daily spiritual companion</Text>
         </Animated.View>
       </Animated.View>
@@ -82,8 +87,8 @@ function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
 
 const splashStyles = StyleSheet.create({
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  hindi: { fontSize: 40, fontWeight: '700', lineHeight: 56 },
-  appName: { fontSize: 13, fontWeight: '800', letterSpacing: 8, paddingLeft: 8, marginTop: 2 },
+  hindi: { fontSize: 46, lineHeight: 66, fontFamily: DS.font.deva },
+  appName: { fontSize: 22, fontFamily: DS.font.display, marginTop: -4, letterSpacing: 0.4 },
   tagline: { fontSize: 13, marginTop: 14, letterSpacing: 0.3 },
 });
 
@@ -92,6 +97,22 @@ function RootLayoutInner() {
   const { isDark, colors } = useTheme();
   const { profile } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
+  const dialog = useDialog();
+
+  // OTA: fetch a new update in the background and offer to restart into it
+  // right away (otherwise it would only apply on the next cold start).
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const ready = await downloadPendingUpdate();
+      if (!ready || cancelled) return;
+      dialog.alert('Update ready', 'A new version of Sadhak has been downloaded. Restart now to use it?', [
+        { text: 'Later', style: 'cancel' },
+        { text: 'Restart', onPress: applyUpdateNow },
+      ], { tone: 'success' });
+    }, 4000);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, []);
 
   // Keep scheduled alerts in line with the Settings switches + location.
   const prefsKey = profile ? JSON.stringify(prefsFromProfile(profile)) : '';
@@ -190,14 +211,30 @@ function RootLayoutInner() {
 
 // ─── Root Export ────────────────────────────────────────────────────────────
 export default function RootLayout() {
+  // Brand faces: Fraunces for Latin titles, Tiro Devanagari for shlokas and
+  // Hindi display text. The native splash stays up while they load; a slow or
+  // failed load never blocks the app (falls back to system fonts).
+  const [fontsLoaded, fontError] = useFonts({
+    [DS.font.display]: require('../assets/fonts/Fraunces_600SemiBold.ttf'),
+    [DS.font.deva]: require('../assets/fonts/TiroDevanagariHindi_400Regular.ttf'),
+  });
+  const [fontTimeout, setFontTimeout] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setFontTimeout(true), 2500);
+    return () => clearTimeout(t);
+  }, []);
+  if (!fontsLoaded && !fontError && !fontTimeout) return null;
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
         <DialogProvider>
           <LanguageProvider>
-            <AuthProvider>
-              <RootLayoutInner />
-            </AuthProvider>
+            <QuickSettingsProvider>
+              <AuthProvider>
+                <RootLayoutInner />
+              </AuthProvider>
+            </QuickSettingsProvider>
           </LanguageProvider>
         </DialogProvider>
       </ThemeProvider>

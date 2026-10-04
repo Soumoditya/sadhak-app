@@ -16,9 +16,10 @@ import { getDeityImage } from '../constants/deityImages';
 import { Diya } from '../components/ui';
 import { DS } from '../constants/ds';
 import { Header } from '../components/ui';
+import { toneSolid } from '../constants/theme';
 
 export default function DevotionalScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, tone } = useTheme();
   const { t: tr } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [category, setCategory] = useState<DevotionalCategory>('aarti');
@@ -59,9 +60,9 @@ export default function DevotionalScreen() {
             {/* Emblem: dark ambient panel with a soft radial glow behind
                 the deity painting (or the candle fallback if no image). */}
             <View style={st.emblemWrap}>
-              <View style={[st.emblemGlow, { backgroundColor: selected.color, opacity: 0.18 }]} />
-              <View style={[st.emblemRing, { borderColor: selected.color + '66' }]} />
-              <View style={[st.emblemCore, { backgroundColor: colors.surfaceElevated, borderColor: selected.color + '55' }]}>
+              <View style={[st.emblemGlow, { backgroundColor: toneSolid(selected.color), opacity: 0.18 }]} />
+              <View style={[st.emblemRing, { borderColor: tone(selected.color).fg + '66' }]} />
+              <View style={[st.emblemCore, { backgroundColor: colors.surfaceElevated, borderColor: tone(selected.color).fg + '55' }]}>
                 {deityImg ? (
                   <ExpoImage
                     source={deityImg.local ?? remote(deityImg.url)}
@@ -72,16 +73,16 @@ export default function DevotionalScreen() {
                     cachePolicy="disk"
                   />
                 ) : (
-                  <Diya size={40} color={selected.color} />
+                  <Diya size={40} color={tone(selected.color).fg} />
                 )}
               </View>
             </View>
 
             <Text style={[st.detailTitle, { color: colors.text }]}>{selected.title}</Text>
-            <Text style={[st.detailTitleHi, { color: selected.color }]}>{selected.titleHi}</Text>
+            <Text style={[st.detailTitleHi, { color: tone(selected.color).fg }]}>{selected.titleHi}</Text>
             <Text style={[st.detailDeity, { color: colors.textTertiary }]}>{selected.deity}</Text>
 
-            <TouchableOpacity style={[st.listenBtn, { backgroundColor: selected.color }]} onPress={() => openPlayer(selected)} activeOpacity={0.85}>
+            <TouchableOpacity style={[st.listenBtn, { backgroundColor: toneSolid(selected.color) }]} onPress={() => openPlayer(selected)} activeOpacity={0.85}>
               <MaterialCommunityIcons name="play-circle" size={19} color="#FFF" />
               <Text style={st.listenBtnText}>Listen / Watch</Text>
             </TouchableOpacity>
@@ -137,7 +138,7 @@ export default function DevotionalScreen() {
             activeOpacity={0.7}
           >
             {/* Deity avatar with a thin colored ring, or the category icon fallback */}
-            <View style={[st.cardIcon, { backgroundColor: item.color + '18', borderColor: item.color + '55', borderWidth: 1 }]}>
+            <View style={[st.cardIcon, { backgroundColor: tone(item.color).bg, borderColor: tone(item.color).fg + '55', borderWidth: 1 }]}>
               {img ? (
                 <ExpoImage
                   source={img.local ?? remote(img.url)}
@@ -148,11 +149,11 @@ export default function DevotionalScreen() {
                   cachePolicy="disk"
                 />
               ) : item.category === 'aarti' ? (
-                <Diya size={26} color={item.color} />
+                <Diya size={26} color={tone(item.color).fg} />
               ) : (
                 <MaterialCommunityIcons
                   name={DEVOTIONAL_CATEGORIES.find(c => c.key === item.category)?.icon as any}
-                  size={22} color={item.color}
+                  size={22} color={tone(item.color).fg}
                 />
               )}
             </View>
@@ -161,8 +162,8 @@ export default function DevotionalScreen() {
               <Text style={[st.cardTitleHi, { color: colors.primary }]} numberOfLines={1}>{item.titleHi}</Text>
               <Text style={[st.cardDeity, { color: colors.textSecondary }]}>{item.deity}</Text>
             </View>
-            <TouchableOpacity onPress={() => openPlayer(item)} hitSlop={8} style={[st.playBtn, { backgroundColor: item.color + '14' }]}>
-              <MaterialCommunityIcons name="play" size={20} color={item.color} />
+            <TouchableOpacity onPress={() => openPlayer(item)} hitSlop={8} style={[st.playBtn, { backgroundColor: tone(item.color).bg }]}>
+              <MaterialCommunityIcons name="play" size={20} color={tone(item.color).fg} />
             </TouchableOpacity>
           </TouchableOpacity>
           );

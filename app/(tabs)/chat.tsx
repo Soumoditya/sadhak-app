@@ -7,7 +7,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { db, rtdb, collection, getDocs, addDoc, serverTimestamp, ref, onValue, off } from '../../config/firebase';
-import { Screen, Card, Button, Diya, Icon, fromMaterial } from '../../components/ui';
+import { Screen, Card, Button, Diya, Icon, fromMaterial, AppBar } from '../../components/ui';
 import { DS, useDsInsets } from '../../constants/ds';
 
 type ChatTab = 'rooms' | 'dms' | 'groups' | 'channels';
@@ -39,7 +39,7 @@ function relTime(ts?: number): string {
 
 export default function CommunityScreen() {
   const { user } = useAuth();
-  const { colors } = useTheme();
+  const { colors, tone } = useTheme();
   const { t } = useLanguage();
   const dialog = useDialog();
   const { insets, tabScrollBottom } = useDsInsets();
@@ -115,45 +115,45 @@ export default function CommunityScreen() {
   return (
     <Screen tabbed edges={{ top: false, bottom: false }}>
       {/* Header */}
-      <View style={{ paddingTop: insets.top + 12 }}>
-        <View style={s.headRow}>
-          <Text style={[s.title, { color: colors.text }]}>{t('chat.title')}</Text>
-          {canCreate && (
+      <View style={{ paddingTop: insets.top }}>
+        <AppBar
+          title={t('chat.title')}
+          subtitle={t('chat.subtitle')}
+          right={canCreate ? (
             <TouchableOpacity
               onPress={() => setCreateOpen(true)}
-              style={[s.newBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}
+              accessibilityLabel="New"
+              style={[s.newBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
             >
-              <Ionicons name="add" size={16} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 12 }}>NEW</Text>
+              <Icon name="plus" size={18} color="#FFF" weight="regular" />
             </TouchableOpacity>
-          )}
-        </View>
-        <Text style={[s.sub, { color: colors.textTertiary }]}>{t('chat.subtitle')}</Text>
+          ) : undefined}
+        />
       </View>
 
       {/* Explore Feed banner */}
       <Card
         onPress={() => router.push('/feed')}
-        style={{ marginTop: DS.space.lg, backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }}
+        style={{ marginTop: 0, backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }}
       >
         <View style={s.exploreRow}>
           <View style={[s.exploreIcon, { backgroundColor: colors.primary }]}>
-            <Ionicons name="compass" size={20} color="#FFF" />
+            <Icon name="newspaper" size={20} color="#FFF" />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[s.exploreTitle, { color: colors.text }]}>{t('chat.explore')}</Text>
             <Text style={[s.exploreSub, { color: colors.textSecondary }]}>{t('chat.exploreSub')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+          <Icon name="caret-right" size={16} color={colors.textTertiary} weight="regular" />
         </View>
       </Card>
 
       {/* Search */}
       <View style={[s.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        <Ionicons name="search" size={17} color={colors.textTertiary} />
+        <Icon name="magnifying-glass" size={17} color={colors.textTertiary} weight="regular" />
         <TextInput
           style={[s.searchInput, { color: colors.text }]}
-          placeholder="Search rooms, groups…"
+          placeholder={t('chat.search')}
           placeholderTextColor={colors.textTertiary}
           value={q} onChangeText={setQ}
         />
@@ -191,13 +191,13 @@ export default function CommunityScreen() {
             style={[s.roomCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             activeOpacity={0.75}
           >
-            <View style={[s.roomIcon, { backgroundColor: item.color + '18' }]}>
+            <View style={[s.roomIcon, { backgroundColor: tone(item.color).bg }]}>
               {item.icon === 'candle' ? (
-                <Diya size={22} color={item.color} />
+                <Diya size={22} color={tone(item.color).fg} />
               ) : fromMaterial(item.icon) ? (
-                <Icon name={fromMaterial(item.icon)!} size={24} color={item.color} />
+                <Icon name={fromMaterial(item.icon)!} size={24} color={tone(item.color).fg} />
               ) : (
-                <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
+                <MaterialCommunityIcons name={item.icon as any} size={20} color={tone(item.color).fg} />
               )}
             </View>
             <View style={{ flex: 1 }}>

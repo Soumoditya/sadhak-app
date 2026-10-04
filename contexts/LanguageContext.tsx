@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import type { TextStyle } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DS } from '../constants/ds';
 import { ALL_TRANSLATIONS, SUPPORTED_LANGUAGES, LOCALE, type LanguageCode } from '../constants/translations';
 
 interface LanguageContextType {
@@ -12,6 +14,11 @@ interface LanguageContextType {
   locale: string;
   /** Style override: Indic scripts break apart with letter-spacing, so drop it. */
   noTrack: { letterSpacing?: number };
+  /**
+   * Display face for titles in the current script: Fraunces for Latin, Tiro
+   * Devanagari for Hindi/Marathi, heavy system face for other scripts.
+   */
+  display: TextStyle;
 }
 
 const LanguageContext = createContext<LanguageContextType>({
@@ -21,6 +28,7 @@ const LanguageContext = createContext<LanguageContextType>({
   tf: (key: string) => key,
   locale: 'en-IN',
   noTrack: {},
+  display: { fontFamily: DS.font.display, fontWeight: 'normal' },
 });
 
 export const useLanguage = () => useContext(LanguageContext);
@@ -61,8 +69,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const locale = LOCALE[language] || 'en-IN';
   const noTrack = useMemo(() => (language === 'en' ? {} : { letterSpacing: 0 }), [language]);
 
+  const display = useMemo<TextStyle>(() => {
+    if (language === 'en') return { fontFamily: DS.font.display, fontWeight: 'normal' };
+    if (language === 'hi' || language === 'mr') return { fontFamily: DS.font.deva, fontWeight: 'normal', letterSpacing: 0 };
+    return { fontWeight: '800', letterSpacing: 0 };
+  }, [language]);
+
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, tf, locale, noTrack }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, tf, locale, noTrack, display }}>
       {children}
     </LanguageContext.Provider>
   );

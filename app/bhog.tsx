@@ -11,9 +11,10 @@ import { useLayoutInsets } from '../constants/layout';
 import { BHOG_RECIPES, type BhogRecipe } from '../constants/recipes';
 import { getFoodImage } from '../constants/foodImages';
 import { Header } from '../components/ui';
+import { toneSolid } from '../constants/theme';
 
 export default function BhogScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, tone } = useTheme();
   const { t: tr } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [query, setQuery] = useState('');
@@ -48,7 +49,7 @@ export default function BhogScreen() {
     return (
       <View style={[st.container, { backgroundColor: colors.background }]}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottomPadding }}>
-          <LinearGradient colors={[recipe.color, recipe.color + 'B3']} style={[st.dHeader, { paddingTop: headerPaddingTop }]}>
+          <LinearGradient colors={[toneSolid(recipe.color), toneSolid(recipe.color) + 'B3']} style={[st.dHeader, { paddingTop: headerPaddingTop }]}>
             <TouchableOpacity style={st.dBack} onPress={() => setRecipe(null)} hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color="#FFF" />
             </TouchableOpacity>
@@ -106,14 +107,14 @@ export default function BhogScreen() {
           </View>
 
           {!!recipe.tips && (
-            <View style={[st.tipCard, { backgroundColor: recipe.color + '0E', borderColor: recipe.color + '35' }]}>
-              <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={recipe.color} />
+            <View style={[st.tipCard, { backgroundColor: tone(recipe.color).bg, borderColor: tone(recipe.color).fg + '35' }]}>
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={tone(recipe.color).fg} />
               <Text style={[st.tipText, { color: colors.textSecondary }]}>{recipe.tips}</Text>
             </View>
           )}
 
           <TouchableOpacity
-            style={[st.watchBtn, { backgroundColor: recipe.color }]}
+            style={[st.watchBtn, { backgroundColor: toneSolid(recipe.color) }]}
             onPress={() => router.push({ pathname: '/play', params: { query: recipe.playQuery, title: recipe.name } })}
           >
             <MaterialCommunityIcons name="play-circle-outline" size={19} color="#FFF" />
@@ -131,9 +132,8 @@ export default function BhogScreen() {
         title={tr('f.bhog')}
         subtitle="सात्विक भोग · no onion, no garlic"
         right={
-          <TouchableOpacity onPress={surpriseMe} style={[st.randomBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6}>
-            <MaterialCommunityIcons name="dice-5-outline" size={17} color={colors.primary} />
-            <Text style={[st.randomText, { color: colors.text }]}>Surprise me</Text>
+          <TouchableOpacity onPress={surpriseMe} accessibilityLabel="Surprise me" style={[st.randomBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6}>
+            <MaterialCommunityIcons name="dice-5-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
         }
       />
@@ -168,7 +168,7 @@ export default function BhogScreen() {
             onPress={() => setRecipe(r)}
             activeOpacity={0.75}
           >
-            <View style={[st.cardIcon, { backgroundColor: r.color + '14' }]}>
+            <View style={[st.cardIcon, { backgroundColor: tone(r.color).bg }]}>
               {img ? (
                 <ExpoImage
                   source={img.local ?? remote(img.url)}
@@ -179,11 +179,11 @@ export default function BhogScreen() {
                   cachePolicy="disk"
                 />
               ) : (
-                <MaterialCommunityIcons name={r.icon as any} size={24} color={r.color} />
+                <MaterialCommunityIcons name={r.icon as any} size={24} color={tone(r.color).fg} />
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[st.cardTitle, { color: colors.text }]}>{r.name} <Text style={{ color: r.color, fontSize: 13 }}>{r.nameHi}</Text></Text>
+              <Text style={[st.cardTitle, { color: colors.text }]}>{r.name} <Text style={{ color: tone(r.color).fg, fontSize: 13 }}>{r.nameHi}</Text></Text>
               <Text style={[st.cardMeta, { color: colors.textTertiary }]} numberOfLines={1}>{r.occasion}</Text>
             </View>
             <View style={[st.timeChip, { backgroundColor: colors.background }]}>
@@ -205,7 +205,7 @@ const st = StyleSheet.create({
   backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 21, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  randomBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 100 },
+  randomBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 20 },
   randomText: { fontSize: 12.5, fontWeight: '700' },
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 44, marginHorizontal: 20, marginBottom: 4 },
   searchInput: { flex: 1, fontSize: 14 },

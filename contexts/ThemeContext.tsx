@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Appearance, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SystemUI from 'expo-system-ui';
-import { Colors } from '../constants/theme';
+import { Colors, Tones, toneNameFor, type Tone, type ToneName } from '../constants/theme';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -10,6 +10,10 @@ interface ThemeContextType {
   isDark: boolean;
   mode: ThemeMode;
   colors: typeof Colors.light;
+  /** Earthy accent family (fg/bg pairs) for icons, chips and categories. */
+  tones: Record<ToneName, Tone>;
+  /** Tone for a tone name or a legacy accent hex (themed fg/bg pair). */
+  tone: (color?: string) => Tone;
   setMode: (mode: ThemeMode) => void;
   toggleTheme: () => void;
   setDarkMode: (dark: boolean) => void;
@@ -19,6 +23,8 @@ const ThemeContext = createContext<ThemeContextType>({
   isDark: false,
   mode: 'light',
   colors: Colors.light,
+  tones: Tones.light,
+  tone: (c?: string) => Tones.light[toneNameFor(c)],
   setMode: () => {},
   toggleTheme: () => {},
   setDarkMode: () => {},
@@ -46,6 +52,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const isDark = mode === 'system' ? systemDark : mode === 'dark';
   const colors = isDark ? Colors.dark : Colors.light;
+  const tones = isDark ? Tones.dark : Tones.light;
+  const tone = useCallback((c?: string) => tones[toneNameFor(c)], [tones]);
 
   // Make native pieces (date pickers, alerts, keyboard) and the window
   // background follow the app's choice, not just the phone's.
@@ -62,7 +70,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const toggleTheme = useCallback(() => setMode(isDark ? 'light' : 'dark'), [isDark, setMode]);
 
   return (
-    <ThemeContext.Provider value={{ isDark, mode, colors, setMode, toggleTheme, setDarkMode }}>
+    <ThemeContext.Provider value={{ isDark, mode, colors, tones, tone, setMode, toggleTheme, setDarkMode }}>
       {children}
     </ThemeContext.Provider>
   );

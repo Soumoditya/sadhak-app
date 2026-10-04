@@ -6,6 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Header } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
 import { PRAKRITI_QUIZ, DOSHAS, type Dosha } from '../constants/ayurveda';
+import { toneSolid } from '../constants/theme';
 
 const STORE_KEY = 'sadhak_prakriti_result';
 const ORDER: Dosha[] = ['vata', 'pitta', 'kapha'];
@@ -32,7 +33,7 @@ function parseStored(v: string): Result | null {
 }
 
 export default function AyurvedaScreen() {
-  const { colors } = useTheme();
+  const { colors, tone } = useTheme();
   const { screenBottom } = useDsInsets();
   const [answers, setAnswers] = useState<Record<number, Dosha>>({});
   const [step, setStep] = useState(0);
@@ -89,10 +90,10 @@ export default function AyurvedaScreen() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Header title="Your Ayurvedic Type" subtitle={sec ? `${p.name}-${sec.name} prakriti` : `${p.name} · ${p.nameHi}`} />
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
-          <View style={[st.hero, { backgroundColor: p.color + '14', borderColor: p.color + '35' }]}>
-            <View style={[st.heroIcon, { backgroundColor: p.color + '22' }]}><MaterialCommunityIcons name={p.icon as any} size={34} color={p.color} /></View>
+          <View style={[st.hero, { backgroundColor: tone(p.color).bg, borderColor: tone(p.color).fg + '35' }]}>
+            <View style={[st.heroIcon, { backgroundColor: tone(p.color).bg }]}><MaterialCommunityIcons name={p.icon as any} size={34} color={tone(p.color).fg} /></View>
             <Text style={[st.heroName, { color: colors.text }]}>
-              {p.name}{sec ? <Text style={{ color: sec.color }}>-{sec.name}</Text> : null}
+              {p.name}{sec ? <Text style={{ color: tone(sec.color).fg }}>-{sec.name}</Text> : null}
             </Text>
             <Text style={[st.heroEl, { color: colors.textSecondary }]}>{p.elements}{sec ? ` · ${sec.elements}` : ''}</Text>
             <Text style={[st.heroNature, { color: colors.textSecondary }]}>{p.nature}</Text>
@@ -105,7 +106,7 @@ export default function AyurvedaScreen() {
                   <View key={d} style={st.barRow}>
                     <Text style={[st.barLabel, { color: colors.text }]}>{DOSHAS[d].name}</Text>
                     <View style={[st.barTrack, { backgroundColor: colors.cardBorder }]}>
-                      <View style={[st.barFill, { width: `${pct}%`, backgroundColor: DOSHAS[d].color }]} />
+                      <View style={[st.barFill, { width: `${pct}%`, backgroundColor: toneSolid(DOSHAS[d].color) }]} />
                     </View>
                     <Text style={[st.barPct, { color: colors.textSecondary }]}>{pct}%</Text>
                   </View>

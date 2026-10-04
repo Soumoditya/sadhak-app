@@ -51,18 +51,21 @@ The app is built **in the cloud** by EAS (no need for Android Studio). Two kinds
 ---
 
 ## C2. Instant (OTA) updates, no reinstall
-From v1.11.0 the app has **expo-updates**. Changes to screens, text, design and app logic can be sent straight to phones:
+From v1.11.0 the app has **expo-updates**. Changes to screens, text, design and app logic go straight to phones, no APK needed.
 
-```
-npx eas-cli update --channel production --message "what changed"
-```
+**Easiest: one click on GitHub (set up once)**
+1. expo.dev → Account settings → Access tokens → create a token.
+2. GitHub repo → Settings → Secrets and variables → Actions → New repository secret: name `EXPO_TOKEN`, paste the token.
+3. Actions tab → **Publish OTA update** → Run workflow → pick the branch → Run. It also runs by itself on every push to `main`.
 
-Phones download it in the background and use it on the next app start.
+**From a computer:** `npx eas-cli update --channel production --message "what changed"`
+
+Phones download the update in the background and show **Update ready → Restart** (from the first OTA onwards; before that, it applies on the next app start).
 
 Rules:
-- An OTA update only reaches builds with the **same app version** (`version` in `app.json`, e.g. 1.11.0). Don't bump the version for an OTA update.
+- An OTA update only reaches builds with the **same app version** (`version` in `app.json`, now 1.12.0). Don't bump the version for an OTA update.
 - Adding a library with native code, changing permissions, the app icon or splash still needs a **new build** (Section C). Bump the version then.
-- Claude can publish OTA updates for you from a cloud session if an `EXPO_TOKEN` (expo.dev → Account settings → Access tokens) is added to the environment's secrets.
+- Settings and About show the running update (e.g. "v1.12.0 · update 4 Oct, 3f9a2c1d"), so you can confirm it arrived.
 
 ---
 

@@ -120,6 +120,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="tools"
+        options={{
+          title: 'Tools',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon label={t('nav.tools')} color={color} focused={focused}>
+              <Icon name="squares-four" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="library"
         options={{
           title: 'Library',
@@ -144,6 +155,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
+          // Reached from the avatar on Home and Tools; keeps the bar to five.
+          href: null,
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon label={t('nav.profile')} color={color} focused={focused}>

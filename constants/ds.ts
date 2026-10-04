@@ -3,6 +3,14 @@
 // this, not inline magic numbers.
 
 export const DS = {
+  // ─── FONTS ───
+  // Loaded in app/_layout. Custom faces carry one weight each, so styles that
+  // use them must not also set a bold fontWeight (Android would fake-bold or
+  // drop the face). Use useLanguage().display for script-aware titles.
+  font: {
+    display: 'Fraunces_600SemiBold',
+    deva: 'TiroDevanagariHindi_400Regular',
+  },
   // ─── SPACING (4pt base) ───
   space: {
     xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 24, '3xl': 32, '4xl': 40, '5xl': 56,

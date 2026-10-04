@@ -3,11 +3,14 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from './Icon';
 import { router } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { DS, useDsInsets } from '../../constants/ds';
+import { QuickSettingsButton } from './QuickSettings';
 
 /**
- * Redesigned page header — inline title, no gradient posters. Kept to the
- * screen padding grid so it aligns with body content.
+ * Screen header for every pushed screen: back, display-face title, optional
+ * right actions, and the theme + language button so those are one tap away
+ * everywhere (pass quick={false} on immersive screens that draw their own).
  */
 interface Props {
   title: string;
@@ -16,6 +19,7 @@ interface Props {
   right?: React.ReactNode;
   /** Custom back action (e.g. close an in-screen sub-view instead of leaving). */
   onBack?: () => void;
+  quick?: boolean;
 }
 
 // Screens opened from a notification on a cold start have no history to go
@@ -25,28 +29,43 @@ export function goBackOrHome() {
   else router.replace('/');
 }
 
-export default function Header({ title, subtitle, back = true, right, onBack }: Props) {
+export default function Header({ title, subtitle, back = true, right, onBack, quick = true }: Props) {
   const { colors } = useTheme();
+  const { display, noTrack } = useLanguage();
   const { insets } = useDsInsets();
+  // Long names ("Temples & Bhandara") step down a size instead of truncating
+  // next to header actions.
+  const crowded = !!right;
+  const titleSize = title.length > 18 || (crowded && title.length > 12) ? 18 : title.length > 13 ? 20 : 22;
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + 8, paddingBottom: DS.space.md }]}>
       <View style={styles.row}>
-        {back ? (
+        {back && (
           <TouchableOpacity
             onPress={onBack || goBackOrHome}
             style={[styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
           >
-            <Icon name="caret-left" size={22} color={colors.text} weight="regular" />
+            <Icon name="caret-left" size={20} color={colors.text} weight="regular" />
           </TouchableOpacity>
-        ) : (
-          <View style={styles.iconBtn} />
         )}
-        <View style={{ flex: 1, marginLeft: DS.space.md, marginRight: right ? DS.space.md : 0 }}>
-          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{title}</Text>
-          {subtitle && <Text style={[styles.sub, { color: colors.textTertiary }]} numberOfLines={1}>{subtitle}</Text>}
+        <View style={{ flex: 1, marginLeft: back ? DS.space.md : 0, marginRight: DS.space.sm }}>
+          <Text
+            style={[styles.title, { color: colors.text, fontSize: titleSize, lineHeight: titleSize + 8 }, display]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            {title}
+          </Text>
+          {!!subtitle && <Text style={[styles.sub, { color: colors.textTertiary }, noTrack]} numberOfLines={1}>{subtitle}</Text>}
         </View>
-        {right}
+        <View style={styles.right}>
+          {right}
+          {quick && <QuickSettingsButton />}
+        </View>
       </View>
     </View>
   );
@@ -55,7 +74,8 @@ export default function Header({ title, subtitle, back = true, right, onBack }: 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: DS.layout.screenPaddingH },
   row: { flexDirection: 'row', alignItems: 'center' },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: DS.type.title2.size, fontWeight: '800', letterSpacing: -0.3 },
-  sub: { fontSize: DS.type.caption.size, marginTop: 2 },
+  title: { fontSize: 22, lineHeight: 30 },
+  sub: { fontSize: DS.type.caption.size, marginTop: 0 },
 });

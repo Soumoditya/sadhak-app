@@ -1,0 +1,64 @@
+# Publishes an over-the-air (OTA) update to installed Sadhak apps.
+#
+# One-time setup: create an access token at https://expo.dev/settings/access-tokens
+# and add it to this repo as a secret named EXPO_TOKEN
+# (GitHub → Settings → Secrets and variables → Actions → New repository secret).
+#
+# Runs on every push to main, or by hand from the Actions tab
+# ("Publish OTA update" → Run workflow → pick the branch).
+#
+# OTA only carries JavaScript and images. Phones accept an update only if it
+# was published with the same app "version" (app.json) as the APK they run,
+# so leave the version alone for OTA releases and bump it only together with
+# a new APK build.
+name: Publish OTA update
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: What changed (shown in the Expo dashboard)
+        required: false
+        default: Sadhak update
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+
+concurrency:
+  group: ota-update
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add the EXPO_TOKEN repository secret first (see the top of this file)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+
+      - name: Publish to the production channel
+        env:
+          MESSAGE: ${{ github.event.inputs.message || github.event.head_commit.message || 'Sadhak update' }}
+        run: eas update --channel production --platform android --message "$MESSAGE" --non-interactive

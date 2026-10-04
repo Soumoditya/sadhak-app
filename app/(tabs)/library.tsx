@@ -17,6 +17,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useLayoutInsets } from '../../constants/layout';
+import { AppBar, Icon } from '../../components/ui';
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: 'bookshelf', color: '#C2410C' },
@@ -50,7 +51,7 @@ interface LibraryItem {
 
 export default function LibraryScreen() {
   const { user, isAdmin } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, tone } = useTheme();
   const dialog = useDialog();
   const { t } = useLanguage();
   const { headerPaddingTop, tabContentPadding, bottomInset } = useLayoutInsets();
@@ -248,8 +249,8 @@ export default function LibraryScreen() {
     if (viewMode === 'grid') {
       return (
         <TouchableOpacity style={[st.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
-          <View style={[st.gridIcon, { backgroundColor: cat.color + '12' }]}>
-            <MaterialCommunityIcons name={cat.icon as any} size={32} color={cat.color} />
+          <View style={[st.gridIcon, { backgroundColor: tone(cat.color).bg }]}>
+            <MaterialCommunityIcons name={cat.icon as any} size={32} color={tone(cat.color).fg} />
           </View>
           <Text style={[st.gridTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
           <Text style={[st.gridAuthor, { color: colors.textSecondary }]} numberOfLines={1}>{item.author}</Text>
@@ -266,8 +267,8 @@ export default function LibraryScreen() {
 
     return (
       <TouchableOpacity style={[st.bookCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
-        <View style={[st.bookIcon, { backgroundColor: cat.color + '12' }]}>
-          <MaterialCommunityIcons name={cat.icon as any} size={28} color={cat.color} />
+        <View style={[st.bookIcon, { backgroundColor: tone(cat.color).bg }]}>
+          <MaterialCommunityIcons name={cat.icon as any} size={28} color={tone(cat.color).fg} />
         </View>
         <View style={st.bookInfo}>
           <Text style={[st.bookTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
@@ -281,7 +282,7 @@ export default function LibraryScreen() {
                 <Text style={[st.downloadCount, { color: colors.textTertiary }]}>{item.downloadCount}</Text>
               </View>
             )}
-            <Text style={[st.bookCategory, { color: cat.color, backgroundColor: cat.color + '10' }]}>{cat.name}</Text>
+            <Text style={[st.bookCategory, { color: tone(cat.color).fg, backgroundColor: tone(cat.color).bg }]}>{cat.name}</Text>
           </View>
         </View>
         <TouchableOpacity style={[st.dlBtn, { backgroundColor: colors.primary + '12' }]} onPress={() => downloadPDF(item)}>
@@ -296,32 +297,29 @@ export default function LibraryScreen() {
     <View style={[st.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[st.header, { paddingTop: headerPaddingTop + 4 }]}>
-        <View style={st.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[st.headerTitle, { color: colors.text }]}>{t('lib.title')}</Text>
-            <Text style={[st.headerSub, { color: colors.textTertiary }]}>{books.length} {books.length === 1 ? 'text' : 'texts'} · scriptures & books</Text>
-          </View>
-          <View style={st.headerActions}>
-            {isAdmin && submissions.length > 0 && (
-              <TouchableOpacity style={[st.reviewBadge, { backgroundColor: '#EF444418' }]} onPress={() => setShowReviewQueue(true)}>
-                <MaterialCommunityIcons name="file-clock-outline" size={18} color="#EF4444" />
-                <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{submissions.length}</Text>
+        <AppBar
+          title={t('f.library')}
+          subtitle={`${books.length} · ${t('lib.sub')}`}
+          right={
+            <>
+              {isAdmin && submissions.length > 0 && (
+                <TouchableOpacity style={[st.reviewBadge, { backgroundColor: '#EF444418' }]} onPress={() => setShowReviewQueue(true)}>
+                  <MaterialCommunityIcons name="file-clock-outline" size={18} color="#EF4444" />
+                  <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{submissions.length}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} style={[st.headerBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+                <Icon name={viewMode === 'grid' ? 'list-bullets' : 'squares-four'} size={19} color={colors.text} weight="regular" />
               </TouchableOpacity>
-            )}
-            <TouchableOpacity onPress={() => router.push('/wiki')} style={[st.headerBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-              <MaterialCommunityIcons name="book-education-outline" size={20} color={colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} style={[st.headerBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-              <MaterialCommunityIcons name={viewMode === 'grid' ? 'view-list-outline' : 'view-grid-outline'} size={20} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-        </View>
+            </>
+          }
+        />
       </View>
 
       {/* Search */}
       <View style={[st.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Ionicons name="search" size={18} color={colors.textTertiary} />
-        <TextInput style={[st.searchInput, { color: colors.text }]} placeholder="Search books, authors..." placeholderTextColor={colors.textTertiary} value={searchQuery} onChangeText={setSearchQuery} />
+        <Icon name="magnifying-glass" size={18} color={colors.textTertiary} weight="regular" />
+        <TextInput style={[st.searchInput, { color: colors.text }]} placeholder={t('lib.search')} placeholderTextColor={colors.textTertiary} value={searchQuery} onChangeText={setSearchQuery} />
         {searchQuery ? <TouchableOpacity onPress={() => setSearchQuery('')}><Ionicons name="close-circle" size={18} color={colors.textTertiary} /></TouchableOpacity> : null}
       </View>
 
@@ -346,9 +344,9 @@ export default function LibraryScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.catScroll} contentContainerStyle={st.catRow}>
         {CATEGORIES.map(cat => (
           <TouchableOpacity key={cat.id}
-            style={[st.catChip, { backgroundColor: selectedCategory === cat.id ? cat.color : colors.surface, borderColor: selectedCategory === cat.id ? cat.color : colors.border }]}
+            style={[st.catChip, { backgroundColor: selectedCategory === cat.id ? colors.primary : colors.surface, borderColor: selectedCategory === cat.id ? colors.primary : colors.border }]}
             onPress={() => setSelectedCategory(cat.id)}>
-            <MaterialCommunityIcons name={cat.icon as any} size={14} color={selectedCategory === cat.id ? '#FFF' : cat.color} />
+            <MaterialCommunityIcons name={cat.icon as any} size={14} color={selectedCategory === cat.id ? '#FFF' : tone(cat.color).fg} />
             <Text style={[st.catText, { color: selectedCategory === cat.id ? '#FFF' : colors.text }]}>{cat.name}</Text>
           </TouchableOpacity>
         ))}

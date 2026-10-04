@@ -6,3 +6,6 @@ export { default as Header } from './Header';
 export { default as SettingsRow } from './SettingsRow';
 export { default as Diya } from './Diya';
 export { default as Icon, fromMaterial } from './Icon';
+export { default as AppBar } from './AppBar';
+export { ToolTile, ToolRow, ToolGlyph } from './ToolTile';
+export { LanguageChip, ThemeToggle, QuickSettingsButton, useQuickSettings } from './QuickSettings';

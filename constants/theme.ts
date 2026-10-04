@@ -363,3 +363,46 @@ export const NAKSHATRAS = [
 
 export const APP_NAME = 'Sadhak';
 export const APP_TAGLINE = 'Your Spiritual Companion';
+
+// ─── Tones ─────────────────────────────────────────────────────────────────
+// One earthy accent family for icons, chips and categories, replacing the old
+// mix of neon purple/blue/green per item. Every tool and category picks one of
+// these, so the whole app reads as one palette in both themes.
+export type ToneName = 'saffron' | 'kumkum' | 'haldi' | 'tulsi' | 'neel' | 'plum';
+export type Tone = { fg: string; bg: string };
+export const Tones: Record<'light' | 'dark', Record<ToneName, Tone>> = {
+  light: {
+    saffron: { fg: '#C2410C', bg: '#FBE8DA' },
+    kumkum: { fg: '#B0263E', bg: '#F8E2E5' },
+    haldi: { fg: '#9A6508', bg: '#F7EBD2' },
+    tulsi: { fg: '#2E7149', bg: '#E1EFE4' },
+    neel: { fg: '#24608A', bg: '#DFEAF3' },
+    plum: { fg: '#7B3F79', bg: '#F0E3EF' },
+  },
+  dark: {
+    saffron: { fg: '#F59A62', bg: '#3A2418' },
+    kumkum: { fg: '#F0909E', bg: '#3A1E24' },
+    haldi: { fg: '#E6B65A', bg: '#372B16' },
+    tulsi: { fg: '#7FC99A', bg: '#1C3125' },
+    neel: { fg: '#86BCE2', bg: '#1A2B39' },
+    plum: { fg: '#D59ED3', bg: '#2F2030' },
+  },
+};
+
+// Older screens and data files carry fixed accent hexes (MUI-style purple,
+// blue, green). Map each to the nearest tone so they theme correctly.
+const LEGACY_TONE: Record<string, ToneName> = {
+  '#C2410C': 'saffron', '#FF6B00': 'saffron', '#FF8C00': 'saffron', '#EA580C': 'saffron', '#EA8C00': 'saffron', '#E8650A': 'saffron', '#F97316': 'saffron', '#FF9933': 'saffron',
+  '#D32F2F': 'kumkum', '#8B0000': 'kumkum', '#DC2626': 'kumkum', '#D93025': 'kumkum', '#B71C1C': 'kumkum', '#E91E63': 'kumkum', '#EF4444': 'kumkum', '#8B1A1A': 'kumkum',
+  '#1565C0': 'neel', '#0EA5E9': 'neel', '#2563EB': 'neel', '#475569': 'neel', '#37474F': 'neel', '#616161': 'neel', '#0D47A1': 'neel', '#1976D2': 'neel', '#00838F': 'neel',
+  '#7C3AED': 'plum', '#9C27B0': 'plum', '#6A1B9A': 'plum', '#8E24AA': 'plum', '#4A148C': 'plum',
+  '#2D6A4F': 'tulsi', '#1B7A42': 'tulsi', '#16A34A': 'tulsi', '#2E7D32': 'tulsi', '#388E3C': 'tulsi', '#43A047': 'tulsi',
+  '#C49A2C': 'haldi', '#F59E0B': 'haldi', '#FFD700': 'haldi', '#E8C34A': 'haldi', '#B8862B': 'haldi', '#F5A623': 'haldi', '#FFA000': 'haldi',
+};
+export function toneNameFor(color?: string): ToneName {
+  if (!color) return 'saffron';
+  if (color in Tones.light) return color as ToneName;
+  return LEGACY_TONE[color.toUpperCase()] || 'saffron';
+}
+/** Strong (light-palette) tone colour for solid fills behind white text. */
+export const toneSolid = (color?: string) => Tones.light[toneNameFor(color)].fg;

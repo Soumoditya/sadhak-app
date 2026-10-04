@@ -16,6 +16,7 @@ import { getDailyGroomingAdvice, getGroomingStatusColor, type GroomingStatus } f
 import { getFestivalsForDate, getFixedFestivals, type Festival } from '../../services/festivals';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLayoutInsets } from '../../constants/layout';
+import { AppBar, Icon } from '../../components/ui';
 
 const GRID_PAD = 10;
 // Percent width, not a pixel guess from the screen width: the old math assumed
@@ -58,7 +59,7 @@ export default function CalendarScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
-  const { t, locale, noTrack } = useLanguage();
+  const { t, locale, noTrack, display } = useLanguage();
   // Weekday/month names in the chosen language (1 Jan 2023 was a Sunday).
   const dayNames = useMemo(() => Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i).toLocaleDateString(locale, { weekday: 'short' })), [locale]);
   const monthNames = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(2023, i, 1).toLocaleDateString(locale, { month: 'long' })), [locale]);
@@ -263,37 +264,38 @@ export default function CalendarScreen() {
     <View style={[st.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabContentPadding }}>
 
-        {/* ═══ Inline title + Today pill ═══ */}
-        <View style={[st.headerTopRow, { paddingTop: headerPaddingTop + 4, paddingHorizontal: 0 }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[st.headerTitle, { color: colors.text }]}>{t('t.calendar')}</Text>
-            <Text style={[st.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
-              {selectedPanchang ? `${selectedPanchang.hinduMonth.nameHi} · ${selectedPanchang.tithi.pakshaHi}` : ''}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={goToToday}
-            style={[st.todayPill, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="calendar-today" size={13} color={colors.primary} />
-            <Text style={[st.todayPillText, { color: colors.primary }]}>{t('ui.today')}</Text>
-          </TouchableOpacity>
+        {/* ═══ App bar: title, Today, language + theme ═══ */}
+        <View style={{ paddingTop: headerPaddingTop }}>
+          <AppBar
+            title={t('f.calendar')}
+            subtitle={selectedPanchang ? `${selectedPanchang.hinduMonth.nameHi} · ${selectedPanchang.tithi.pakshaHi}` : ''}
+            right={
+              <TouchableOpacity
+                onPress={goToToday}
+                style={[st.todayPill, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}
+                activeOpacity={0.8}
+                accessibilityLabel={t('ui.today')}
+              >
+                <Icon name="calendar-dots" size={14} color={colors.primary} />
+                <Text style={[st.todayPillText, { color: colors.primary }]}>{t('ui.today')}</Text>
+              </TouchableOpacity>
+            }
+          />
         </View>
 
         {/* ═══ Month navigator (subdued, not the hero) ═══ */}
-        <View style={[st.monthRow, { marginTop: 16, marginHorizontal: 0 }]}>
+        <View style={[st.monthRow, { marginTop: 0, marginHorizontal: 0 }]}>
           <TouchableOpacity
             onPress={goToPrevMonth}
             style={[st.monthArrow, { backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}
             hitSlop={8}
           >
-            <Ionicons name="chevron-back" size={20} color={colors.text} />
+            <Icon name="caret-left" size={18} color={colors.text} weight="regular" />
           </TouchableOpacity>
           <TouchableOpacity style={st.monthCenter} onPress={() => setMonthPicker(true)} activeOpacity={0.7}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={[st.monthText, { color: colors.text }]}>{monthNames[month]}</Text>
-              <Ionicons name="chevron-down" size={16} color={colors.textTertiary} />
+              <Text style={[st.monthText, { color: colors.text }, display]}>{monthNames[month]}</Text>
+              <Icon name="caret-down" size={14} color={colors.textTertiary} weight="regular" />
             </View>
             <Text style={[st.yearText, { color: colors.textTertiary }]}>{year}</Text>
           </TouchableOpacity>
@@ -302,7 +304,7 @@ export default function CalendarScreen() {
             style={[st.monthArrow, { backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}
             hitSlop={8}
           >
-            <Ionicons name="chevron-forward" size={20} color={colors.text} />
+            <Icon name="caret-right" size={18} color={colors.text} weight="regular" />
           </TouchableOpacity>
         </View>
 
@@ -629,11 +631,11 @@ export default function CalendarScreen() {
             {/* Year stepper */}
             <View style={st.yearStepper}>
               <TouchableOpacity onPress={() => setCurrentDate(new Date(year - 1, month, 1))} style={[st.monthArrow, { backgroundColor: colors.background, borderColor: colors.cardBorder, borderWidth: 1 }]} hitSlop={8}>
-                <Ionicons name="chevron-back" size={20} color={colors.text} />
+                <Icon name="caret-left" size={18} color={colors.text} weight="regular" />
               </TouchableOpacity>
               <Text style={[st.yearStepperText, { color: colors.text }]}>{year}</Text>
               <TouchableOpacity onPress={() => setCurrentDate(new Date(year + 1, month, 1))} style={[st.monthArrow, { backgroundColor: colors.background, borderColor: colors.cardBorder, borderWidth: 1 }]} hitSlop={8}>
-                <Ionicons name="chevron-forward" size={20} color={colors.text} />
+                <Icon name="caret-right" size={18} color={colors.text} weight="regular" />
               </TouchableOpacity>
             </View>
 
@@ -667,12 +669,12 @@ const st = StyleSheet.create({
   headerTopRow: { flexDirection: 'row', alignItems: 'center' },
   headerTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
   headerSub: { fontSize: 13, marginTop: 3 },
-  todayPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100 },
+  todayPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, paddingHorizontal: 12, height: 40, borderRadius: 100 },
   todayPillText: { fontSize: 12, fontWeight: '800' },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthArrow: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   monthCenter: { alignItems: 'center' },
-  monthText: { fontSize: 20, fontWeight: '800', letterSpacing: -0.2 },
+  monthText: { fontSize: 22, lineHeight: 30 },
   yearText: { fontSize: 12, fontWeight: '600', marginTop: 1 },
 
   // Grid

@@ -13,6 +13,7 @@ import { sendTestNotification } from '../services/notifications';
 import { APP_VERSION, WEBSITE_URL } from '../constants/appInfo';
 import { Header, Card, SettingsRow, Icon } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
+import { updateLabel } from '../services/appUpdates';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -85,7 +86,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title={t('t.settings')} />
+      <Header title={t('t.settings')} quick={false} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: screenBottom }}>
 
         <SectionLabel label={t('s.preferences')} />
@@ -191,7 +192,7 @@ export default function SettingsScreen() {
           )}
         </Card>
 
-        <Text style={[styles.versionText, { color: colors.textTertiary }]}>Sadhak v{APP_VERSION}</Text>
+        <Text style={[styles.versionText, { color: colors.textTertiary }]}>Sadhak v{APP_VERSION}{updateLabel() ? ` · ${updateLabel()}` : ''}</Text>
 
         {/* Language Modal */}
         <Modal visible={languageOpen} transparent animationType="slide" onRequestClose={() => setLanguageOpen(false)}>

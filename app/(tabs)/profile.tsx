@@ -17,7 +17,7 @@ import { db, collection, getDocs, query, where, setDoc, doc } from '../../config
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { getUserPosts, type Post } from '../../services/posts';
 import { WEBSITE_URL } from '../../constants/appInfo';
-import { Screen, Card, Button } from '../../components/ui';
+import { Screen, Card, Button, AppBar, Icon } from '../../components/ui';
 import { DS } from '../../constants/ds';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -28,7 +28,7 @@ export default function ProfileScreen() {
   const { profile, isGuest, isAdmin, updateProfile, user } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
-  const { t } = useLanguage();
+  const { t, display } = useLanguage();
   const insets = useSafeAreaInsets();
 
   const [uploadingPfp, setUploadingPfp] = useState(false);
@@ -157,17 +157,21 @@ export default function ProfileScreen() {
   return (
     <Screen scroll tabbed edges={{ top: true, bottom: false }}>
 
-      {/* ═══ Top bar: title + settings gear ═══ */}
-      <View style={styles.topBar}>
-        <Text style={[styles.screenTitle, { color: colors.text }]}>{t('p.title')}</Text>
-        <TouchableOpacity
-          onPress={() => router.push('/settings' as any)}
-          style={[styles.gearBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-          hitSlop={8}
-        >
-          <Ionicons name="settings-outline" size={20} color={colors.text} />
-        </TouchableOpacity>
-      </View>
+      {/* ═══ Top bar: back, title, settings, language + theme ═══ */}
+      <AppBar
+        back
+        title={t('p.title')}
+        right={
+          <TouchableOpacity
+            onPress={() => router.push('/settings' as any)}
+            style={[styles.gearBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            hitSlop={8}
+            accessibilityLabel={t('t.settings')}
+          >
+            <Icon name="gear-six" size={19} color={colors.text} />
+          </TouchableOpacity>
+        }
+      />
 
       {/* ═══ Identity: avatar + stats (Instagram-style) ═══ */}
       <View style={styles.identityRow}>
@@ -211,7 +215,7 @@ export default function ProfileScreen() {
 
       {/* Name + handle + bio */}
       <View style={{ marginTop: DS.space.md }}>
-        <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{profile?.displayName || 'Sadhak'}</Text>
+        <Text style={[styles.name, { color: colors.text }, display]} numberOfLines={1}>{profile?.displayName || 'Sadhak'}</Text>
         <TouchableOpacity onPress={() => setUsernameOpen(true)} hitSlop={4}>
           <Text style={[styles.handle, { color: colors.textTertiary }]}>@{profile?.username || 'set-username'}</Text>
         </TouchableOpacity>
@@ -410,7 +414,7 @@ const styles = StyleSheet.create({
   statNum: { fontSize: 20, fontWeight: '800' },
   statLabel: { fontSize: 12, marginTop: 2 },
 
-  name: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  name: { fontSize: 24, lineHeight: 32 },
   handle: { fontSize: 13.5, marginTop: 2 },
   bio: { fontSize: 14, lineHeight: 20, marginTop: 6 },
   badgeRow: { flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' },

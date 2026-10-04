@@ -8,7 +8,7 @@ import { useDsInsets } from '../constants/ds';
 import { WIKI, WIKI_CATEGORIES, type WikiArticle, type WikiCat } from '../constants/hinduWiki';
 
 export default function WikiScreen() {
-  const { colors } = useTheme();
+  const { colors, tone } = useTheme();
   const { t: tr } = useLanguage();
   const { screenBottom } = useDsInsets();
   const [cat, setCat] = useState<WikiCat | 'all'>('all');
@@ -40,7 +40,7 @@ export default function WikiScreen() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Header title={article.title} subtitle={c.label} onBack={() => setArticle(null)} />
         <ScrollView ref={readerRef} contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
-          {!!article.titleHi && <Text style={[st.artHi, { color: c.color }]}>{article.titleHi}</Text>}
+          {!!article.titleHi && <Text style={[st.artHi, { color: tone(c.color).fg }]}>{article.titleHi}</Text>}
           <Text style={[st.artBody, { color: colors.text }]}>{article.body}</Text>
           {related.length > 0 && (
             <View style={{ marginTop: 26 }}>
@@ -92,7 +92,7 @@ export default function WikiScreen() {
           return (
             <TouchableOpacity key={a.id} onPress={() => setArticle(a)} activeOpacity={0.8}
               style={[st.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <View style={[st.cardIcon, { backgroundColor: c.color + '18' }]}><MaterialCommunityIcons name={c.icon as any} size={20} color={c.color} /></View>
+              <View style={[st.cardIcon, { backgroundColor: tone(c.color).bg }]}><MaterialCommunityIcons name={c.icon as any} size={20} color={tone(c.color).fg} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={[st.cardTitle, { color: colors.text }]}>{a.title}{a.titleHi ? <Text style={{ color: colors.textTertiary }}>  {a.titleHi}</Text> : null}</Text>
                 <Text style={[st.cardSum, { color: colors.textSecondary }]} numberOfLines={2}>{a.summary}</Text>

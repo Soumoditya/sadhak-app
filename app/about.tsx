@@ -7,6 +7,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { APP_NAME, APP_VERSION, APP_TAGLINE, DEVELOPER_NAME, SUPPORT_EMAIL, SOCIAL_LINKS, CHANGELOG } from '../constants/appInfo';
+import { updateLabel } from '../services/appUpdates';
 
 export default function AboutScreen() {
   const { colors, isDark } = useTheme();
@@ -30,7 +31,7 @@ export default function AboutScreen() {
           <Text style={[styles.appName, { color: colors.text }]}>{APP_NAME}</Text>
           <Text style={[styles.tagline, { color: colors.textSecondary }]}>{APP_TAGLINE}</Text>
           <View style={[styles.versionBadge, { backgroundColor: colors.primary + '14' }]}>
-            <Text style={[styles.versionText, { color: colors.primary }]}>{t('about.version')} {APP_VERSION}</Text>
+            <Text style={[styles.versionText, { color: colors.primary }]}>{t('about.version')} {APP_VERSION}{updateLabel() ? ` · ${updateLabel()}` : ''}</Text>
           </View>
         </View>
 

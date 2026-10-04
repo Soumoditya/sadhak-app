@@ -12,9 +12,10 @@ import { PUJA_GUIDES, type PujaGuide } from '../constants/pujaGuides';
 import { Diya } from '../components/ui';
 import { resolveDeityImage } from '../constants/deityImages';
 import { Header } from '../components/ui';
+import { toneSolid } from '../constants/theme';
 
 export default function PujaGuideScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, tone } = useTheme();
   const { t: tr } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [guide, setGuide] = useState<PujaGuide | null>(null);
@@ -31,7 +32,7 @@ export default function PujaGuideScreen() {
     return (
       <View style={[st.container, { backgroundColor: colors.background }]}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottomPadding }}>
-          <LinearGradient colors={[guide.color, guide.color + 'B3']} style={[st.dHeader, { paddingTop: headerPaddingTop }]}>
+          <LinearGradient colors={[toneSolid(guide.color), toneSolid(guide.color) + 'B3']} style={[st.dHeader, { paddingTop: headerPaddingTop }]}>
             <TouchableOpacity style={st.dBack} onPress={() => setGuide(null)} hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color="#FFF" />
             </TouchableOpacity>
@@ -91,15 +92,15 @@ export default function PujaGuideScreen() {
           </Section>
 
           {/* Mantra */}
-          <View style={[st.mantraCard, { backgroundColor: guide.color + '0E', borderColor: guide.color + '35' }]}>
-            <Text style={[st.mantraLabel, { color: guide.color }]}>MOOL MANTRA</Text>
+          <View style={[st.mantraCard, { backgroundColor: tone(guide.color).bg, borderColor: tone(guide.color).fg + '35' }]}>
+            <Text style={[st.mantraLabel, { color: tone(guide.color).fg }]}>MOOL MANTRA</Text>
             <Text style={[st.mantraText, { color: colors.text }]}>{guide.mantra}</Text>
           </View>
 
           {/* Actions */}
           <View style={st.actions}>
             <TouchableOpacity
-              style={[st.actionBtn, { backgroundColor: guide.color }]}
+              style={[st.actionBtn, { backgroundColor: toneSolid(guide.color) }]}
               onPress={() => router.push({ pathname: '/play', params: { query: guide.playQuery, title: `${guide.deity} Puja` } })}
             >
               <MaterialCommunityIcons name="play-circle-outline" size={18} color="#FFF" />
@@ -137,7 +138,7 @@ export default function PujaGuideScreen() {
             onPress={() => setGuide(g)}
             activeOpacity={0.75}
           >
-            <View style={[st.cardIcon, { backgroundColor: g.color + '14', borderColor: g.color + '44', borderWidth: img ? 1 : 0 }]}>
+            <View style={[st.cardIcon, { backgroundColor: tone(g.color).bg, borderColor: tone(g.color).fg + '44', borderWidth: img ? 1 : 0 }]}>
               {img ? (
                 <ExpoImage
                   source={img.local ?? remote(img.url)}
@@ -148,11 +149,11 @@ export default function PujaGuideScreen() {
                   cachePolicy="disk"
                 />
               ) : (
-                <MaterialCommunityIcons name={g.icon as any} size={26} color={g.color} />
+                <MaterialCommunityIcons name={g.icon as any} size={26} color={tone(g.color).fg} />
               )}
             </View>
             <Text style={[st.cardTitle, { color: colors.text }]} numberOfLines={1}>{g.deity.replace('Lord ', '').replace('Goddess ', '').replace('Maa ', '')}</Text>
-            <Text style={[st.cardHi, { color: g.color }]}>{g.deityHi}</Text>
+            <Text style={[st.cardHi, { color: tone(g.color).fg }]}>{g.deityHi}</Text>
             <Text style={[st.cardDay, { color: colors.textTertiary }]} numberOfLines={1}>{g.day}</Text>
           </TouchableOpacity>
           );
