@@ -4,6 +4,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { remote } from '../constants/remoteImage';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
@@ -18,6 +19,7 @@ import { Header } from '../components/ui';
 
 export default function DevotionalScreen() {
   const { colors, isDark } = useTheme();
+  const { t: tr } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [category, setCategory] = useState<DevotionalCategory>('aarti');
   const [selected, setSelected] = useState<DevotionalItem | null>(null);
@@ -106,7 +108,7 @@ export default function DevotionalScreen() {
   // ─── List view ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <Header title="Devotional Library" subtitle="Aarti · Chalisa · Mantra · Stotra" />
+      <Header title={tr('t.devotional')} subtitle="Aarti · Chalisa · Mantra · Stotra" />
       <View style={st.tabs}>
         {DEVOTIONAL_CATEGORIES.map((cat) => {
           const active = category === cat.key;

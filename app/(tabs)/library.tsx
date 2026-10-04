@@ -19,7 +19,7 @@ import * as Sharing from 'expo-sharing';
 import { useLayoutInsets } from '../../constants/layout';
 
 const CATEGORIES = [
-  { id: 'all', name: 'All', icon: 'bookshelf', color: '#D94F00' },
+  { id: 'all', name: 'All', icon: 'bookshelf', color: '#C2410C' },
   { id: 'vedas', name: 'Vedas & Upanishads', icon: 'book-open-page-variant', color: '#FF6B00' },
   { id: 'puranas', name: 'Puranas', icon: 'book-multiple', color: '#8B0000' },
   { id: 'gita', name: 'Bhagavad Gita', icon: 'book-cross', color: '#1565C0' },
@@ -386,7 +386,7 @@ export default function LibraryScreen() {
 
       {/* Upload FAB — sits above the floating tab bar */}
       <TouchableOpacity style={[st.fab, { bottom: tabContentPadding }]} onPress={() => setUploadModal(true)} activeOpacity={0.8}>
-        <LinearGradient colors={['#D94F00', '#FF8C00']} style={st.fabGrad}>
+        <LinearGradient colors={['#C2410C', '#E8743B']} style={st.fabGrad}>
           <MaterialCommunityIcons name="plus" size={28} color="#FFF" />
         </LinearGradient>
       </TouchableOpacity>
@@ -445,7 +445,7 @@ export default function LibraryScreen() {
             <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, height: 80, textAlignVertical: 'top' }]} placeholder="Description (optional)" placeholderTextColor={colors.textTertiary} value={uploadData.description} onChangeText={t => setUploadData({ ...uploadData, description: t })} multiline numberOfLines={3} />
 
             <TouchableOpacity onPress={handleUpload} disabled={uploading} activeOpacity={0.8}>
-              <LinearGradient colors={isAdmin ? ['#D94F00', '#FF8C00'] : ['#2D6A4F', '#4CAF50']} style={st.uploadBtn}>
+              <LinearGradient colors={isAdmin ? ['#C2410C', '#E8743B'] : ['#2D6A4F', '#4CAF50']} style={st.uploadBtn}>
                 {uploading ? <ActivityIndicator color="#FFF" /> : (
                   <>
                     <MaterialCommunityIcons name={isAdmin ? 'upload' : 'send-check'} size={20} color="#FFF" />
@@ -556,7 +556,7 @@ const st = StyleSheet.create({
   emptyText: { fontSize: 14, textAlign: 'center' },
 
   fab: { position: 'absolute', bottom: 90, right: 20 },
-  fabGrad: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#D94F00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+  fabGrad: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#C2410C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },

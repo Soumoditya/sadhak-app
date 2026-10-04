@@ -26,7 +26,7 @@ export default function AboutScreen() {
         {/* Header */}
         <Header title={t('about.title') || 'About'} />
         <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          <Image source={require('../assets/images/icon.png')} style={styles.appIcon} />
+          <Image source={require('../assets/images/emblem.png')} style={styles.appIcon} />
           <Text style={[styles.appName, { color: colors.text }]}>{APP_NAME}</Text>
           <Text style={[styles.tagline, { color: colors.textSecondary }]}>{APP_TAGLINE}</Text>
           <View style={[styles.versionBadge, { backgroundColor: colors.primary + '14' }]}>
@@ -37,7 +37,7 @@ export default function AboutScreen() {
         {/* Mission */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={styles.cardHeader}>
-            <MaterialCommunityIcons name="heart-outline" size={22} color="#D94F00" />
+            <MaterialCommunityIcons name="heart-outline" size={22} color="#C2410C" />
             <Text style={[styles.cardTitle, { color: colors.text }]}>{t('about.mission')}</Text>
           </View>
           <Text style={[styles.cardBody, { color: colors.textSecondary }]}>
@@ -53,8 +53,8 @@ export default function AboutScreen() {
           </View>
           <Text style={[styles.cardBody, { color: colors.textSecondary }]}>{DEVELOPER_NAME}</Text>
           <TouchableOpacity onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} style={styles.emailRow}>
-            <MaterialCommunityIcons name="email-outline" size={16} color="#D94F00" />
-            <Text style={[styles.emailText, { color: '#D94F00' }]}>{SUPPORT_EMAIL}</Text>
+            <MaterialCommunityIcons name="email-outline" size={16} color="#C2410C" />
+            <Text style={[styles.emailText, { color: '#C2410C' }]}>{SUPPORT_EMAIL}</Text>
           </TouchableOpacity>
         </View>
 

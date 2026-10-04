@@ -26,6 +26,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.12.0',
+    date: '2026-10-04',
+    title: 'Light mode, your language & a calmer look',
+    changes: [
+      'Choose Light, Dark or follow your phone (Settings → Appearance); Light is the default',
+      'Warmer, richer colours across the whole app',
+      'Language switch now works: Hindi and Bengali throughout menus, Home, Panchang, Calendar and Settings',
+      'Other Indian languages show their own words for the main labels; anything missing falls back to English',
+      'New splash screen and a proper app and notification icon',
+      'Share Sadhak with a beautiful invite card',
+      'Japa follows your theme; onboarding restyled',
+    ],
+  },
+  {
     version: '1.11.0',
     date: '2026-10-04',
     title: 'Premium icons & instant updates',

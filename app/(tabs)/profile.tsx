@@ -9,6 +9,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '../../contexts/AuthContext';
+import { shareSadhak } from '../../services/shareApp';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useLanguage, SUPPORTED_LANGUAGES } from '../../contexts/LanguageContext';
@@ -27,6 +28,7 @@ export default function ProfileScreen() {
   const { profile, isGuest, isAdmin, updateProfile, user } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
 
   const [uploadingPfp, setUploadingPfp] = useState(false);
@@ -144,11 +146,10 @@ export default function ProfileScreen() {
   };
 
   const shareApp = async () => {
-    try {
-      await Share.share({
-        message: `🙏 Sadhak — your Hindu spiritual companion.\n\nAccurate Panchang, Hindu calendar, nearby temples, sacred library, aarti & community.\n\n${WEBSITE_URL}`,
-      });
-    } catch {}
+    const how = await shareSadhak();
+    if (how === 'image') {
+      dialog.alert('Invite copied', 'The invite message with the link is copied. Paste it as the caption if your app asks for one.', undefined, { tone: 'success' });
+    }
   };
 
   const initials = (profile?.displayName || 'S').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
@@ -158,7 +159,7 @@ export default function ProfileScreen() {
 
       {/* ═══ Top bar: title + settings gear ═══ */}
       <View style={styles.topBar}>
-        <Text style={[styles.screenTitle, { color: colors.text }]}>Profile</Text>
+        <Text style={[styles.screenTitle, { color: colors.text }]}>{t('p.title')}</Text>
         <TouchableOpacity
           onPress={() => router.push('/settings' as any)}
           style={[styles.gearBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
@@ -235,13 +236,13 @@ export default function ProfileScreen() {
       </View>
 
       <View style={{ marginTop: DS.space.lg }}>
-        <Button title="Edit Profile" variant="secondary" size="md" icon="account-edit-outline" onPress={() => setEditOpen(true)} />
+        <Button title={t('p.edit')} variant="secondary" size="md" icon="account-edit-outline" onPress={() => setEditOpen(true)} />
       </View>
 
       {/* ═══ My Posts grid ═══ */}
       <View style={styles.postsHeadRow}>
         <MaterialCommunityIcons name="grid" size={16} color={colors.text} />
-        <Text style={[styles.postsHead, { color: colors.text }]}>My Posts</Text>
+        <Text style={[styles.postsHead, { color: colors.text }]}>{t('p.myPosts')}</Text>
         {myPosts.length > 0 && (
           <View style={styles.sortChips}>
             {([['new', 'New'], ['old', 'Oldest'], ['top', 'Top']] as const).map(([key, label]) => {
@@ -265,7 +266,7 @@ export default function ProfileScreen() {
       ) : myPosts.length === 0 ? (
         <View style={styles.emptyPosts}>
           <MaterialCommunityIcons name="image-multiple-outline" size={40} color={colors.textTertiary} />
-          <Text style={[styles.emptyPostsText, { color: colors.textSecondary }]}>You haven't posted yet.</Text>
+          <Text style={[styles.emptyPostsText, { color: colors.textSecondary }]}>{t('p.noPosts')}</Text>
           <TouchableOpacity onPress={() => router.push('/create-post')} style={[styles.emptyPostsBtn, { backgroundColor: colors.primary }]}>
             <MaterialCommunityIcons name="plus" size={16} color="#FFF" />
             <Text style={styles.emptyPostsBtnText}>Create your first post</Text>
@@ -402,7 +403,7 @@ const styles = StyleSheet.create({
   identityRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 16 },
   avatarWrap: { position: 'relative' },
   avatar: { width: 84, height: 84, borderRadius: 42 },
-  pfpEdit: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#0B0E13' },
+  pfpEdit: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#13110F' },
 
   statsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around', marginLeft: 12 },
   stat: { alignItems: 'center' },

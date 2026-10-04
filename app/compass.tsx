@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import { Magnetometer } from 'expo-sensors';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Line, Path, Text as SvgText, G } from 'react-native-svg';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Header } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
@@ -17,7 +18,7 @@ const VASTU: {
   { key: 'N',  label: 'North',      labelHi: 'उत्तर',  center: 0,   dikpala: 'Kubera (wealth)', element: 'Water',         good: 'Cash locker, valuables, water source; keep light & open', avoid: 'Heavy storage, clutter, toilets', color: '#1565C0' },
   { key: 'NE', label: 'North-East', labelHi: 'ईशान',   center: 45,  dikpala: 'Ishana (Shiva)',  element: 'Water + Ether', good: 'Puja room / mandir, meditation, study: the most sacred corner', avoid: 'Toilet, kitchen, heavy furniture, shoes', color: '#7C3AED' },
   { key: 'E',  label: 'East',       labelHi: 'पूर्व',   center: 90,  dikpala: 'Indra',           element: 'Air',           good: 'Main entrance, windows, morning surya arghya', avoid: 'Blocking walls, storage that darkens it', color: '#D97706' },
-  { key: 'SE', label: 'South-East', labelHi: 'आग्नेय', center: 135, dikpala: 'Agni',            element: 'Fire',          good: 'Kitchen (cook facing east), electrical appliances', avoid: 'Water tank, puja room, bedroom for couples', color: '#D94F00' },
+  { key: 'SE', label: 'South-East', labelHi: 'आग्नेय', center: 135, dikpala: 'Agni',            element: 'Fire',          good: 'Kitchen (cook facing east), electrical appliances', avoid: 'Water tank, puja room, bedroom for couples', color: '#C2410C' },
   { key: 'S',  label: 'South',      labelHi: 'दक्षिण', center: 180, dikpala: 'Yama',            element: 'Earth',         good: 'Heavy storage, master bedroom (sleep with head to the south)', avoid: 'Main entrance (unless vastu-corrected), water bodies', color: '#9F1239' },
   { key: 'SW', label: 'South-West', labelHi: 'नैऋत्य', center: 225, dikpala: 'Nirriti',         element: 'Earth',         good: "Master bedroom, heavy almirahs, family elders' room", avoid: "Kitchen, toilets, children's room, entrance", color: '#78350F' },
   { key: 'W',  label: 'West',       labelHi: 'पश्चिम', center: 270, dikpala: 'Varuna',          element: 'Water',         good: "Dining, children's bedroom, study desks facing east", avoid: 'Excess openings; main door without vastu advice', color: '#2D6A4F' },
@@ -31,6 +32,7 @@ type Source = 'fused' | 'magnetometer' | 'none';
 
 export default function CompassScreen() {
   const { colors, isDark } = useTheme();
+  const { t: tr } = useLanguage();
   const { screenBottom } = useDsInsets();
   const { width } = useWindowDimensions();
   const SIZE = Math.min(width - 48, 320);
@@ -123,7 +125,7 @@ export default function CompassScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title="Vastu Compass" subtitle="वास्तु दिशा · find directions for your home" />
+      <Header title={tr('t.compass')} subtitle="वास्तु दिशा · find directions for your home" />
       <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: screenBottom, paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
         {source === 'none' ? (
           <View style={{ alignItems: 'center', marginTop: 60, paddingHorizontal: 20 }}>

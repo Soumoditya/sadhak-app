@@ -23,7 +23,7 @@ export const BHOG_RECIPES: BhogRecipe[] = [
     occasion: 'Ashtami, Satyanarayan katha, everyday bhog',
     time: '20 min',
     icon: 'bowl-mix',
-    color: '#D94F00',
+    color: '#C2410C',
     ingredients: [
       { item: 'Sooji (semolina)', qty: '1 cup' },
       { item: 'Ghee', qty: '½ cup' },

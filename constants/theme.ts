@@ -5,12 +5,12 @@
 export const Colors = {
   light: {
     // ── Primary ──
-    primary: '#D94F00',        // Rich saffron-orange
-    primaryLight: '#F07830',
-    primaryDark: '#B33D00',
-    primaryMuted: '#D94F0018', // For tinted backgrounds
-    primaryGradientStart: '#D94F00',
-    primaryGradientEnd: '#F59A3F',
+    primary: '#C2410C',        // Deep kesari saffron (AA on white)
+    primaryLight: '#E8743B',
+    primaryDark: '#9A3412',
+    primaryMuted: '#C2410C16', // For tinted backgrounds
+    primaryGradientStart: '#C2410C',
+    primaryGradientEnd: '#E8743B',
 
     // ── Secondary ──
     secondary: '#8B1A1A',      // Deep temple maroon
@@ -18,7 +18,7 @@ export const Colors = {
     secondaryDark: '#6B0F1A',
 
     // ── Accent ──
-    gold: '#C49A2C',
+    gold: '#B8862B',
     goldLight: '#E8C34A',
     goldMuted: '#C49A2C14',
     vermillion: '#D93025',
@@ -27,17 +27,17 @@ export const Colors = {
     saffron: '#F5A623',
 
     // ── Surfaces ──
-    background: '#FDFAF5',     // Warm ivory
+    background: '#FBF7F1',     // Warm parchment
     surface: '#FFFFFF',
     surfaceElevated: '#FFFFFF',
-    surfaceSecondary: '#F7F3ED', // Subtle warm gray
+    surfaceSecondary: '#F5EFE6', // Subtle warm sand
     card: '#FFFFFF',
-    cardBorder: '#EDE6DB',
+    cardBorder: '#ECE3D7',
 
     // ── Text ──
-    text: '#1C1917',           // Rich near-black
-    textSecondary: '#57534E',
-    textTertiary: '#A8A29E',
+    text: '#1F1A16',           // Warm near-black
+    textSecondary: '#5C534B',
+    textTertiary: '#9E948A',
     textOnPrimary: '#FFFFFF',
     textOnDark: '#FFFFFF',
     textMuted: '#D6D3D1',
@@ -62,11 +62,11 @@ export const Colors = {
     personalNote: '#2563EB',
 
     // ── UI Chrome ──
-    border: '#E7E0D8',
-    divider: '#F0EBE3',
-    tabIconDefault: '#A8A29E',
-    tabIconSelected: '#D94F00',
-    ripple: 'rgba(217, 79, 0, 0.10)',
+    border: '#E6DCCE',
+    divider: '#F1EADF',
+    tabIconDefault: '#9E948A',
+    tabIconSelected: '#C2410C',
+    ripple: 'rgba(194, 65, 12, 0.10)',
     overlay: 'rgba(28, 25, 23, 0.50)',
     overlayHeavy: 'rgba(28, 25, 23, 0.72)',
     shadow: 'rgba(28, 25, 23, 0.08)',
@@ -80,12 +80,12 @@ export const Colors = {
 
   dark: {
     // ── Primary ──
-    primary: '#F07830',        // Brighter saffron for dark bg
-    primaryLight: '#FFB074',
-    primaryDark: '#D94F00',
-    primaryMuted: '#F0783018',
-    primaryGradientStart: '#D94F00',
-    primaryGradientEnd: '#F07830',
+    primary: '#F08A4B',        // Glowing saffron on warm charcoal
+    primaryLight: '#F7B07F',
+    primaryDark: '#C2410C',
+    primaryMuted: '#F08A4B18',
+    primaryGradientStart: '#C2410C',
+    primaryGradientEnd: '#F08A4B',
 
     // ── Secondary ──
     secondary: '#E8899A',
@@ -102,20 +102,20 @@ export const Colors = {
     saffron: '#FBB848',
 
     // ── Surfaces ──
-    background: '#0F1218',     // Deep ink
-    surface: '#171C24',        // Card surface
-    surfaceElevated: '#1E242E', // Elevated card
-    surfaceSecondary: '#141920',
-    card: '#1E242E',
-    cardBorder: '#2A3140',
+    background: '#13110F',     // Warm charcoal (was cold blue-grey)
+    surface: '#1C1916',        // Card surface
+    surfaceElevated: '#25211D', // Elevated card
+    surfaceSecondary: '#191613',
+    card: '#25211D',
+    cardBorder: '#332D27',
 
     // ── Text ──
-    text: '#F1F0EE',           // Warm white
-    textSecondary: '#9CA3AF',
-    textTertiary: '#5C6370',
-    textOnPrimary: '#0F1218',
-    textOnDark: '#F1F0EE',
-    textMuted: '#374151',
+    text: '#F4EEE7',           // Warm white
+    textSecondary: '#B5AA9E',
+    textTertiary: '#7D7268',
+    textOnPrimary: '#13110F',
+    textOnDark: '#F4EEE7',
+    textMuted: '#3D3630',
 
     // ── Status ──
     success: '#4ADE80',
@@ -137,20 +137,20 @@ export const Colors = {
     personalNote: '#60A5FA',
 
     // ── UI Chrome ──
-    border: '#2A3140',
-    divider: '#1E242E',
-    tabIconDefault: '#5C6370',
-    tabIconSelected: '#F07830',
-    ripple: 'rgba(240, 120, 48, 0.12)',
+    border: '#332D27',
+    divider: '#25211D',
+    tabIconDefault: '#7D7268',
+    tabIconSelected: '#F08A4B',
+    ripple: 'rgba(240, 138, 75, 0.12)',
     overlay: 'rgba(0, 0, 0, 0.60)',
     overlayHeavy: 'rgba(0, 0, 0, 0.82)',
     shadow: 'rgba(0, 0, 0, 0.40)',
-    shimmer: '#1E242E',
-    shimmerHighlight: '#2A3140',
+    shimmer: '#25211D',
+    shimmerHighlight: '#332D27',
 
     // ── Glassmorphism ──
-    glass: 'rgba(23, 28, 36, 0.82)',
-    glassBorder: 'rgba(42, 49, 64, 0.60)',
+    glass: 'rgba(28, 25, 22, 0.85)',
+    glassBorder: 'rgba(51, 45, 39, 0.60)',
   },
 };
 

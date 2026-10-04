@@ -19,7 +19,7 @@ const FAQ_SECTIONS: { title: string; icon: string; color: string; items: FAQItem
   {
     title: 'Getting Started',
     icon: 'rocket-launch-outline',
-    color: '#D94F00',
+    color: '#C2410C',
     items: [
       { q: 'What is Sadhak?', a: 'Sadhak is your complete Hindu spiritual companion app. It provides daily Panchang, grooming guidance based on traditional scriptures, a Hindu calendar with festivals, a sacred library, community chat, Japa Mala counter, Aarti collection, and much more — all personalized to your gender, marriage status, and location.', icon: 'information-outline' },
       { q: 'Is this app free?', a: 'Yes! Sadhak is completely free to use. All features including Panchang, calendar, grooming rules, library, chat, and notifications are available at no cost.', icon: 'currency-inr' },

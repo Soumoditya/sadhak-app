@@ -330,7 +330,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       name: 'Spiritual Reminders',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#D94F00',
+      lightColor: '#C2410C',
       sound: 'default',
       description: 'Hourly spiritual wisdom, mantras, and Hindu facts',
     });

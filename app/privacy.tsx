@@ -96,12 +96,12 @@ export default function PrivacyScreen() {
         {SECTIONS.map((section, idx) => (
           <View key={idx} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={styles.cardHeader}>
-              <MaterialCommunityIcons name={section.icon as any} size={20} color="#D94F00" />
+              <MaterialCommunityIcons name={section.icon as any} size={20} color="#C2410C" />
               <Text style={[styles.cardTitle, { color: colors.text }]}>{section.title}</Text>
             </View>
             {section.items.map((item, i) => (
               <View key={i} style={styles.bulletRow}>
-                <Text style={[styles.bullet, { color: '#D94F00' }]}>•</Text>
+                <Text style={[styles.bullet, { color: '#C2410C' }]}>•</Text>
                 <Text style={[styles.bulletText, { color: colors.textSecondary }]}>{item}</Text>
               </View>
             ))}

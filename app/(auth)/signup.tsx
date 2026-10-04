@@ -63,7 +63,7 @@ export default function SignupScreen() {
 
           {/* Brand */}
           <View style={st.brand}>
-            <Image source={require('../../assets/images/icon.png')} style={st.emblem} />
+            <Image source={require('../../assets/images/emblem.png')} style={st.emblem} />
           </View>
 
           {/* Title */}

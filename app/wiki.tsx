@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, BackHandler } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Header } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
@@ -8,6 +9,7 @@ import { WIKI, WIKI_CATEGORIES, type WikiArticle, type WikiCat } from '../consta
 
 export default function WikiScreen() {
   const { colors } = useTheme();
+  const { t: tr } = useLanguage();
   const { screenBottom } = useDsInsets();
   const [cat, setCat] = useState<WikiCat | 'all'>('all');
   const [q, setQ] = useState('');
@@ -64,7 +66,7 @@ export default function WikiScreen() {
   // ── Index ──
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title="Hindu Wiki" subtitle="Deities · scriptures · festivals · concepts" />
+      <Header title={tr('f.wiki')} subtitle="Deities · scriptures · festivals · concepts" />
       <View style={{ paddingHorizontal: 20 }}>
         <View style={[st.search, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <Ionicons name="search" size={17} color={colors.textTertiary} />

@@ -4,6 +4,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { remote } from '../constants/remoteImage';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
@@ -13,6 +14,7 @@ import { Header } from '../components/ui';
 
 export default function BhogScreen() {
   const { colors, isDark } = useTheme();
+  const { t: tr } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [query, setQuery] = useState('');
   const [recipe, setRecipe] = useState<BhogRecipe | null>(null);
@@ -126,7 +128,7 @@ export default function BhogScreen() {
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
       <Header
-        title="Satvik Bhog"
+        title={tr('f.bhog')}
         subtitle="सात्विक भोग · no onion, no garlic"
         right={
           <TouchableOpacity onPress={surpriseMe} style={[st.randomBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6}>

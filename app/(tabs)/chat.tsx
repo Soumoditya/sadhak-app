@@ -20,7 +20,7 @@ interface Room {
 }
 
 const DEFAULT_ROOMS: Room[] = [
-  { id: 'general', name: 'General', description: 'Dharma & spirituality', type: 'public', icon: 'forum-outline', color: '#D94F00' },
+  { id: 'general', name: 'General', description: 'Dharma & spirituality', type: 'public', icon: 'forum-outline', color: '#C2410C' },
   { id: 'puja', name: 'Puja & Rituals', description: 'Vidhi and rituals', type: 'public', icon: 'candle', color: '#D32F2F' },
   { id: 'gita', name: 'Gita Discussion', description: 'Bhagavad Gita shlokas', type: 'public', icon: 'book-open-variant', color: '#1565C0' },
   { id: 'festivals', name: 'Festivals', description: 'Celebrations & preparation', type: 'public', icon: 'party-popper', color: '#FF8C00' },

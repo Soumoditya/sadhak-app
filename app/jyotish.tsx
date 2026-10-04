@@ -6,6 +6,7 @@ import {
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { Header } from '../components/ui';
@@ -22,6 +23,7 @@ import { scheduleDailyAstroReminder, cancelDailyAstroReminder, getAstroReminder 
 export default function JyotishScreen() {
   const { user, profile, updateProfile } = useAuth();
   const { colors } = useTheme();
+  const { t: tr } = useLanguage();
   const dialog = useDialog();
   const { screenBottom } = useDsInsets();
 
@@ -286,7 +288,7 @@ export default function JyotishScreen() {
   if (loading || !kundli) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Header title="Jyotish" />
+        <Header title={tr('f.jyotish')} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={{ color: colors.textSecondary }}>Casting your chart…</Text>
@@ -312,7 +314,7 @@ export default function JyotishScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title="Jyotish" subtitle={`${b.rashi} · ${b.nakshatra}`} right={
+      <Header title={tr('f.jyotish')} subtitle={`${b.rashi} · ${b.nakshatra}`} right={
         <TouchableOpacity onPress={() => setEditing(true)} hitSlop={8}><MaterialCommunityIcons name="pencil-outline" size={20} color={colors.textSecondary} /></TouchableOpacity>
       } />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>

@@ -4,6 +4,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { remote } from '../constants/remoteImage';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
@@ -14,6 +15,7 @@ import { Header } from '../components/ui';
 
 export default function PujaGuideScreen() {
   const { colors, isDark } = useTheme();
+  const { t: tr } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [guide, setGuide] = useState<PujaGuide | null>(null);
 
@@ -123,7 +125,7 @@ export default function PujaGuideScreen() {
   // ─── Deity grid ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <Header title="Puja Guide" subtitle="किसकी पूजा करनी है? Choose the deity" />
+      <Header title={tr('f.puja')} subtitle="किसकी पूजा करनी है? Choose the deity" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.grid, { paddingBottom: screenBottomPadding }]}>
         {PUJA_GUIDES.map((g) => {

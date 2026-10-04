@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -88,16 +88,11 @@ export default function ProfileSetupScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={['#D94F00', '#F07830']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <MaterialCommunityIcons name="account-cog-outline" size={40} color="#FFFFFF" />
-          <Text style={styles.headerTitle}>Personalize Sadhak</Text>
-          <Text style={styles.headerSub}>For accurate spiritual guidance</Text>
-        </LinearGradient>
+        <View style={styles.header}>
+          <Image source={require('../../assets/images/emblem.png')} style={styles.emblem} />
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Personalize Sadhak</Text>
+          <Text style={[styles.headerSub, { color: colors.textSecondary }]}>A few details for accurate Panchang and guidance</Text>
+        </View>
 
         <View style={styles.content}>
           {/* Gender */}
@@ -153,7 +148,7 @@ export default function ProfileSetupScreen() {
 
           {/* Complete Button */}
           <TouchableOpacity onPress={handleComplete} disabled={loading} activeOpacity={0.8} style={{ marginTop: 32 }}>
-            <LinearGradient colors={['#D94F00', '#FF8C00']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.completeBtn}>
+            <LinearGradient colors={['#C2410C', '#E8743B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.completeBtn}>
               {loading ? <ActivityIndicator color="#FFFFFF" /> : (
                 <>
                   <MaterialCommunityIcons name="check-all" size={22} color="#FFFFFF" />
@@ -176,9 +171,10 @@ export default function ProfileSetupScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { flexGrow: 1 },
-  header: { paddingTop: 70, paddingBottom: 40, alignItems: 'center', borderBottomLeftRadius: 40, borderBottomRightRadius: 40 },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', marginTop: 10, letterSpacing: 1 },
-  headerSub: { fontSize: 14, color: 'rgba(255,255,255,0.85)', marginTop: 4 },
+  header: { paddingTop: 64, paddingBottom: 12, alignItems: 'center', paddingHorizontal: 24 },
+  emblem: { width: 84, height: 84, marginBottom: 6 },
+  headerTitle: { fontSize: 26, fontWeight: '800', marginTop: 10 },
+  headerSub: { fontSize: 14, marginTop: 4, textAlign: 'center' },
   content: { paddingHorizontal: 20, paddingTop: 24 },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 12 },
   selectionRow: { flexDirection: 'row', gap: 12 },

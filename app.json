@@ -2,15 +2,15 @@
   "expo": {
     "name": "Sadhak",
     "slug": "sadhak-app",
-    "version": "1.11.0",
+    "version": "1.12.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sadhak",
     "userInterfaceStyle": "automatic",
     "android": {
-      "versionCode": 13,
+      "versionCode": 14,
       "adaptiveIcon": {
-        "backgroundColor": "#0B0E13",
+        "backgroundColor": "#13110F",
         "foregroundImage": "./assets/images/adaptive-foreground.png"
       },
       "package": "com.sadhak.app",
@@ -43,15 +43,15 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icon.png",
-          "imageWidth": 220,
+          "image": "./assets/images/emblem.png",
+          "imageWidth": 170,
           "resizeMode": "contain",
-          "backgroundColor": "#0B0E13",
+          "backgroundColor": "#FBF7F1",
           "dark": {
-            "image": "./assets/images/icon.png",
-            "imageWidth": 220,
+            "image": "./assets/images/emblem.png",
+            "imageWidth": 170,
             "resizeMode": "contain",
-            "backgroundColor": "#0B0E13"
+            "backgroundColor": "#13110F"
           }
         }
       ],
@@ -64,8 +64,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#D94F00"
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#C2410C"
         }
       ],
       [

@@ -48,7 +48,7 @@ export default function Button({
   if (variant === 'primary') {
     return (
       <TouchableOpacity disabled={disabled || loading} onPress={onPress} activeOpacity={0.85} style={[wrap, style]}>
-        <LinearGradient colors={['#D94F00', '#F07830']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fill}>
+        <LinearGradient colors={['#C2410C', '#E8743B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fill}>
           {content('#FFF')}
         </LinearGradient>
       </TouchableOpacity>

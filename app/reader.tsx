@@ -102,7 +102,7 @@ export default function ReaderScreen() {
         // Read the PDF as base64 — embedded into the HTML, no file:// origin needed.
         const b64 = await FileSystem.readAsStringAsync(pdfPath, { encoding: FileSystem.EncodingType.Base64 });
         if (!cancelled) {
-          setHtml(VIEWER_HTML(isDark ? '#0B0E13' : '#F5F3F0', isDark ? '#8b8e94' : '#6b6b6b', b64));
+          setHtml(VIEWER_HTML(isDark ? '#13110F' : '#F5F3F0', isDark ? '#8b8e94' : '#6b6b6b', b64));
           setPhase('render');
         }
       } catch (e: any) {
@@ -166,7 +166,7 @@ export default function ReaderScreen() {
         <View style={{ flex: 1 }}>
           <WebView
             source={{ html, baseUrl: 'https://sadhak.local/' }}
-            style={{ flex: 1, backgroundColor: isDark ? '#0B0E13' : '#F5F3F0' }}
+            style={{ flex: 1, backgroundColor: isDark ? '#13110F' : '#F5F3F0' }}
             originWhitelist={['*']}
             javaScriptEnabled
             domStorageEnabled

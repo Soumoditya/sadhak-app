@@ -7,6 +7,8 @@ import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDialog } from '../contexts/DialogContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { goBackOrHome } from '../components/ui/Header';
 
 const STORE_KEY = 'sadhak_japa_state';
@@ -16,6 +18,8 @@ const TARGETS = [27, 54, 108] as const;
 
 export default function JapaScreen() {
   const dialog = useDialog();
+  const { colors, isDark } = useTheme();
+  const { t: tr } = useLanguage();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [count, setCount] = useState(0);
@@ -65,73 +69,77 @@ export default function JapaScreen() {
   const progress = inMala / target;
 
   const size = Math.min(width * 0.72, 300);
+  // Follows the app theme: parchment + saffron in light, charcoal + gold in dark.
+  const pal = isDark
+    ? { bg: ['#16100A', colors.background] as const, fg: '#FFF', muted: 'rgba(255,255,255,0.55)', faint: 'rgba(255,255,255,0.4)', line: 'rgba(255,255,255,0.12)', panel: 'rgba(255,255,255,0.05)', track: 'rgba(255,255,255,0.08)', accent: GOLD, onAccent: '#1A1208' }
+    : { bg: [colors.background, colors.surfaceSecondary] as const, fg: colors.text, muted: colors.textSecondary, faint: colors.textTertiary, line: colors.cardBorder, panel: colors.surface, track: colors.primary + '1A', accent: colors.primary, onAccent: '#FFF' };
   const stroke = 10;
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
 
   return (
-    <LinearGradient colors={['#16100A', '#0B0E13']} style={{ flex: 1 }}>
+    <LinearGradient colors={pal.bg} style={{ flex: 1 }}>
       {/* Top bar */}
       <View style={[st.top, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={st.iconBtn} onPress={goBackOrHome} hitSlop={8}>
-          <Ionicons name="chevron-back" size={22} color="#FFF" />
+        <TouchableOpacity style={[st.iconBtn, { backgroundColor: pal.panel, borderColor: pal.line }]} onPress={goBackOrHome} hitSlop={8}>
+          <Ionicons name="chevron-back" size={22} color={pal.fg} />
         </TouchableOpacity>
-        <Text style={st.title}>Japa Mala</Text>
-        <TouchableOpacity style={[st.iconBtn, { opacity: count ? 1 : 0.4 }]} onPress={reset} hitSlop={8}>
-          <MaterialCommunityIcons name="restore" size={21} color="#FFF" />
+        <Text style={[st.title, { color: pal.fg }]}>{tr('t.japa')}</Text>
+        <TouchableOpacity style={[st.iconBtn, { backgroundColor: pal.panel, borderColor: pal.line, opacity: count ? 1 : 0.4 }]} onPress={reset} hitSlop={8}>
+          <MaterialCommunityIcons name="restore" size={21} color={pal.fg} />
         </TouchableOpacity>
       </View>
 
       {/* Stats */}
-      <View style={st.stats}>
-        <Stat label="Malas" value={malas} />
-        <View style={st.statDivider} />
-        <Stat label="Total chants" value={count} />
+      <View style={[st.stats, { backgroundColor: pal.panel, borderColor: pal.line }]}>
+        <Stat label="Malas" value={malas} pal={pal} />
+        <View style={[st.statDivider, { backgroundColor: pal.line }]} />
+        <Stat label="Total chants" value={count} pal={pal} />
       </View>
 
       {/* The whole middle area is the tap target, not just the circle. */}
       <Pressable onPress={increment} style={st.tapArea} accessibilityRole="button" accessibilityLabel={`Count chant, ${inMala} of ${target}`}>
         <Animated.View style={{ transform: [{ scale }], width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
-          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: size / 2, backgroundColor: GOLD, opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.25] }) }]} />
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: size / 2, backgroundColor: pal.accent, opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.25] }) }]} />
           <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-            <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} fill="rgba(255,255,255,0.03)" />
+            <Circle cx={size / 2} cy={size / 2} r={r} stroke={pal.track} strokeWidth={stroke} fill={isDark ? 'rgba(255,255,255,0.03)' : colors.surface} />
             <Circle
               cx={size / 2} cy={size / 2} r={r}
-              stroke={GOLD} strokeWidth={stroke} fill="none" strokeLinecap="round"
+              stroke={pal.accent} strokeWidth={stroke} fill="none" strokeLinecap="round"
               strokeDasharray={`${circ} ${circ}`} strokeDashoffset={circ * (1 - progress)}
               transform={`rotate(-90 ${size / 2} ${size / 2})`}
             />
           </Svg>
-          <Text style={st.count}>{inMala}</Text>
-          <Text style={st.of}>of {target}</Text>
+          <Text style={[st.count, { color: pal.fg }]}>{inMala}</Text>
+          <Text style={[st.of, { color: pal.muted }]}>of {target}</Text>
         </Animated.View>
-        <Text style={st.hint}>Tap anywhere to count</Text>
+        <Text style={[st.hint, { color: pal.faint }]}>Tap anywhere to count</Text>
       </Pressable>
 
       {/* Mala size */}
       <View style={[st.bottom, { paddingBottom: insets.bottom + 24 }]}>
-        <Text style={st.bottomLabel}>BEADS PER MALA</Text>
+        <Text style={[st.bottomLabel, { color: pal.faint }]}>BEADS PER MALA</Text>
         <View style={st.targets}>
           {TARGETS.map((m) => {
             const active = target === m;
             return (
-              <TouchableOpacity key={m} onPress={() => setTarget(m)} style={[st.target, active && st.targetActive]}>
-                <Text style={[st.targetText, active && { color: '#1A1208' }]}>{m}</Text>
+              <TouchableOpacity key={m} onPress={() => setTarget(m)} style={[st.target, { borderColor: active ? pal.accent : pal.line, backgroundColor: active ? pal.accent : 'transparent' }]}>
+                <Text style={[st.targetText, { color: active ? pal.onAccent : pal.muted }]}>{m}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
-        <Text style={st.om}>ॐ</Text>
+        <Text style={[st.om, { color: isDark ? SAFFRON : colors.primary }]}>ॐ</Text>
       </View>
     </LinearGradient>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, pal }: { label: string; value: number; pal: { accent: string; muted: string } }) {
   return (
     <View style={{ alignItems: 'center', minWidth: 90 }}>
-      <Text style={st.statValue}>{value}</Text>
-      <Text style={st.statLabel}>{label}</Text>
+      <Text style={[st.statValue, { color: pal.accent }]}>{value}</Text>
+      <Text style={[st.statLabel, { color: pal.muted }]}>{label}</Text>
     </View>
   );
 }

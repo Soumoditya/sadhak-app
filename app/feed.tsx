@@ -8,6 +8,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import { Header } from '../components/ui';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLayoutInsets } from '../constants/layout';
 import {
@@ -33,6 +34,7 @@ function timeAgo(createdAt: any): string {
 export default function FeedScreen() {
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { t: tr } = useLanguage();
   const { headerPaddingTop, backBtnTop, screenBottomPadding, bottomInset } = useLayoutInsets();
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -220,7 +222,7 @@ export default function FeedScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header title="Explore" subtitle="Posts from the Sadhak community" />
+      <Header title={tr('t.explore')} subtitle="Posts from the Sadhak community" />
       <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
         <Ionicons name="search" size={18} color={colors.textTertiary} />
         <TextInput
@@ -265,7 +267,7 @@ export default function FeedScreen() {
         activeOpacity={0.85}
         onPress={() => router.push('/create-post')}
       >
-        <LinearGradient colors={['#D94F00', '#FF8C00']} style={styles.fabGrad}>
+        <LinearGradient colors={['#C2410C', '#E8743B']} style={styles.fabGrad}>
           <MaterialCommunityIcons name="feather" size={24} color="#FFF" />
         </LinearGradient>
       </TouchableOpacity>
@@ -382,7 +384,7 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', marginTop: 60, gap: 6 },
   emptyTitle: { fontSize: 17, fontWeight: '700' },
   fab: { position: 'absolute', right: 20 },
-  fabGrad: { width: 58, height: 58, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#D94F00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8 },
+  fabGrad: { width: 58, height: 58, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#C2410C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8 },
 
   // Comments sheet
   sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },

@@ -58,7 +58,11 @@ export default function CalendarScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
-  const { t } = useLanguage();
+  const { t, locale, noTrack } = useLanguage();
+  // Weekday/month names in the chosen language (1 Jan 2023 was a Sunday).
+  const dayNames = useMemo(() => Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i).toLocaleDateString(locale, { weekday: 'short' })), [locale]);
+  const monthNames = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(2023, i, 1).toLocaleDateString(locale, { month: 'long' })), [locale]);
+  const monthShort = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(2023, i, 1).toLocaleDateString(locale, { month: 'short' })), [locale]);
   const { headerPaddingTop, tabContentPadding, bottomInset } = useLayoutInsets();
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -232,7 +236,7 @@ export default function CalendarScreen() {
       if (existingReminder?.id) {
         try { await Notifications.cancelScheduledNotificationAsync(existingReminder.id); } catch {}
       }
-      const dateLabel = selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+      const dateLabel = selectedDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
       const note = notes[selectedDateKey];
       const id = await Notifications.scheduleNotificationAsync({
         content: {
@@ -262,7 +266,7 @@ export default function CalendarScreen() {
         {/* ═══ Inline title + Today pill ═══ */}
         <View style={[st.headerTopRow, { paddingTop: headerPaddingTop + 4, paddingHorizontal: 0 }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[st.headerTitle, { color: colors.text }]}>{t('cal.title')}</Text>
+            <Text style={[st.headerTitle, { color: colors.text }]}>{t('t.calendar')}</Text>
             <Text style={[st.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
               {selectedPanchang ? `${selectedPanchang.hinduMonth.nameHi} · ${selectedPanchang.tithi.pakshaHi}` : ''}
             </Text>
@@ -273,7 +277,7 @@ export default function CalendarScreen() {
             activeOpacity={0.8}
           >
             <MaterialCommunityIcons name="calendar-today" size={13} color={colors.primary} />
-            <Text style={[st.todayPillText, { color: colors.primary }]}>Today</Text>
+            <Text style={[st.todayPillText, { color: colors.primary }]}>{t('ui.today')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -288,7 +292,7 @@ export default function CalendarScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={st.monthCenter} onPress={() => setMonthPicker(true)} activeOpacity={0.7}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={[st.monthText, { color: colors.text }]}>{MONTHS[month]}</Text>
+              <Text style={[st.monthText, { color: colors.text }]}>{monthNames[month]}</Text>
               <Ionicons name="chevron-down" size={16} color={colors.textTertiary} />
             </View>
             <Text style={[st.yearText, { color: colors.textTertiary }]}>{year}</Text>
@@ -305,9 +309,9 @@ export default function CalendarScreen() {
         {/* ═══ Calendar grid — clean by default, markers only when meaningful ═══ */}
         <View style={[st.calendarCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={st.dayHeaders}>
-            {DAYS_SHORT.map((d, i) => (
+            {dayNames.map((d, i) => (
               <View key={i} style={{ width: CELL, alignItems: 'center', paddingVertical: 8 }}>
-                <Text style={[st.dayHeaderText, { color: i === 0 ? colors.festival : colors.textTertiary }]}>{d}</Text>
+                <Text style={[st.dayHeaderText, { color: i === 0 ? colors.festival : colors.textTertiary }, noTrack]}>{d}</Text>
               </View>
             ))}
           </View>
@@ -374,10 +378,10 @@ export default function CalendarScreen() {
 
           <View style={[st.legend, { borderTopColor: colors.divider }]}>
             {[
-              { swatch: <View style={[st.legendDot, { backgroundColor: colors.purnima }]} />, label: 'Purnima' },
-              { swatch: <View style={[st.legendDot, { backgroundColor: colors.amavasya, borderWidth: 1, borderColor: colors.textTertiary }]} />, label: 'Amavasya' },
-              { swatch: <View style={[st.legendDot, { backgroundColor: colors.ekadashi }]} />, label: 'Ekadashi' },
-              { swatch: <View style={[st.legendSquare, { backgroundColor: colors.purnima + '3D' }]} />, label: 'Festival' },
+              { swatch: <View style={[st.legendDot, { backgroundColor: colors.purnima }]} />, label: t('cal.purnima') },
+              { swatch: <View style={[st.legendDot, { backgroundColor: colors.amavasya, borderWidth: 1, borderColor: colors.textTertiary }]} />, label: t('cal.amavasya') },
+              { swatch: <View style={[st.legendDot, { backgroundColor: colors.ekadashi }]} />, label: t('cal.ekadashi') },
+              { swatch: <View style={[st.legendSquare, { backgroundColor: colors.purnima + '3D' }]} />, label: t('cal.festival') },
             ].map((item, idx) => (
               <View key={idx} style={st.legendItem}>
                 {item.swatch}
@@ -392,10 +396,10 @@ export default function CalendarScreen() {
           <View style={st.detailHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[st.detailWeekday, { color: colors.primary }]}>
-                {selectedDate.toLocaleDateString('en-IN', { weekday: 'long' }).toUpperCase()}
+                {selectedDate.toLocaleDateString(locale, { weekday: 'long' }).toUpperCase()}
               </Text>
               <Text style={[st.detailDate, { color: colors.text }]}>
-                {selectedDate.getDate()} {selectedDate.toLocaleDateString('en-IN', { month: 'long' })}
+                {selectedDate.getDate()} {selectedDate.toLocaleDateString(locale, { month: 'long' })}
                 <Text style={{ color: colors.textTertiary, fontSize: 16 }}>  {selectedDate.getFullYear()}</Text>
               </Text>
             </View>
@@ -404,7 +408,7 @@ export default function CalendarScreen() {
             <View style={[st.statusBadge, { backgroundColor: groomingColor + '14', borderColor: groomingColor + '3D' }]}>
               <MaterialCommunityIcons name="content-cut" size={14} color={groomingColor} />
               <Text style={[st.statusBadgeText, { color: groomingColor }]}>
-                {selectedGrooming.overallStatus === 'allowed' ? 'OK' : selectedGrooming.overallStatus === 'avoid' ? 'Caution' : 'Avoid'}
+                {t(selectedGrooming.overallStatus === 'allowed' ? 'grooming.ok' : selectedGrooming.overallStatus === 'avoid' ? 'grooming.caution' : 'grooming.avoid')}
               </Text>
             </View>
           </View>
@@ -450,19 +454,19 @@ export default function CalendarScreen() {
           <View style={[st.timingsRow, { backgroundColor: isDark ? colors.surfaceElevated : '#F8F4F0', borderColor: colors.divider }]}>
             <View style={st.timing}>
               <MaterialCommunityIcons name="weather-sunset-up" size={15} color="#FF8C00" />
-              <Text style={[st.timingLabel, { color: colors.textTertiary }]}>Sunrise</Text>
+              <Text style={[st.timingLabel, { color: colors.textTertiary }]}>{t('ui.sunrise')}</Text>
               <Text style={[st.timingValue, { color: colors.text }]}>{selectedPanchang.sunrise}</Text>
             </View>
             <View style={[st.timingDivider, { backgroundColor: colors.divider }]} />
             <View style={st.timing}>
               <MaterialCommunityIcons name="weather-sunset-down" size={15} color="#7C3AED" />
-              <Text style={[st.timingLabel, { color: colors.textTertiary }]}>Sunset</Text>
+              <Text style={[st.timingLabel, { color: colors.textTertiary }]}>{t('ui.sunset')}</Text>
               <Text style={[st.timingValue, { color: colors.text }]}>{selectedPanchang.sunset}</Text>
             </View>
             <View style={[st.timingDivider, { backgroundColor: colors.divider }]} />
             <View style={st.timing}>
               <MaterialCommunityIcons name="alert-circle-outline" size={15} color={colors.festival} />
-              <Text style={[st.timingLabel, { color: colors.textTertiary }]}>Rahu Kaal</Text>
+              <Text style={[st.timingLabel, { color: colors.textTertiary }]}>{t('ui.rahuKaal')}</Text>
               <Text style={[st.timingValue, { color: colors.festival }]}>{selectedPanchang.rahuKaal.start}–{selectedPanchang.rahuKaal.end}</Text>
             </View>
           </View>
@@ -470,8 +474,8 @@ export default function CalendarScreen() {
           {/* Grooming per-activity chips (consistent with Home) */}
           <View style={st.groomingChips}>
             {selectedGrooming.rules.slice(0, 3).map((rule, idx) => {
-              const label = rule.type === 'haircut' ? 'Haircut' : rule.type === 'shaving' ? 'Shaving' : 'Nails';
-              const word = rule.status === 'allowed' ? 'OK' : rule.status === 'avoid' ? 'Caution' : 'Avoid';
+              const label = t(rule.type === 'haircut' ? 'grooming.haircut' : rule.type === 'shaving' ? 'grooming.shaving' : 'grooming.nails');
+              const word = t(rule.status === 'allowed' ? 'grooming.ok' : rule.status === 'avoid' ? 'grooming.caution' : 'grooming.avoid');
               const c = getGroomingStatusColor(rule.status);
               return (
                 <View key={idx} style={[st.gChip, { backgroundColor: c + '12', borderColor: c + '30' }]}>
@@ -509,7 +513,7 @@ export default function CalendarScreen() {
               onPress={() => { setNoteText(notes[selectedDateKey] || ''); setNoteModal(true); }}
             >
               <MaterialCommunityIcons name={hasNote ? 'note-edit-outline' : 'note-plus-outline'} size={17} color={colors.primary} />
-              <Text style={[st.actionBtnText, { color: colors.primary }]}>{hasNote ? 'Edit Note' : 'Add Note'}</Text>
+              <Text style={[st.actionBtnText, { color: colors.primary }]}>{t(hasNote ? 'cal.editNote' : 'cal.addNoteBtn')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[st.actionBtn, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}
@@ -517,7 +521,7 @@ export default function CalendarScreen() {
             >
               <MaterialCommunityIcons name={existingReminder ? 'bell-check' : 'bell-plus-outline'} size={17} color={colors.primary} />
               <Text style={[st.actionBtnText, { color: colors.primary }]}>
-                {existingReminder ? `Reminds ${existingReminder.time}` : 'Reminder'}
+                {existingReminder ? `Reminds ${existingReminder.time}` : t('cal.reminder')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -530,13 +534,13 @@ export default function CalendarScreen() {
           <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + bottomInset }]}>
             <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
             <View style={st.sheetHeader}>
-              <Text style={[st.sheetTitle, { color: colors.text }]}>{hasNote ? 'Edit Note' : 'Add Note'}</Text>
+              <Text style={[st.sheetTitle, { color: colors.text }]}>{t(hasNote ? 'cal.editNote' : 'cal.addNoteBtn')}</Text>
               <TouchableOpacity onPress={() => setNoteModal(false)} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textTertiary} />
               </TouchableOpacity>
             </View>
             <Text style={[st.sheetSub, { color: colors.textSecondary }]}>
-              {selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              {selectedDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </Text>
             <TextInput
               style={[st.noteInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
@@ -549,7 +553,7 @@ export default function CalendarScreen() {
               autoFocus
             />
             <TouchableOpacity onPress={addNote} activeOpacity={0.85}>
-              <LinearGradient colors={['#D94F00', '#F07830']} style={st.primaryBtn}>
+              <LinearGradient colors={['#C2410C', '#E8743B']} style={st.primaryBtn}>
                 <MaterialCommunityIcons name="content-save-outline" size={19} color="#FFF" />
                 <Text style={st.primaryBtnText}>Save Note</Text>
               </LinearGradient>
@@ -570,7 +574,7 @@ export default function CalendarScreen() {
               </TouchableOpacity>
             </View>
             <Text style={[st.sheetSub, { color: colors.textSecondary }]}>
-              {selectedDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {selectedDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
 
             {/* Big time display — tap to open native clock dial */}
@@ -601,7 +605,7 @@ export default function CalendarScreen() {
             )}
 
             <TouchableOpacity onPress={scheduleReminder} activeOpacity={0.85}>
-              <LinearGradient colors={['#D94F00', '#F07830']} style={st.primaryBtn}>
+              <LinearGradient colors={['#C2410C', '#E8743B']} style={st.primaryBtn}>
                 <MaterialCommunityIcons name="bell-check-outline" size={19} color="#FFF" />
                 <Text style={st.primaryBtnText}>Set for {fmt12(remHour, remMinute)}</Text>
               </LinearGradient>
@@ -616,7 +620,7 @@ export default function CalendarScreen() {
           <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + bottomInset }]}>
             <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
             <View style={st.sheetHeader}>
-              <Text style={[st.sheetTitle, { color: colors.text }]}>Jump to</Text>
+              <Text style={[st.sheetTitle, { color: colors.text }]}>{t('cal.jumpTo')}</Text>
               <TouchableOpacity onPress={() => setMonthPicker(false)} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textTertiary} />
               </TouchableOpacity>
@@ -635,7 +639,7 @@ export default function CalendarScreen() {
 
             {/* Month grid */}
             <View style={st.monthGrid}>
-              {MONTHS.map((m, i) => {
+              {monthNames.map((m, i) => {
                 const active = i === month;
                 return (
                   <TouchableOpacity
@@ -644,7 +648,7 @@ export default function CalendarScreen() {
                     onPress={() => { setCurrentDate(new Date(year, i, 1)); setMonthPicker(false); }}
                     activeOpacity={0.75}
                   >
-                    <Text style={[st.monthGridText, { color: active ? '#FFF' : colors.text }]}>{m.slice(0, 3)}</Text>
+                    <Text style={[st.monthGridText, { color: active ? '#FFF' : colors.text }]}>{monthShort[i]}</Text>
                   </TouchableOpacity>
                 );
               })}

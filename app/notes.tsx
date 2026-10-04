@@ -28,7 +28,7 @@ const NOTE_COLORS = [
   { id: 'coral', color: '#FBE9E7', dark: '#3E2420', label: 'Coral' },
 ];
 
-const TEXT_COLORS = ['default', '#D94F00', '#DC2626', '#2D6A4F', '#1565C0', '#7C3AED', '#9C27B0', '#F59E0B'];
+const TEXT_COLORS = ['default', '#C2410C', '#DC2626', '#2D6A4F', '#1565C0', '#7C3AED', '#9C27B0', '#F59E0B'];
 const HIGHLIGHT_COLORS = ['transparent', '#FFEB3B80', '#A5D6A780', '#81D4FA80', '#CE93D880', '#FFCC8080'];
 const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28];
 
@@ -449,7 +449,7 @@ export default function NotesScreen() {
       {/* ── FAB ── */}
       {activeFolder !== 'Trash' && (
         <TouchableOpacity style={st.fab} onPress={() => openEditor()} activeOpacity={0.8}>
-          <LinearGradient colors={['#D94F00', '#FF8C00']} style={st.fabGrad}>
+          <LinearGradient colors={['#C2410C', '#E8743B']} style={st.fabGrad}>
             <MaterialCommunityIcons name="plus" size={28} color="#FFF" />
           </LinearGradient>
         </TouchableOpacity>
@@ -751,7 +751,7 @@ export default function NotesScreen() {
             </View>
 
             <TouchableOpacity onPress={scheduleNoteReminder} activeOpacity={0.85}>
-              <LinearGradient colors={['#D94F00', '#F07830']} style={st.remSubmit}>
+              <LinearGradient colors={['#C2410C', '#E8743B']} style={st.remSubmit}>
                 <MaterialCommunityIcons name="bell-check-outline" size={19} color="#FFF" />
                 <Text style={st.remSubmitText}>Set reminder</Text>
               </LinearGradient>
@@ -819,7 +819,7 @@ const st = StyleSheet.create({
   emptyText: { fontSize: 14 },
 
   fab: { position: 'absolute', bottom: 30, right: 20 },
-  fabGrad: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#D94F00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+  fabGrad: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#C2410C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
 
   // Editor
   editorContainer: { flex: 1 },

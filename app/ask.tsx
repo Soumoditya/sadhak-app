@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { Header } from '../components/ui';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useLayoutInsets } from '../constants/layout';
@@ -26,6 +27,7 @@ interface ChatItem extends AiMessage {
 export default function AskScreen() {
   const { profile, user } = useAuth();
   const { colors, isDark } = useTheme();
+  const { t: tr } = useLanguage();
   const dialog = useDialog();
   const { headerPaddingTop, backBtnTop, bottomInset, insets } = useLayoutInsets();
   const astroMode = useLocalSearchParams().astro === '1';
@@ -114,7 +116,7 @@ export default function AskScreen() {
     <View style={[st.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <Header
-        title="Sadhak AI"
+        title={tr('f.ai')}
         subtitle={astroMode ? 'Reading your birth chart' : 'Your spiritual companion · scripture-grounded'}
         right={messages.length > 0 ? (
           <TouchableOpacity onPress={clearChat} style={[st.clearBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={8}>
@@ -133,7 +135,7 @@ export default function AskScreen() {
       >
         {messages.length === 0 ? (
           <View style={st.emptyWrap}>
-            <Image source={require('../assets/images/icon.png')} style={st.emptyEmblem} />
+            <Image source={require('../assets/images/emblem.png')} style={st.emptyEmblem} />
             <Text style={[st.emptyTitle, { color: colors.text }]}>Namaste 🙏</Text>
             <Text style={[st.emptySub, { color: colors.textSecondary }]}>
               Ask anything about dharma, scriptures, festivals, puja, mantras or daily practice.

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-nati
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { calculatePanchang } from '../services/panchang';
 import { Header, Icon } from '../components/ui';
 import type { IconName } from '../components/ui/Icon';
@@ -20,6 +21,7 @@ const inRange = (now: number, s: string, e: string) => {
 export default function PanchangScreen() {
   const { profile } = useAuth();
   const { colors } = useTheme();
+  const { t, tf, locale, noTrack } = useLanguage();
   const { screenBottom } = useDsInsets();
   const [offset, setOffset] = useState(0); // days from today
 
@@ -32,11 +34,11 @@ export default function PanchangScreen() {
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
 
   const timings = [
-    { key: 'brahma', label: 'Brahma Muhurta', hint: 'Best for meditation, japa and study', icon: 'weather-night', t: p.brahmaMuhurta, good: true },
-    { key: 'abhijit', label: 'Abhijit Muhurta', hint: 'Auspicious window to begin new work', icon: 'white-balance-sunny', t: p.abhijitMuhurta, good: true },
-    { key: 'rahu', label: 'Rahu Kaal', hint: 'Avoid starting anything new', icon: 'alert-circle-outline', t: p.rahuKaal, good: false },
-    { key: 'yama', label: 'Yamaganda', hint: 'Inauspicious; avoid travel and new ventures', icon: 'timer-sand', t: p.yamaghanta, good: false },
-    { key: 'gulika', label: 'Gulika Kaal', hint: 'Avoid important beginnings', icon: 'circle-off-outline', t: p.gulikaKaal, good: false },
+    { key: 'brahma', label: t('mu.brahma'), hint: t('mu.brahmaHint'), icon: 'weather-night', t: p.brahmaMuhurta, good: true },
+    { key: 'abhijit', label: t('mu.abhijit'), hint: t('mu.abhijitHint'), icon: 'white-balance-sunny', t: p.abhijitMuhurta, good: true },
+    { key: 'rahu', label: t('ui.rahuKaal'), hint: t('mu.rahuHint'), icon: 'alert-circle-outline', t: p.rahuKaal, good: false },
+    { key: 'yama', label: t('mu.yama'), hint: t('mu.yamaHint'), icon: 'timer-sand', t: p.yamaghanta, good: false },
+    { key: 'gulika', label: t('mu.gulika'), hint: t('mu.gulikaHint'), icon: 'circle-off-outline', t: p.gulikaKaal, good: false },
   ].sort((a, b) => toMin(a.t.start) - toMin(b.t.start));
 
   // "Right now" banner (today only): the active window, else the next one.
@@ -44,16 +46,16 @@ export default function PanchangScreen() {
   const next = isToday && !active ? timings.find((x) => toMin(x.t.start) > nowMin) : undefined;
 
   const elements: { label: string; hi: string; value: string; valueHi: string; extra?: string; icon: IconName; color: string }[] = [
-    { label: 'Tithi', hi: 'तिथि', value: p.tithi.name, valueHi: `${p.tithi.pakshaHi} ${p.tithi.nameHi}`, extra: p.tithi.endTime ? `until ${p.tithi.endTime}` : undefined, icon: 'moon', color: '#7C3AED' },
-    { label: 'Nakshatra', hi: 'नक्षत्र', value: p.nakshatra.name, valueHi: `${p.nakshatra.nameHi} · lord ${p.nakshatra.lord}`, extra: p.nakshatra.endTime ? `until ${p.nakshatra.endTime}` : undefined, icon: 'star-four', color: '#EA580C' },
-    { label: 'Yoga', hi: 'योग', value: p.yoga.name, valueHi: p.yoga.nameHi, icon: 'yin-yang', color: GOOD },
-    { label: 'Karana', hi: 'करण', value: p.karana.name, valueHi: p.karana.nameHi, icon: 'hourglass', color: '#1565C0' },
-    { label: 'Vara', hi: 'वार', value: p.vara.name, valueHi: `${p.vara.nameHi} · ${p.vara.deity}`, icon: 'calendar-star', color: '#D94F00' },
+    { label: t('el.tithi'), hi: 'तिथि', value: p.tithi.name, valueHi: `${p.tithi.pakshaHi} ${p.tithi.nameHi}`, extra: p.tithi.endTime ? tf('panch.until', { t: p.tithi.endTime }) : undefined, icon: 'moon', color: '#7C3AED' },
+    { label: t('el.nakshatra'), hi: 'नक्षत्र', value: p.nakshatra.name, valueHi: `${p.nakshatra.nameHi} · lord ${p.nakshatra.lord}`, extra: p.nakshatra.endTime ? tf('panch.until', { t: p.nakshatra.endTime }) : undefined, icon: 'star-four', color: '#EA580C' },
+    { label: t('el.yoga'), hi: 'योग', value: p.yoga.name, valueHi: p.yoga.nameHi, icon: 'yin-yang', color: GOOD },
+    { label: t('el.karana'), hi: 'करण', value: p.karana.name, valueHi: p.karana.nameHi, icon: 'hourglass', color: '#1565C0' },
+    { label: t('el.vara'), hi: 'वार', value: p.vara.name, valueHi: `${p.vara.nameHi} · ${p.vara.deity}`, icon: 'calendar-star', color: '#C2410C' },
   ];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title="Panchang" subtitle={profile?.location?.city ? `For ${profile.location.city}` : 'Daily Hindu almanac'} />
+      <Header title={t('f.panchang')} subtitle={profile?.location?.city ? tf('panch.for', { city: profile.location.city }) : t('panch.subtitle')} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: DS.layout.screenPaddingH, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
         {/* Day navigator */}
         <View style={[st.nav, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -61,8 +63,8 @@ export default function PanchangScreen() {
             <Ionicons name="chevron-back" size={20} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setOffset(0)} style={{ flex: 1, alignItems: 'center' }} disabled={isToday}>
-            <Text style={[st.navKicker, { color: isToday ? colors.primary : colors.textTertiary }]}>{isToday ? 'TODAY' : offset === 1 ? 'TOMORROW' : offset === -1 ? 'YESTERDAY' : 'TAP FOR TODAY'}</Text>
-            <Text style={[st.navDate, { color: colors.text }]}>{date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+            <Text style={[st.navKicker, { color: isToday ? colors.primary : colors.textTertiary }, noTrack]}>{t(isToday ? 'ui.today' : offset === 1 ? 'ui.tomorrow' : offset === -1 ? 'ui.yesterday' : 'ui.tapForToday').toUpperCase()}</Text>
+            <Text style={[st.navDate, { color: colors.text }]}>{date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setOffset((o) => o + 1)} style={st.navBtn} hitSlop={8}>
             <Ionicons name="chevron-forward" size={20} color={colors.text} />
@@ -76,13 +78,13 @@ export default function PanchangScreen() {
           <Text style={[st.heroEn, { color: colors.textSecondary }]}>{p.hinduMonth.name} · {p.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna'} {p.tithi.name}</Text>
           <View style={[st.sunRow, { borderTopColor: colors.primary + '25' }]}>
             {([
-              { icon: 'sun-horizon', label: 'Sunrise', v: p.sunrise, c: '#EA8C00' },
-              { icon: 'moon-stars', label: 'Sunset', v: p.sunset, c: '#7C3AED' },
-              { icon: 'moon', label: 'Moonrise', v: p.moonrise, c: '#475569' },
+              { icon: 'sun-horizon', label: t('ui.sunrise'), v: p.sunrise, c: '#EA8C00' },
+              { icon: 'moon-stars', label: t('ui.sunset'), v: p.sunset, c: '#7C3AED' },
+              { icon: 'moon', label: t('ui.moonrise'), v: p.moonrise, c: '#475569' },
             ] as { icon: IconName; label: string; v: string; c: string }[]).map((x) => (
               <View key={x.label} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
                 <Icon name={x.icon} size={20} color={x.c} />
-                <Text style={[st.sunLabel, { color: colors.textTertiary }]}>{x.label}</Text>
+                <Text style={[st.sunLabel, { color: colors.textTertiary }, noTrack]}>{x.label}</Text>
                 <Text style={[st.sunVal, { color: colors.text }]}>{x.v || '-'}</Text>
               </View>
             ))}
@@ -95,14 +97,14 @@ export default function PanchangScreen() {
             <View style={[st.nowDot, { backgroundColor: active ? (active.good ? GOOD : BAD) : colors.textTertiary }]} />
             <Text style={{ flex: 1, color: colors.text, fontSize: 13.5, lineHeight: 19 }}>
               {active
-                ? <><Text style={{ fontWeight: '800' }}>{active.label} now</Text> · until {active.t.end}. {active.hint}.</>
-                : <><Text style={{ fontWeight: '800' }}>Next: {next!.label}</Text> at {next!.t.start}</>}
+                ? <><Text style={{ fontWeight: '800' }}>{tf('panch.activeNow', { name: active.label })}</Text> · {tf('panch.until', { t: active.t.end })}. {active.hint}.</>
+                : <><Text style={{ fontWeight: '800' }}>{tf('panch.next', { name: next!.label })}</Text> {tf('panch.at', { t: next!.t.start })}</>}
             </Text>
           </View>
         )}
 
         {/* Five elements */}
-        <Text style={[st.section, { color: colors.text }]}>Five elements · पंचांग</Text>
+        <Text style={[st.section, { color: colors.text }]}>{t('panch.fiveElements')}</Text>
         <View style={[st.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           {elements.map((e, i) => (
             <View key={e.label} style={[st.elRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.divider }]}>
@@ -110,7 +112,7 @@ export default function PanchangScreen() {
                 <Icon name={e.icon} size={22} color={e.color} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[st.elLabel, { color: colors.textTertiary }]}>{e.label.toUpperCase()} · {e.hi}</Text>
+                <Text style={[st.elLabel, { color: colors.textTertiary }, noTrack]}>{e.label.toUpperCase()}{e.label === e.hi ? '' : ` · ${e.hi}`}</Text>
                 <Text style={[st.elValue, { color: colors.text }]}>{e.value}</Text>
                 <Text style={[st.elHi, { color: colors.textSecondary }]}>{e.valueHi}</Text>
               </View>
@@ -120,7 +122,7 @@ export default function PanchangScreen() {
         </View>
 
         {/* Muhurta timeline */}
-        <Text style={[st.section, { color: colors.text }]}>Muhurta · good & bad times</Text>
+        <Text style={[st.section, { color: colors.text }]}>{t('panch.muhurta')}</Text>
         <View style={[st.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           {timings.map((x, i) => {
             const c = x.good ? GOOD : BAD;
@@ -131,7 +133,7 @@ export default function PanchangScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={[st.tLabel, { color: colors.text }]}>{x.label}</Text>
-                    {live && <View style={[st.liveTag, { backgroundColor: c }]}><Text style={st.liveText}>NOW</Text></View>}
+                    {live && <View style={[st.liveTag, { backgroundColor: c }]}><Text style={st.liveText}>{t('panch.now')}</Text></View>}
                   </View>
                   <Text style={[st.tHint, { color: colors.textSecondary }]}>{x.hint}</Text>
                 </View>
@@ -140,7 +142,7 @@ export default function PanchangScreen() {
             );
           })}
         </View>
-        <Text style={[st.foot, { color: colors.textTertiary }]}>Times are calculated for your saved location. Update your city in Profile for accuracy.</Text>
+        <Text style={[st.foot, { color: colors.textTertiary }]}>{t('panch.foot')}</Text>
       </ScrollView>
     </View>
   );

@@ -94,7 +94,7 @@ export default function LoginScreen() {
         >
           {/* Brand mark — compact, understated */}
           <View style={st.brand}>
-            <Image source={require('../../assets/images/icon.png')} style={st.emblem} />
+            <Image source={require('../../assets/images/emblem.png')} style={st.emblem} />
             <Text style={[st.wordmark, { color: colors.text }]}>Sadhak</Text>
           </View>
 

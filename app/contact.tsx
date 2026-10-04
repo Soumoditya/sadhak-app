@@ -54,7 +54,7 @@ export default function ContactScreen() {
   };
 
   const contactOptions = [
-    { icon: 'email-outline', label: t('contact.email'), color: '#D94F00', action: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Sadhak App Feedback`) },
+    { icon: 'email-outline', label: t('contact.email'), color: '#C2410C', action: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Sadhak App Feedback`) },
     { icon: 'bug-outline', label: t('contact.reportBug'), color: '#EF4444', action: () => setActiveForm('bug') },
     { icon: 'lightbulb-outline', label: t('contact.featureRequest'), color: '#4ADE80', action: () => setActiveForm('feature') },
     { icon: 'star-outline', label: t('settings.rateApp'), color: '#FFD700', action: () => {
@@ -122,7 +122,7 @@ export default function ContactScreen() {
             />
 
             <TouchableOpacity onPress={handleSubmit} disabled={submitting} activeOpacity={0.8}>
-              <LinearGradient colors={['#D94F00', '#F07830']} style={styles.submitBtn}>
+              <LinearGradient colors={['#C2410C', '#E8743B']} style={styles.submitBtn}>
                 {submitting ? (
                   <ActivityIndicator color="#FFF" />
                 ) : (
@@ -144,7 +144,7 @@ export default function ContactScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <Text style={[styles.infoText, { color: colors.textSecondary }]}>
             We typically respond within 24-48 hours. For urgent issues, please email us directly at{' '}
-            <Text style={{ color: '#D94F00', fontWeight: '600' }}>{SUPPORT_EMAIL}</Text>
+            <Text style={{ color: '#C2410C', fontWeight: '600' }}>{SUPPORT_EMAIL}</Text>
           </Text>
         </View>
       </ScrollView>

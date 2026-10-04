@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { remote, IMAGE_HEADERS } from '../constants/remoteImage';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { Header } from '../components/ui';
@@ -23,6 +24,7 @@ const COL_W = (width - 20 * 2 - GAP) / 2;
 
 export default function WallpapersScreen() {
   const { colors } = useTheme();
+  const { t: tr } = useLanguage();
   const dialog = useDialog();
   const { screenBottom } = useDsInsets();
   const [cat, setCat] = useState<'all' | Wallpaper['category']>('all');
@@ -114,7 +116,7 @@ export default function WallpapersScreen() {
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <Header title="Wallpapers" subtitle="Gods, temples & sacred nature" />
+      <Header title={tr('f.wallpapers')} subtitle="Gods, temples & sacred nature" />
 
       {/* Category chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.catScroll} contentContainerStyle={st.catRow}>

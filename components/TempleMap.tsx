@@ -35,7 +35,7 @@ interface Props {
 // in afterwards so new results don't reload the map and reset the user's zoom.
 export function buildHtml(userLat: number, userLon: number, isDark: boolean): string {
   const style = `https://tiles.openfreemap.org/styles/${isDark ? 'dark' : 'liberty'}`;
-  const bg = isDark ? '#0B0E13' : '#EAE6DF';
+  const bg = isDark ? '#13110F' : '#EAE6DF';
   return `<!DOCTYPE html><html><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
@@ -64,7 +64,7 @@ export function buildHtml(userLat: number, userLon: number, isDark: boolean): st
     map.on('moveend',function(){var c=map.getCenter();post({type:'center',lat:c.lat,lon:c.lng});});
     map.on('error',function(e){post({type:'maperror',msg:String(e&&e.error&&e.error.message||e)});});
   }catch(e){post({type:'fatal',msg:String(e&&e.message||e)});}
-  function el(p){var d=document.createElement('div');var c=p.kind==='bhandara'?'#1B7A42':'#D94F00';d.className='pin'+(p.id===sel?' sel':'');d.style.background=c;d.innerHTML='<span>'+(p.kind==='bhandara'?'🍲':'🛕')+'</span>';d.addEventListener('click',function(ev){ev.stopPropagation();post({type:'select',id:p.id});});return d;}
+  function el(p){var d=document.createElement('div');var c=p.kind==='bhandara'?'#1B7A42':'#C2410C';d.className='pin'+(p.id===sel?' sel':'');d.style.background=c;d.innerHTML='<span>'+(p.kind==='bhandara'?'🍲':'🛕')+'</span>';d.addEventListener('click',function(ev){ev.stopPropagation();post({type:'select',id:p.id});});return d;}
   function setPins(list){
     if(!map)return;
     Object.keys(markers).forEach(function(k){markers[k].remove();});markers={};pins=list||[];
@@ -111,7 +111,7 @@ const TempleMap = forwardRef<TempleMapHandle, Props>(({ userLat, userLon, pins, 
       ref={webRef}
       originWhitelist={['*']}
       source={{ html }}
-      style={{ flex: 1, backgroundColor: isDark ? '#0B0E13' : '#EAE6DF' }}
+      style={{ flex: 1, backgroundColor: isDark ? '#13110F' : '#EAE6DF' }}
       javaScriptEnabled
       domStorageEnabled
       onMessage={(e) => {

@@ -24,7 +24,7 @@ export const PUJA_GUIDES: PujaGuide[] = [
     deity: 'Lord Ganesha',
     deityHi: 'श्री गणेश',
     icon: 'elephant',
-    color: '#D94F00',
+    color: '#C2410C',
     day: 'Wednesday · Chaturthi',
     samagri: ['Ganesha murti or image', 'Chowki with red/yellow cloth', 'Diya with ghee', 'Agarbatti & dhoop', 'Roli, akshat (rice), kalava', 'Durva grass (21 blades)', 'Red flowers (hibiscus)', 'Modak or laddu for bhog', 'Paan, supari, fruit', 'Panchamrit (milk, curd, ghee, honey, sugar)'],
     offerings: ['Modak / besan laddu', 'Durva grass — dearest to Ganesha', 'Red hibiscus flowers', 'Banana and seasonal fruit'],

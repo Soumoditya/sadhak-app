@@ -5,6 +5,7 @@ import React, { useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import Icon from '../../components/ui/Icon';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { BorderRadius, Shadows, Spacing } from '../../constants/theme';
 import { useLayoutInsets, TAB_BAR_HEIGHT } from '../../constants/layout';
 
@@ -64,6 +65,7 @@ function TabButton({ children, onPress, accessibilityState, colors }: any) {
 
 export default function TabLayout() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useLanguage();
   const { colors, isDark } = useTheme();
   const { tabBarBottom } = useLayoutInsets();
 
@@ -79,11 +81,11 @@ export default function TabLayout() {
           bottom: tabBarBottom,
           left: Spacing.lg,
           right: Spacing.lg,
-          backgroundColor: isDark ? '#141921' : '#FFFFFF',
+          backgroundColor: colors.surface,
           borderRadius: BorderRadius.xxl,
           borderTopWidth: 0,
           borderWidth: 1,
-          borderColor: isDark ? 'rgba(42, 49, 64, 0.6)' : 'rgba(0,0,0,0.06)',
+          borderColor: colors.cardBorder,
           height: TAB_BAR_HEIGHT,
           paddingBottom: 0,
           paddingTop: 0,
@@ -100,7 +102,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon label="Home" color={color} focused={focused}>
+            <TabIcon label={t('nav.home')} color={color} focused={focused}>
               <Icon name="house" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
             </TabIcon>
           ),
@@ -111,7 +113,7 @@ export default function TabLayout() {
         options={{
           title: 'Calendar',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon label="Calendar" color={color} focused={focused}>
+            <TabIcon label={t('nav.calendar')} color={color} focused={focused}>
               <Icon name="calendar-dots" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
             </TabIcon>
           ),
@@ -122,7 +124,7 @@ export default function TabLayout() {
         options={{
           title: 'Library',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon label="Library" color={color} focused={focused}>
+            <TabIcon label={t('nav.library')} color={color} focused={focused}>
               <Icon name="books" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
             </TabIcon>
           ),
@@ -133,7 +135,7 @@ export default function TabLayout() {
         options={{
           title: 'Chat',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon label="Chat" color={color} focused={focused}>
+            <TabIcon label={t('nav.chat')} color={color} focused={focused}>
               <Icon name="chats-circle" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
             </TabIcon>
           ),
@@ -144,7 +146,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon label="Profile" color={color} focused={focused}>
+            <TabIcon label={t('nav.profile')} color={color} focused={focused}>
               <Icon name="user-circle" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
             </TabIcon>
           ),

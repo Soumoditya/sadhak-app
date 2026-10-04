@@ -25,15 +25,15 @@ function buildHtml(k: Kundli, birth: BirthInput | null, name?: string): string {
     @page { margin: 32px; }
     * { box-sizing: border-box; }
     body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; font-size: 12px; }
-    .hd { text-align:center; border-bottom: 2px solid #D94F00; padding-bottom: 12px; margin-bottom: 16px; }
-    .hd h1 { margin: 0; color: #D94F00; font-size: 22px; letter-spacing: 1px; }
+    .hd { text-align:center; border-bottom: 2px solid #C2410C; padding-bottom: 12px; margin-bottom: 16px; }
+    .hd h1 { margin: 0; color: #C2410C; font-size: 22px; letter-spacing: 1px; }
     .hd p { margin: 3px 0; color: #555; }
-    h2 { color:#D94F00; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; border-bottom:1px solid #eee; padding-bottom:4px; margin: 18px 0 8px; }
+    h2 { color:#C2410C; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; border-bottom:1px solid #eee; padding-bottom:4px; margin: 18px 0 8px; }
     table { width:100%; border-collapse: collapse; }
     td, th { padding: 5px 7px; border-bottom: 1px solid #eee; text-align:left; }
     .grid { display:flex; flex-wrap:wrap; }
     .grid div { width:50%; padding: 3px 0; }
-    .r { color:#D94F00; font-weight:bold; }
+    .r { color:#C2410C; font-weight:bold; }
     ul { margin: 4px 0; padding-left: 18px; }
     li { margin: 3px 0; }
     .foot { margin-top: 22px; text-align:center; color:#999; font-size: 10px; border-top:1px solid #eee; padding-top:8px; }

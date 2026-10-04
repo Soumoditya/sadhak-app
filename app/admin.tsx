@@ -159,7 +159,7 @@ export default function AdminScreen() {
         submissions.map(sub => (
           <View key={sub.id} style={[styles.reviewCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={styles.reviewHeader}>
-              <MaterialCommunityIcons name="file-pdf-box" size={24} color="#D94F00" />
+              <MaterialCommunityIcons name="file-pdf-box" size={24} color="#C2410C" />
               <View style={styles.reviewInfo}>
                 <Text style={[styles.reviewTitle, { color: colors.text }]}>{sub.title}</Text>
                 <Text style={[styles.reviewAuthor, { color: colors.textSecondary }]}>{sub.author} • {sub.category}</Text>

@@ -180,7 +180,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     title: 'Jai Ganesh Deva',
     titleHi: 'जय गणेश देवा',
     deity: 'Lord Ganesha',
-    color: '#D94F00',
+    color: '#C2410C',
     playQuery: 'Jai Ganesh Jai Ganesh Deva aarti',
     text: `जय गणेश जय गणेश, जय गणेश देवा।
 माता जाकी पार्वती, पिता महादेवा॥
@@ -482,7 +482,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     title: 'Vakratunda Mahakaya',
     titleHi: 'वक्रतुण्ड महाकाय',
     deity: 'Lord Ganesha',
-    color: '#D94F00',
+    color: '#C2410C',
     playQuery: 'Vakratunda Mahakaya mantra',
     text: `वक्रतुण्ड महाकाय
 सूर्यकोटि समप्रभ।
@@ -698,7 +698,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     title: 'Ganesha Pancharatnam',
     titleHi: 'गणेश पञ्चरत्नम्',
     deity: 'Lord Ganesha',
-    color: '#D94F00',
+    color: '#C2410C',
     playQuery: 'Ganesha Pancharatnam Mudakaratta Modakam',
     text: `मुदाकरात्तमोदकं सदा विमुक्तिसाधकं
 कलाधरावतंसकं विलासिलोकरक्षकम्।

@@ -20,7 +20,7 @@ export default function ChangelogScreen() {
         {CHANGELOG.map((entry, idx) => (
           <View key={entry.version} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={styles.versionRow}>
-              <View style={[styles.versionBadge, idx === 0 && { backgroundColor: '#D94F00' }]}>
+              <View style={[styles.versionBadge, idx === 0 && { backgroundColor: '#C2410C' }]}>
                 <Text style={[styles.versionNumber, idx === 0 && { color: '#FFF' }]}>v{entry.version}</Text>
               </View>
               {idx === 0 && (
@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   card: { marginHorizontal: 20, marginTop: 16, borderRadius: 16, padding: 16, borderWidth: 1 },
   versionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   versionBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, backgroundColor: 'rgba(217,79,0,0.1)' },
-  versionNumber: { fontSize: 13, fontWeight: '700', color: '#D94F00' },
+  versionNumber: { fontSize: 13, fontWeight: '700', color: '#C2410C' },
   latestBadge: { backgroundColor: '#4ADE80', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   latestText: { fontSize: 10, fontWeight: '700', color: '#FFF' },
   dateText: { flex: 1, textAlign: 'right', fontSize: 12 },

@@ -22,29 +22,29 @@ const SHLOKAS = [
 ];
 
 const QUICK_ACTIONS = [
-  { key: 'panchang', label: 'Panchang', icon: 'sun-horizon', color: '#7C3AED', route: '/panchang' },
-  { key: 'temples', label: 'Temples', icon: 'temple-hindu', color: '#1B7A42', route: '/temples' },
-  { key: 'aarti', label: 'Aarti', icon: 'candle', color: '#EA580C', route: '/aarti' },
-  { key: 'japa', label: 'Japa', icon: 'hands-praying', color: '#1565C0', route: '/japa' },
+  { key: 'panchang', label: 'f.panchang', icon: 'sun-horizon', color: '#7C3AED', route: '/panchang' },
+  { key: 'temples', label: 'f.temples', icon: 'temple-hindu', color: '#1B7A42', route: '/temples' },
+  { key: 'aarti', label: 'f.aarti', icon: 'candle', color: '#EA580C', route: '/aarti' },
+  { key: 'japa', label: 'f.japa', icon: 'hands-praying', color: '#1565C0', route: '/japa' },
 ] as const;
 
 const MORE_MODULES = [
-  { key: 'ai', label: 'Sadhak AI', icon: 'sparkle', color: '#D94F00', route: '/ask' },
-  { key: 'jyotish', label: 'Jyotish', icon: 'star-four', color: '#C49A2C', route: '/jyotish' },
-  { key: 'vastu', label: 'Vastu', icon: 'compass', color: '#7C3AED', route: '/compass' },
-  { key: 'puja', label: 'Puja Guide', icon: 'flower-lotus', color: '#DC2626', route: '/puja-guide' },
-  { key: 'bhog', label: 'Satvik Bhog', icon: 'cooking-pot', color: '#2D6A4F', route: '/bhog' },
-  { key: 'ayurveda', label: 'Ayurveda', icon: 'leaf', color: '#1B7A42', route: '/ayurveda' },
-  { key: 'wiki', label: 'Hindu Wiki', icon: 'book-open-text', color: '#1565C0', route: '/wiki' },
-  { key: 'wallpaper', label: 'Wallpapers', icon: 'images', color: '#0EA5E9', route: '/wallpapers' },
-  { key: 'notes', label: 'Notes', icon: 'note-pencil', color: '#37474F', route: '/notes' },
-  { key: 'feed', label: 'Feed', icon: 'newspaper', color: '#F59E0B', route: '/feed' },
+  { key: 'ai', label: 'f.ai', icon: 'sparkle', color: '#C2410C', route: '/ask' },
+  { key: 'jyotish', label: 'f.jyotish', icon: 'star-four', color: '#C49A2C', route: '/jyotish' },
+  { key: 'vastu', label: 'f.vastu', icon: 'compass', color: '#7C3AED', route: '/compass' },
+  { key: 'puja', label: 'f.puja', icon: 'flower-lotus', color: '#DC2626', route: '/puja-guide' },
+  { key: 'bhog', label: 'f.bhog', icon: 'cooking-pot', color: '#2D6A4F', route: '/bhog' },
+  { key: 'ayurveda', label: 'f.ayurveda', icon: 'leaf', color: '#1B7A42', route: '/ayurveda' },
+  { key: 'wiki', label: 'f.wiki', icon: 'book-open-text', color: '#1565C0', route: '/wiki' },
+  { key: 'wallpaper', label: 'f.wallpapers', icon: 'images', color: '#0EA5E9', route: '/wallpapers' },
+  { key: 'notes', label: 'f.notes', icon: 'note-pencil', color: '#37474F', route: '/notes' },
+  { key: 'feed', label: 'f.feed', icon: 'newspaper', color: '#F59E0B', route: '/feed' },
 ] as const;
 
 export default function HomeScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { t, locale, noTrack } = useLanguage();
   const today = new Date();
 
   const panchang = useMemo(
@@ -61,11 +61,11 @@ export default function HomeScreen() {
   const hour = today.getHours();
   // Morning 4–11, afternoon 12–16 (Namaste), evening/Sandhya starts at dusk
   // (17), night from 20. Fixes "Shubh Sandhya" showing at 4:32pm.
-  const timeGreeting = hour < 4 ? 'Shubh Ratri' : hour < 12 ? 'Shubh Prabhat' : hour < 17 ? 'Namaste' : hour < 20 ? 'Shubh Sandhya' : 'Shubh Ratri';
+  const timeGreeting = t(hour < 4 ? 'ui.greet.night' : hour < 12 ? 'ui.greet.morning' : hour < 17 ? 'ui.greet.day' : hour < 20 ? 'ui.greet.evening' : 'ui.greet.night');
   const groomingColor = getGroomingStatusColor(grooming.overallStatus);
   // This pill is GROOMING guidance only (haircut/shave/nails per vaara) — not a
   // verdict on the whole day. Labelled + scissors-iconed so it reads that way.
-  const groomingLabel = grooming.overallStatus === 'allowed' ? 'OK' : grooming.overallStatus === 'avoid' ? 'Caution' : 'Avoid';
+  const groomingLabel = t(grooming.overallStatus === 'allowed' ? 'grooming.ok' : grooming.overallStatus === 'avoid' ? 'grooming.caution' : 'grooming.avoid');
   // 4-column launcher grid sized from the measured width, so tiles never
   // stretch (the old 3-col flexGrow grid blew the 10th tile up to full width).
   const [gridW, setGridW] = useState(0);
@@ -78,7 +78,7 @@ export default function HomeScreen() {
       {/* ═══ 1. Header — greeting + avatar ═══ */}
       <View style={s.header}>
         <View style={{ flex: 1 }}>
-          <Text style={[s.greeting, { color: colors.textTertiary }]}>{timeGreeting} 🙏</Text>
+          <Text style={[s.greeting, { color: colors.textTertiary }, noTrack]}>{timeGreeting} 🙏</Text>
           <Text style={[s.name, { color: colors.text }]} numberOfLines={1}>{firstName}</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
@@ -99,9 +99,9 @@ export default function HomeScreen() {
             <Icon name="sun" size={22} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.todayLabel, { color: colors.textTertiary }]}>TODAY</Text>
+            <Text style={[s.todayLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.today').toUpperCase()}</Text>
             <Text style={[s.todayDate, { color: colors.text }]}>
-              {today.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {today.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
           </View>
           <View style={[s.statusPill, { backgroundColor: groomingColor + '18', borderColor: groomingColor + '35' }]}>
@@ -120,17 +120,17 @@ export default function HomeScreen() {
         <View style={[s.timeRow, { borderTopColor: colors.divider }]}>
           <View style={s.timeCol}>
             <Icon name="sun-horizon" size={18} color="#FF8C00" />
-            <Text style={[s.timeLabel, { color: colors.textTertiary }]}>Sunrise</Text>
+            <Text style={[s.timeLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.sunrise')}</Text>
             <Text style={[s.timeValue, { color: colors.text }]}>{panchang.sunrise}</Text>
           </View>
           <View style={s.timeCol}>
             <Icon name="moon-stars" size={18} color="#7C3AED" />
-            <Text style={[s.timeLabel, { color: colors.textTertiary }]}>Sunset</Text>
+            <Text style={[s.timeLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.sunset')}</Text>
             <Text style={[s.timeValue, { color: colors.text }]}>{panchang.sunset}</Text>
           </View>
           <View style={s.timeCol}>
             <Icon name="warning" size={18} color="#EF4444" />
-            <Text style={[s.timeLabel, { color: colors.textTertiary }]}>Rahu Kaal</Text>
+            <Text style={[s.timeLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.rahuKaal')}</Text>
             <Text style={[s.timeValue, { color: '#EF4444' }]}>{panchang.rahuKaal.start.slice(0, 5)}–{panchang.rahuKaal.end.slice(0, 5)}</Text>
           </View>
         </View>
@@ -147,17 +147,17 @@ export default function HomeScreen() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[s.astroTitle, { color: colors.text }]}>
-            {profile?.hasBirthChart ? "Your day in the stars" : 'Discover your birth chart'}
+            {t(profile?.hasBirthChart ? 'home.astroTitle' : 'home.astroNewTitle')}
           </Text>
           <Text style={[s.astroSub, { color: colors.textSecondary }]} numberOfLines={1}>
-            {profile?.hasBirthChart ? "Today's guidance from your kundli" : 'Free Vedic kundli, dasha & daily guidance'}
+            {t(profile?.hasBirthChart ? 'home.astroSub' : 'home.astroNewSub')}
           </Text>
         </View>
         <Icon name="caret-right" size={17} color={colors.textTertiary} weight="regular" />
       </TouchableOpacity>
 
       {/* ═══ 3. Quick actions — 4 primary tiles ═══ */}
-      <Section title="Quick Access" compact>
+      <Section title={t('home.quickAccess')} compact>
         <View style={s.quickGrid}>
           {QUICK_ACTIONS.map((a) => (
             <TouchableOpacity
@@ -173,7 +173,7 @@ export default function HomeScreen() {
                   <Icon name={a.icon as IconName} size={26} color={a.color} />
                 )}
               </View>
-              <Text style={[s.quickLabel, { color: colors.text }]}>{a.label}</Text>
+              <Text style={[s.quickLabel, { color: colors.text }]}>{t(a.label)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -181,14 +181,14 @@ export default function HomeScreen() {
 
       {/* ═══ 4. Shloka of the day ═══ */}
       <Card style={{ marginTop: DS.layout.sectionGap, borderLeftWidth: 3, borderLeftColor: colors.primary, paddingLeft: 20 }}>
-        <Text style={[s.shlokaLabel, { color: colors.primary }]}>SHLOKA OF THE DAY</Text>
+        <Text style={[s.shlokaLabel, { color: colors.primary }, noTrack]}>{t('home.shlokaOfDay')}</Text>
         <Text style={[s.shlokaText, { color: colors.text }]}>{shloka.text}</Text>
         <Text style={[s.shlokaTrans, { color: colors.textSecondary }]}>{shloka.translation}</Text>
         <Text style={[s.shlokaSrc, { color: colors.textTertiary }]}>— {shloka.source}</Text>
       </Card>
 
       {/* ═══ 5. More — full feature tiles ═══ */}
-      <Section title="More">
+      <Section title={t('home.more')}>
         <View style={[s.moreGrid, { gap: GAP }]} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
           {!!tileW && MORE_MODULES.map((a) => (
             <TouchableOpacity
@@ -200,7 +200,7 @@ export default function HomeScreen() {
               <View style={[s.moreIcon, { backgroundColor: a.color + '18' }]}>
                 <Icon name={a.icon} size={25} color={a.color} />
               </View>
-              <Text style={[s.moreLabel, { color: colors.text }]} numberOfLines={1}>{a.label}</Text>
+              <Text style={[s.moreLabel, { color: colors.text }]} numberOfLines={1}>{t(a.label)}</Text>
             </TouchableOpacity>
           ))}
         </View>

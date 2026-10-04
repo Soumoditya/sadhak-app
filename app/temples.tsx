@@ -7,6 +7,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { Header } from '../components/ui';
@@ -20,7 +21,7 @@ import {
 type Tab = 'temples' | 'bhandara';
 type Status = 'locating' | 'loading' | 'done' | 'error';
 const RADII = [5, 10, 20, 50];
-const TEMPLE = '#D94F00';
+const TEMPLE = '#C2410C';
 const BHANDARA = '#1B7A42';
 
 interface Place extends Temple {
@@ -45,6 +46,7 @@ function whenLabel(ms?: number | null): string {
 export default function TemplesScreen() {
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { t: tr } = useLanguage();
   const dialog = useDialog();
   const { insets } = useDsInsets();
   const { width } = useWindowDimensions();
@@ -305,7 +307,7 @@ export default function TemplesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header
-        title="Temples & Bhandara"
+        title={tr('t.temples')}
         subtitle={subtitle}
         right={
           <TouchableOpacity onPress={() => setView((v) => (v === 'map' ? 'list' : 'map'))} style={[st.headerBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6}>

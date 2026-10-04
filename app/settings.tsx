@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, Share, Linking, Scroll
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { shareSadhak } from '../services/shareApp';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useLanguage, SUPPORTED_LANGUAGES, type LanguageCode } from '../contexts/LanguageContext';
@@ -10,7 +11,7 @@ import { auth } from '../config/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { sendTestNotification } from '../services/notifications';
 import { APP_VERSION, WEBSITE_URL } from '../constants/appInfo';
-import { Header, Card, SettingsRow } from '../components/ui';
+import { Header, Card, SettingsRow, Icon } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -19,9 +20,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function SettingsScreen() {
   const { profile, isGuest, isAdmin, logout, updateProfile, deleteAccount } = useAuth();
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { colors, isDark, mode, setMode } = useTheme();
   const dialog = useDialog();
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const { screenBottom } = useDsInsets();
   const [languageOpen, setLanguageOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -34,11 +35,10 @@ export default function SettingsScreen() {
   };
 
   const shareApp = async () => {
-    try {
-      await Share.share({
-        message: `🙏 Sadhak — your Hindu spiritual companion.\n\nAccurate Panchang, Hindu calendar, nearby temples, sacred library, aarti & community.\n\n${WEBSITE_URL}`,
-      });
-    } catch {}
+    const how = await shareSadhak();
+    if (how === 'image') {
+      dialog.alert('Invite copied', 'The invite message with the link is copied. Paste it as the caption if your app asks for one.', undefined, { tone: 'success' });
+    }
   };
 
   const rateApp = () => {
@@ -85,96 +85,108 @@ export default function SettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title="Settings" />
+      <Header title={t('t.settings')} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: screenBottom }}>
 
-        <SectionLabel label="Preferences" />
+        <SectionLabel label={t('s.preferences')} />
         <Card padded={false} style={{ overflow: 'hidden' }}>
-          <SettingsRow icon="theme-light-dark" label="Dark Mode" right="switch" switchValue={isDark} onSwitchChange={toggleTheme} />
+          <SettingsRow icon="theme-light-dark" label={t('s.appearance')} right={<View />} />
+          <View style={[st.segment, { backgroundColor: colors.surfaceSecondary, borderColor: colors.cardBorder }]}>
+            {(['light', 'dark', 'system'] as const).map((m) => {
+              const active = mode === m;
+              return (
+                <TouchableOpacity key={m} onPress={() => setMode(m)} activeOpacity={0.85}
+                  style={[st.segBtn, active && { backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}>
+                  <Icon name={m === 'light' ? 'sun' : m === 'dark' ? 'moon' : 'gear-six'} size={16} color={active ? colors.primary : colors.textSecondary} weight={active ? 'duotone' : 'regular'} />
+                  <Text style={{ color: active ? colors.text : colors.textSecondary, fontWeight: active ? '800' : '600', fontSize: 13 }}>{t(`theme.${m}`)}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           <Divider />
-          <SettingsRow icon="translate" label="App Language" detail={langInfo?.nativeName} onPress={() => setLanguageOpen(true)} />
+          <SettingsRow icon="translate" label={t('s.language')} detail={langInfo?.nativeName} onPress={() => setLanguageOpen(true)} />
         </Card>
 
-        <SectionLabel label="Notifications" />
+        <SectionLabel label={t('s.notifications')} />
         <Card padded={false} style={{ overflow: 'hidden' }}>
           {/* Collapsed by default — expands to reveal the individual toggles */}
           <SettingsRow
             icon="bell-outline"
-            label="Alerts & reminders"
-            detail={notifOpen ? 'Tap to collapse' : 'Tap to manage'}
+            label={t('s.alerts')}
+            detail={notifOpen ? t('s.tapCollapse') : t('s.tapManage')}
             right={<Ionicons name={notifOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} />}
             onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setNotifOpen((o) => !o); }}
           />
           {notifOpen && (
             <>
               <Divider />
-              <SettingsRow icon="bell-ring-outline" label="Spiritual reminders" detail="Through the day · paused 10 PM to 6 AM" right="switch" switchValue={s.notifications !== false} onSwitchChange={(v) => updateSetting('notifications', v)} />
+              <SettingsRow icon="bell-ring-outline" label={t('s.spiritual')} detail={t('s.spiritualDetail')} right="switch" switchValue={s.notifications !== false} onSwitchChange={(v) => updateSetting('notifications', v)} />
               <Divider />
-              <SettingsRow icon="content-cut" label="Grooming alerts" detail="6:30 AM on restricted days" right="switch" switchValue={s.groomingReminders !== false} onSwitchChange={(v) => updateSetting('groomingReminders', v)} />
+              <SettingsRow icon="content-cut" label={t('s.grooming')} detail={t('s.groomingDetail')} right="switch" switchValue={s.groomingReminders !== false} onSwitchChange={(v) => updateSetting('groomingReminders', v)} />
               <Divider />
-              <SettingsRow icon="party-popper" label="Festival alerts" detail="6:30 AM on festival days" right="switch" switchValue={s.festivalReminders !== false} onSwitchChange={(v) => updateSetting('festivalReminders', v)} />
+              <SettingsRow icon="party-popper" label={t('s.festival')} detail={t('s.festivalDetail')} right="switch" switchValue={s.festivalReminders !== false} onSwitchChange={(v) => updateSetting('festivalReminders', v)} />
               <Divider />
-              <SettingsRow icon="moon-waning-crescent" label="Ekadashi alerts" detail="6:30 AM on Ekadashi" right="switch" switchValue={s.ekadashiReminders !== false} onSwitchChange={(v) => updateSetting('ekadashiReminders', v)} />
+              <SettingsRow icon="moon-waning-crescent" label={t('s.ekadashi')} detail={t('s.ekadashiDetail')} right="switch" switchValue={s.ekadashiReminders !== false} onSwitchChange={(v) => updateSetting('ekadashiReminders', v)} />
               <Divider />
-              <SettingsRow icon="bell-check-outline" label="Send test notification" onPress={sendTestNotification} />
+              <SettingsRow icon="bell-check-outline" label={t('s.test')} onPress={sendTestNotification} />
             </>
           )}
         </Card>
 
         {!isGuest && (
           <>
-            <SectionLabel label="Privacy" />
+            <SectionLabel label={t('s.privacy')} />
             <Card padded={false} style={{ overflow: 'hidden' }}>
-              <SettingsRow icon="eye-outline" label="Show profile in community" right="switch" switchValue={s.showProfileInCommunity !== false} onSwitchChange={(v) => updateSetting('showProfileInCommunity', v)} />
+              <SettingsRow icon="eye-outline" label={t('s.showProfile')} right="switch" switchValue={s.showProfileInCommunity !== false} onSwitchChange={(v) => updateSetting('showProfileInCommunity', v)} />
               <Divider />
-              <SettingsRow icon="message-outline" label="Allow direct messages" right="switch" switchValue={s.allowDMs !== false} onSwitchChange={(v) => updateSetting('allowDMs', v)} />
+              <SettingsRow icon="message-outline" label={t('s.allowDms')} right="switch" switchValue={s.allowDMs !== false} onSwitchChange={(v) => updateSetting('allowDMs', v)} />
             </Card>
           </>
         )}
 
-        <SectionLabel label="Support" />
+        <SectionLabel label={t('s.support')} />
         <Card padded={false} style={{ overflow: 'hidden' }}>
-          <SettingsRow icon="star-outline" label="Rate Sadhak" onPress={rateApp} />
+          <SettingsRow icon="star-outline" label={t('s.rate')} onPress={rateApp} />
           <Divider />
-          <SettingsRow icon="share-variant-outline" label="Share app" onPress={shareApp} />
+          <SettingsRow icon="share-variant-outline" label={t('s.share')} onPress={shareApp} />
           <Divider />
-          <SettingsRow icon="web" label="Visit website" onPress={() => Linking.openURL(WEBSITE_URL).catch(() => {})} />
+          <SettingsRow icon="web" label={t('s.website')} onPress={() => Linking.openURL(WEBSITE_URL).catch(() => {})} />
           <Divider />
-          <SettingsRow icon="email-outline" label="Contact & feedback" onPress={() => router.push('/contact')} />
+          <SettingsRow icon="email-outline" label={t('s.contact')} onPress={() => router.push('/contact')} />
           <Divider />
-          <SettingsRow icon="help-circle-outline" label="FAQ & help" onPress={() => router.push('/faq')} />
+          <SettingsRow icon="help-circle-outline" label={t('s.faq')} onPress={() => router.push('/faq')} />
         </Card>
 
-        <SectionLabel label="About" />
+        <SectionLabel label={t('s.about')} />
         <Card padded={false} style={{ overflow: 'hidden' }}>
-          <SettingsRow icon="information-outline" label="About Sadhak" onPress={() => router.push('/about')} />
+          <SettingsRow icon="information-outline" label={t('s.aboutSadhak')} onPress={() => router.push('/about')} />
           <Divider />
-          <SettingsRow icon="shield-outline" label="Privacy Policy" onPress={() => router.push('/privacy')} />
+          <SettingsRow icon="shield-outline" label={t('s.privacyPolicy')} onPress={() => router.push('/privacy')} />
           <Divider />
-          <SettingsRow icon="file-document-outline" label="Terms & Conditions" onPress={() => router.push('/terms')} />
+          <SettingsRow icon="file-document-outline" label={t('s.terms')} onPress={() => router.push('/terms')} />
           <Divider />
-          <SettingsRow icon="format-list-bulleted" label="Changelog" detail={`v${APP_VERSION}`} onPress={() => router.push('/changelog')} />
+          <SettingsRow icon="format-list-bulleted" label={t('s.changelog')} detail={`v${APP_VERSION}`} onPress={() => router.push('/changelog')} />
         </Card>
 
-        <SectionLabel label="Account" />
+        <SectionLabel label={t('s.account')} />
         <Card padded={false} style={{ overflow: 'hidden' }}>
           {!isGuest && (
             <>
-              <SettingsRow icon="lock-reset" label="Change password" onPress={changePassword} />
+              <SettingsRow icon="lock-reset" label={t('s.changePassword')} onPress={changePassword} />
               <Divider />
             </>
           )}
           {isAdmin && (
             <>
-              <SettingsRow icon="shield-crown-outline" label="Admin Panel" onPress={() => router.push('/admin' as any)} />
+              <SettingsRow icon="shield-crown-outline" label={t('s.admin')} onPress={() => router.push('/admin' as any)} />
               <Divider />
             </>
           )}
-          <SettingsRow icon="logout" label="Sign out" onPress={handleLogout} />
+          <SettingsRow icon="logout" label={t('s.signOut')} onPress={handleLogout} />
           {!isGuest && (
             <>
               <Divider />
-              <SettingsRow icon="trash-can-outline" label="Delete account" danger onPress={handleDeleteAccount} />
+              <SettingsRow icon="trash-can-outline" label={t('s.deleteAccount')} danger onPress={handleDeleteAccount} />
             </>
           )}
         </Card>
@@ -186,8 +198,10 @@ export default function SettingsScreen() {
           <View style={styles.sheetOverlay}>
             <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
               <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
-              <Text style={[styles.sheetTitle, { color: colors.text }]}>App language</Text>
-              <View style={{ marginTop: 8, maxHeight: 380 }}>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>{t('s.chooseLanguage')}</Text>
+              <Text style={{ color: colors.textTertiary, fontSize: 12.5, lineHeight: 18, marginTop: 4 }}>{t('s.languageNote')}</Text>
+              {/* Scrollable: 12 languages don't fit the old fixed-height box. */}
+              <ScrollView style={{ marginTop: 8, maxHeight: 420 }} showsVerticalScrollIndicator={false}>
                 {SUPPORTED_LANGUAGES.map((lang) => {
                   const active = language === lang.code;
                   return (
@@ -204,7 +218,7 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </ScrollView>
             </View>
           </View>
         </Modal>
@@ -215,12 +229,18 @@ export default function SettingsScreen() {
 
 function SectionLabel({ label }: { label: string }) {
   const { colors } = useTheme();
-  return <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>{label.toUpperCase()}</Text>;
+  const { noTrack } = useLanguage();
+  return <Text style={[styles.sectionLabel, { color: colors.textTertiary }, noTrack]}>{label.toUpperCase()}</Text>;
 }
 function Divider() {
   const { colors } = useTheme();
   return <View style={[styles.divider, { backgroundColor: colors.divider }]} />;
 }
+
+const st = StyleSheet.create({
+  segment: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 14, marginTop: -4, padding: 4, borderRadius: 12, borderWidth: 1, gap: 4 },
+  segBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, borderRadius: 9, borderColor: 'transparent' },
+});
 
 const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginTop: 24, marginBottom: 8, marginLeft: 4 },
