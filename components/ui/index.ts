@@ -5,3 +5,4 @@ export { default as Section } from './Section';
 export { default as Header } from './Header';
 export { default as SettingsRow } from './SettingsRow';
 export { default as Diya } from './Diya';
+export { default as Icon, fromMaterial } from './Icon';

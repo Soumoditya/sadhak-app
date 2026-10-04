@@ -3,6 +3,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, Animated, Pressable, type ColorValue } from 'react-native';
 import React, { useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import Icon from '../../components/ui/Icon';
 import { useTheme } from '../../contexts/ThemeContext';
 import { BorderRadius, Shadows, Spacing } from '../../constants/theme';
 import { useLayoutInsets, TAB_BAR_HEIGHT } from '../../constants/layout';
@@ -100,12 +101,8 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon label="Home" color={color} focused={focused}>
-            <MaterialCommunityIcons
-              name={focused ? 'home' : 'home-outline'}
-              size={22}
-              color={color}
-            />
-          </TabIcon>
+              <Icon name="house" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />
@@ -115,12 +112,8 @@ export default function TabLayout() {
           title: 'Calendar',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon label="Calendar" color={color} focused={focused}>
-            <MaterialCommunityIcons
-              name={focused ? 'calendar-month' : 'calendar-month-outline'}
-              size={22}
-              color={color}
-            />
-          </TabIcon>
+              <Icon name="calendar-dots" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />
@@ -130,12 +123,8 @@ export default function TabLayout() {
           title: 'Library',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon label="Library" color={color} focused={focused}>
-            <MaterialCommunityIcons
-              name={focused ? 'bookshelf' : 'book-outline'}
-              size={22}
-              color={color}
-            />
-          </TabIcon>
+              <Icon name="books" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />
@@ -145,12 +134,8 @@ export default function TabLayout() {
           title: 'Chat',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon label="Chat" color={color} focused={focused}>
-            <Ionicons
-              name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
-              size={22}
-              color={color}
-            />
-          </TabIcon>
+              <Icon name="chats-circle" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />
@@ -160,12 +145,8 @@ export default function TabLayout() {
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon label="Profile" color={color} focused={focused}>
-            <Ionicons
-              name={focused ? 'person' : 'person-outline'}
-              size={22}
-              color={color}
-            />
-          </TabIcon>
+              <Icon name="user-circle" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />

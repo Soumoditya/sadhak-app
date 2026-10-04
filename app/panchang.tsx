@@ -4,7 +4,8 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { calculatePanchang } from '../services/panchang';
-import { Header } from '../components/ui';
+import { Header, Icon } from '../components/ui';
+import type { IconName } from '../components/ui/Icon';
 import { useDsInsets, DS } from '../constants/ds';
 
 const GOOD = '#1B7A42';
@@ -42,12 +43,12 @@ export default function PanchangScreen() {
   const active = isToday ? timings.find((x) => inRange(nowMin, x.t.start, x.t.end)) : undefined;
   const next = isToday && !active ? timings.find((x) => toMin(x.t.start) > nowMin) : undefined;
 
-  const elements: { label: string; hi: string; value: string; valueHi: string; extra?: string; icon: any; color: string }[] = [
-    { label: 'Tithi', hi: 'तिथि', value: p.tithi.name, valueHi: `${p.tithi.pakshaHi} ${p.tithi.nameHi}`, extra: p.tithi.endTime ? `until ${p.tithi.endTime}` : undefined, icon: 'moon-waning-crescent', color: '#7C3AED' },
-    { label: 'Nakshatra', hi: 'नक्षत्र', value: p.nakshatra.name, valueHi: `${p.nakshatra.nameHi} · lord ${p.nakshatra.lord}`, extra: p.nakshatra.endTime ? `until ${p.nakshatra.endTime}` : undefined, icon: 'star-four-points-outline', color: '#EA580C' },
-    { label: 'Yoga', hi: 'योग', value: p.yoga.name, valueHi: p.yoga.nameHi, icon: 'yoga', color: GOOD },
-    { label: 'Karana', hi: 'करण', value: p.karana.name, valueHi: p.karana.nameHi, icon: 'circle-half-full', color: '#1565C0' },
-    { label: 'Vara', hi: 'वार', value: p.vara.name, valueHi: `${p.vara.nameHi} · ${p.vara.deity}`, icon: 'calendar-today', color: '#D94F00' },
+  const elements: { label: string; hi: string; value: string; valueHi: string; extra?: string; icon: IconName; color: string }[] = [
+    { label: 'Tithi', hi: 'तिथि', value: p.tithi.name, valueHi: `${p.tithi.pakshaHi} ${p.tithi.nameHi}`, extra: p.tithi.endTime ? `until ${p.tithi.endTime}` : undefined, icon: 'moon', color: '#7C3AED' },
+    { label: 'Nakshatra', hi: 'नक्षत्र', value: p.nakshatra.name, valueHi: `${p.nakshatra.nameHi} · lord ${p.nakshatra.lord}`, extra: p.nakshatra.endTime ? `until ${p.nakshatra.endTime}` : undefined, icon: 'star-four', color: '#EA580C' },
+    { label: 'Yoga', hi: 'योग', value: p.yoga.name, valueHi: p.yoga.nameHi, icon: 'yin-yang', color: GOOD },
+    { label: 'Karana', hi: 'करण', value: p.karana.name, valueHi: p.karana.nameHi, icon: 'hourglass', color: '#1565C0' },
+    { label: 'Vara', hi: 'वार', value: p.vara.name, valueHi: `${p.vara.nameHi} · ${p.vara.deity}`, icon: 'calendar-star', color: '#D94F00' },
   ];
 
   return (
@@ -74,13 +75,13 @@ export default function PanchangScreen() {
           <Text style={[st.heroTithi, { color: colors.primary }]}>{p.tithi.nameHi}</Text>
           <Text style={[st.heroEn, { color: colors.textSecondary }]}>{p.hinduMonth.name} · {p.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna'} {p.tithi.name}</Text>
           <View style={[st.sunRow, { borderTopColor: colors.primary + '25' }]}>
-            {[
-              { icon: 'weather-sunset-up', label: 'Sunrise', v: p.sunrise, c: '#EA8C00' },
-              { icon: 'weather-sunset-down', label: 'Sunset', v: p.sunset, c: '#7C3AED' },
-              { icon: 'moon-waxing-crescent', label: 'Moonrise', v: p.moonrise, c: '#475569' },
-            ].map((x) => (
+            {([
+              { icon: 'sun-horizon', label: 'Sunrise', v: p.sunrise, c: '#EA8C00' },
+              { icon: 'moon-stars', label: 'Sunset', v: p.sunset, c: '#7C3AED' },
+              { icon: 'moon', label: 'Moonrise', v: p.moonrise, c: '#475569' },
+            ] as { icon: IconName; label: string; v: string; c: string }[]).map((x) => (
               <View key={x.label} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                <MaterialCommunityIcons name={x.icon as any} size={17} color={x.c} />
+                <Icon name={x.icon} size={20} color={x.c} />
                 <Text style={[st.sunLabel, { color: colors.textTertiary }]}>{x.label}</Text>
                 <Text style={[st.sunVal, { color: colors.text }]}>{x.v || '-'}</Text>
               </View>
@@ -106,7 +107,7 @@ export default function PanchangScreen() {
           {elements.map((e, i) => (
             <View key={e.label} style={[st.elRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.divider }]}>
               <View style={[st.elIcon, { backgroundColor: e.color + '15' }]}>
-                <MaterialCommunityIcons name={e.icon} size={19} color={e.color} />
+                <Icon name={e.icon} size={22} color={e.color} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[st.elLabel, { color: colors.textTertiary }]}>{e.label.toUpperCase()} · {e.hi}</Text>

@@ -50,6 +50,22 @@ The app is built **in the cloud** by EAS (no need for Android Studio). Two kinds
 
 ---
 
+## C2. Instant (OTA) updates, no reinstall
+From v1.11.0 the app has **expo-updates**. Changes to screens, text, design and app logic can be sent straight to phones:
+
+```
+npx eas-cli update --channel production --message "what changed"
+```
+
+Phones download it in the background and use it on the next app start.
+
+Rules:
+- An OTA update only reaches builds with the **same app version** (`version` in `app.json`, e.g. 1.11.0). Don't bump the version for an OTA update.
+- Adding a library with native code, changing permissions, the app icon or splash still needs a **new build** (Section C). Bump the version then.
+- Claude can publish OTA updates for you from a cloud session if an `EXPO_TOKEN` (expo.dev → Account settings → Access tokens) is added to the environment's secrets.
+
+---
+
 ## D. The website + privacy policy (Vercel)
 - The website repo is `sadhak-web` (public) → shows at `sadhak-app.vercel.app`.
 - **Privacy Policy** and **Terms** pages are written and already in the `sadhak-web` repo, plus a secure AI proxy (`api/gemini.js`). They just need to be **deployed once** — see "Your action list" below.

@@ -26,6 +26,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.11.0',
+    date: '2026-10-04',
+    title: 'Premium icons & instant updates',
+    changes: [
+      'New premium duotone icon set across Home, tab bar, Settings, Panchang and Community',
+      'A hand-drawn temple icon in the same style',
+      'App can now receive updates instantly, without reinstalling',
+    ],
+  },
+  {
     version: '1.10.0',
     date: '2026-10-04',
     title: 'Compass, temples & a fresh look',

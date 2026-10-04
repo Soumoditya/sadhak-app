@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { router } from 'expo-router';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { calculatePanchang } from '../../services/panchang';
 import { getDailyGroomingAdvice, getGroomingStatusColor } from '../../services/groomingRules';
-import { Screen, Card, Section, Diya } from '../../components/ui';
+import { Screen, Card, Section, Diya, Icon } from '../../components/ui';
+import type { IconName } from '../../components/ui/Icon';
 import { DS } from '../../constants/ds';
 
 // ─── Rotating shlokas (one per day) ──────────────────────────────────
@@ -22,24 +22,24 @@ const SHLOKAS = [
 ];
 
 const QUICK_ACTIONS = [
-  { key: 'panchang', label: 'Panchang', icon: 'calendar-clock', color: '#7C3AED', route: '/panchang' },
+  { key: 'panchang', label: 'Panchang', icon: 'sun-horizon', color: '#7C3AED', route: '/panchang' },
   { key: 'temples', label: 'Temples', icon: 'temple-hindu', color: '#1B7A42', route: '/temples' },
   { key: 'aarti', label: 'Aarti', icon: 'candle', color: '#EA580C', route: '/aarti' },
-  { key: 'japa', label: 'Japa', icon: 'counter', color: '#1565C0', route: '/japa' },
-];
+  { key: 'japa', label: 'Japa', icon: 'hands-praying', color: '#1565C0', route: '/japa' },
+] as const;
 
 const MORE_MODULES = [
-  { key: 'ai', label: 'Sadhak AI', icon: 'sparkles', color: '#D94F00', route: '/ask' },
-  { key: 'jyotish', label: 'Jyotish', icon: 'star-four-points', color: '#C49A2C', route: '/jyotish' },
-  { key: 'vastu', label: 'Vastu', icon: 'compass-outline', color: '#7C3AED', route: '/compass' },
-  { key: 'puja', label: 'Puja Guide', icon: 'flower-tulip', color: '#DC2626', route: '/puja-guide' },
-  { key: 'bhog', label: 'Satvik Bhog', icon: 'food-variant', color: '#2D6A4F', route: '/bhog' },
+  { key: 'ai', label: 'Sadhak AI', icon: 'sparkle', color: '#D94F00', route: '/ask' },
+  { key: 'jyotish', label: 'Jyotish', icon: 'star-four', color: '#C49A2C', route: '/jyotish' },
+  { key: 'vastu', label: 'Vastu', icon: 'compass', color: '#7C3AED', route: '/compass' },
+  { key: 'puja', label: 'Puja Guide', icon: 'flower-lotus', color: '#DC2626', route: '/puja-guide' },
+  { key: 'bhog', label: 'Satvik Bhog', icon: 'cooking-pot', color: '#2D6A4F', route: '/bhog' },
   { key: 'ayurveda', label: 'Ayurveda', icon: 'leaf', color: '#1B7A42', route: '/ayurveda' },
-  { key: 'wiki', label: 'Hindu Wiki', icon: 'book-education-outline', color: '#1565C0', route: '/wiki' },
-  { key: 'wallpaper', label: 'Wallpapers', icon: 'image-multiple-outline', color: '#0EA5E9', route: '/wallpapers' },
-  { key: 'notes', label: 'Notes', icon: 'note-edit-outline', color: '#37474F', route: '/notes' },
-  { key: 'feed', label: 'Feed', icon: 'compass', color: '#F59E0B', route: '/feed' },
-];
+  { key: 'wiki', label: 'Hindu Wiki', icon: 'book-open-text', color: '#1565C0', route: '/wiki' },
+  { key: 'wallpaper', label: 'Wallpapers', icon: 'images', color: '#0EA5E9', route: '/wallpapers' },
+  { key: 'notes', label: 'Notes', icon: 'note-pencil', color: '#37474F', route: '/notes' },
+  { key: 'feed', label: 'Feed', icon: 'newspaper', color: '#F59E0B', route: '/feed' },
+] as const;
 
 export default function HomeScreen() {
   const { profile } = useAuth();
@@ -96,7 +96,7 @@ export default function HomeScreen() {
       <Card onPress={() => router.push('/(tabs)/calendar')} style={{ marginTop: DS.space.md }}>
         <View style={s.todayHead}>
           <View style={[s.todayIcon, { backgroundColor: colors.primary + '18' }]}>
-            <MaterialCommunityIcons name="white-balance-sunny" size={20} color={colors.primary} />
+            <Icon name="sun" size={22} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[s.todayLabel, { color: colors.textTertiary }]}>TODAY</Text>
@@ -105,7 +105,7 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View style={[s.statusPill, { backgroundColor: groomingColor + '18', borderColor: groomingColor + '35' }]}>
-            <MaterialCommunityIcons name="content-cut" size={11} color={groomingColor} />
+            <Icon name="scissors" size={13} color={groomingColor} weight="regular" />
             <Text style={[s.statusText, { color: groomingColor }]}>{groomingLabel}</Text>
           </View>
         </View>
@@ -119,17 +119,17 @@ export default function HomeScreen() {
 
         <View style={[s.timeRow, { borderTopColor: colors.divider }]}>
           <View style={s.timeCol}>
-            <MaterialCommunityIcons name="weather-sunset-up" size={15} color="#FF8C00" />
+            <Icon name="sun-horizon" size={18} color="#FF8C00" />
             <Text style={[s.timeLabel, { color: colors.textTertiary }]}>Sunrise</Text>
             <Text style={[s.timeValue, { color: colors.text }]}>{panchang.sunrise}</Text>
           </View>
           <View style={s.timeCol}>
-            <MaterialCommunityIcons name="weather-sunset-down" size={15} color="#7C3AED" />
+            <Icon name="moon-stars" size={18} color="#7C3AED" />
             <Text style={[s.timeLabel, { color: colors.textTertiary }]}>Sunset</Text>
             <Text style={[s.timeValue, { color: colors.text }]}>{panchang.sunset}</Text>
           </View>
           <View style={s.timeCol}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={15} color="#EF4444" />
+            <Icon name="warning" size={18} color="#EF4444" />
             <Text style={[s.timeLabel, { color: colors.textTertiary }]}>Rahu Kaal</Text>
             <Text style={[s.timeValue, { color: '#EF4444' }]}>{panchang.rahuKaal.start.slice(0, 5)}–{panchang.rahuKaal.end.slice(0, 5)}</Text>
           </View>
@@ -143,7 +143,7 @@ export default function HomeScreen() {
         style={[s.astro, { backgroundColor: isDark ? '#C49A2C14' : '#C49A2C10', borderColor: '#C49A2C40' }]}
       >
         <View style={[s.astroIcon, { backgroundColor: '#C49A2C22' }]}>
-          <MaterialCommunityIcons name="star-four-points" size={20} color="#C49A2C" />
+          <Icon name="star-four" size={22} color="#C49A2C" />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[s.astroTitle, { color: colors.text }]}>
@@ -153,7 +153,7 @@ export default function HomeScreen() {
             {profile?.hasBirthChart ? "Today's guidance from your kundli" : 'Free Vedic kundli, dasha & daily guidance'}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        <Icon name="caret-right" size={17} color={colors.textTertiary} weight="regular" />
       </TouchableOpacity>
 
       {/* ═══ 3. Quick actions — 4 primary tiles ═══ */}
@@ -170,7 +170,7 @@ export default function HomeScreen() {
                 {a.icon === 'candle' ? (
                   <Diya size={24} color={a.color} />
                 ) : (
-                  <MaterialCommunityIcons name={a.icon as any} size={22} color={a.color} />
+                  <Icon name={a.icon as IconName} size={26} color={a.color} />
                 )}
               </View>
               <Text style={[s.quickLabel, { color: colors.text }]}>{a.label}</Text>
@@ -198,11 +198,7 @@ export default function HomeScreen() {
               activeOpacity={0.85}
             >
               <View style={[s.moreIcon, { backgroundColor: a.color + '18' }]}>
-                {a.key === 'ai' ? (
-                  <Ionicons name="sparkles" size={22} color={a.color} />
-                ) : (
-                  <MaterialCommunityIcons name={a.icon as any} size={22} color={a.color} />
-                )}
+                <Icon name={a.icon} size={25} color={a.color} />
               </View>
               <Text style={[s.moreLabel, { color: colors.text }]} numberOfLines={1}>{a.label}</Text>
             </TouchableOpacity>

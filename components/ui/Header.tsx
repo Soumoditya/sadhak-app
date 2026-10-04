@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './Icon';
 import { router } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { DS, useDsInsets } from '../../constants/ds';
@@ -37,7 +37,7 @@ export default function Header({ title, subtitle, back = true, right, onBack }: 
             style={[styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             hitSlop={8}
           >
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
+            <Icon name="caret-left" size={22} color={colors.text} weight="regular" />
           </TouchableOpacity>
         ) : (
           <View style={styles.iconBtn} />
