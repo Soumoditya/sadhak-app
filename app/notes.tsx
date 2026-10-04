@@ -448,7 +448,7 @@ export default function NotesScreen() {
 
       {/* ── FAB ── */}
       {activeFolder !== 'Trash' && (
-        <TouchableOpacity style={st.fab} onPress={() => openEditor()} activeOpacity={0.8}>
+        <TouchableOpacity style={[st.fab, { bottom: 24 + insets.bottom }]} onPress={() => openEditor()} activeOpacity={0.8}>
           <LinearGradient colors={['#C2410C', '#E8743B']} style={st.fabGrad}>
             <MaterialCommunityIcons name="plus" size={28} color="#FFF" />
           </LinearGradient>

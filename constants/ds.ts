@@ -70,13 +70,11 @@ export const DS = {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export function useDsInsets() {
   const insets = useSafeAreaInsets();
-  const TAB = DS.layout.tabBarHeight + DS.layout.tabBarFloatingGap;
   return {
     insets,
     headerTop: insets.top + 12,
-    tabBarBottom: insets.bottom + DS.layout.tabBarFloatingGap,
-    // Bottom padding for tab-nested screens (never behind the floating tab bar).
-    tabScrollBottom: insets.bottom + TAB + 24,
+    // Bottom padding for tab screens; the docked tab bar sits outside them.
+    tabScrollBottom: 28,
     // Bottom padding for non-tab screens.
     screenBottom: insets.bottom + DS.space['3xl'],
   };

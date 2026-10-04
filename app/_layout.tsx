@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useSegments } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { View, Animated, StyleSheet, Image, Dimensions, Text, Easing, Modal } from 'react-native';
@@ -91,6 +92,21 @@ const splashStyles = StyleSheet.create({
   appName: { fontSize: 22, fontFamily: DS.font.display, marginTop: -4, letterSpacing: 0.4 },
   tagline: { fontSize: 13, marginTop: 14, letterSpacing: 0.3 },
 });
+
+
+// ─── System navigation backdrop ───────────────────────────────────────────
+// Android draws the app edge-to-edge, so on pushed screens lists scrolled
+// under the system buttons (gesture pill / ◁ ○ □). Paint the app background
+// behind them. Tabs have their own docked bar; the screens listed here draw
+// their own bottom bar or full-bleed background.
+const OWN_BOTTOM = new Set(['(tabs)', 'ask', 'chatroom', 'temples', 'japa', 'play', 'reader', 'wallpapers', 'create-post']);
+function SystemNavBackdrop() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const segments = useSegments();
+  if (!insets.bottom || OWN_BOTTOM.has(segments[0] as string)) return null;
+  return <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: insets.bottom, backgroundColor: colors.background }} />;
+}
 
 // ─── Root Layout Inner ─────────────────────────────────────────────────────
 function RootLayoutInner() {
@@ -204,6 +220,7 @@ function RootLayoutInner() {
         <Stack.Screen name="changelog" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
+      <SystemNavBackdrop />
       {showSplash && <AnimatedSplash onFinish={() => setShowSplash(false)} />}
     </>
   );

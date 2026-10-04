@@ -64,7 +64,7 @@ export default function CalendarScreen() {
   const dayNames = useMemo(() => Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i).toLocaleDateString(locale, { weekday: 'short' })), [locale]);
   const monthNames = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(2023, i, 1).toLocaleDateString(locale, { month: 'long' })), [locale]);
   const monthShort = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(2023, i, 1).toLocaleDateString(locale, { month: 'short' })), [locale]);
-  const { headerPaddingTop, tabContentPadding, bottomInset } = useLayoutInsets();
+  const { headerPaddingTop, tabContentPadding, bottomInset, insets } = useLayoutInsets();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -529,6 +529,7 @@ export default function CalendarScreen() {
           </View>
         </View>
       </ScrollView>
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: colors.background }} />
 
       {/* ═══ Note modal ═══ */}
       <Modal visible={noteModal} transparent animationType="slide" onRequestClose={() => setNoteModal(false)}>

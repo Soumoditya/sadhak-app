@@ -67,7 +67,7 @@ export default function TabLayout() {
   const { isAuthenticated, isLoading } = useAuth();
   const { t } = useLanguage();
   const { colors, isDark } = useTheme();
-  const { tabBarBottom } = useLayoutInsets();
+  const { insets } = useLayoutInsets();
 
   if (isLoading) return null;
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
@@ -76,21 +76,21 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        // Docked, opaque bar that also fills the Android navigation area.
+        // The old floating pill let content show around and under it and sat
+        // on top of the system buttons on 3-button phones.
         tabBarStyle: {
-          position: 'absolute',
-          bottom: tabBarBottom,
-          left: Spacing.lg,
-          right: Spacing.lg,
           backgroundColor: colors.surface,
-          borderRadius: BorderRadius.xxl,
-          borderTopWidth: 0,
-          borderWidth: 1,
-          borderColor: colors.cardBorder,
-          height: TAB_BAR_HEIGHT,
-          paddingBottom: 0,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.cardBorder,
+          height: TAB_BAR_HEIGHT + insets.bottom,
+          paddingBottom: insets.bottom,
           paddingTop: 0,
-          ...Shadows.xl,
+          elevation: 0,
+          shadowOpacity: 0,
         },
+        sceneStyle: { backgroundColor: colors.background },
+        tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.tabIconDefault,
         tabBarShowLabel: false,

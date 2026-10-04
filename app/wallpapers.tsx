@@ -177,7 +177,7 @@ export default function WallpapersScreen() {
           </TouchableOpacity>
 
           {preview && (
-            <View style={st.previewFooter}>
+            <View style={[st.previewFooter, { paddingBottom: screenBottom + 8 }]}>
               <Text style={st.previewTitle}>{preview.title}</Text>
               <Text style={st.previewCredit}>{preview.credit}</Text>
               <View style={st.previewActions}>

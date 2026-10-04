@@ -383,7 +383,7 @@ export default function LibraryScreen() {
       )}
 
       {/* Upload FAB — sits above the floating tab bar */}
-      <TouchableOpacity style={[st.fab, { bottom: tabContentPadding }]} onPress={() => setUploadModal(true)} activeOpacity={0.8}>
+      <TouchableOpacity style={[st.fab, { bottom: 20 }]} onPress={() => setUploadModal(true)} activeOpacity={0.8}>
         <LinearGradient colors={['#C2410C', '#E8743B']} style={st.fabGrad}>
           <MaterialCommunityIcons name="plus" size={28} color="#FFF" />
         </LinearGradient>
