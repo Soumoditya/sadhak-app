@@ -1,170 +1,228 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Dimensions, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, ScrollView, useWindowDimensions, Platform } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { Magnetometer } from 'expo-sensors';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import Svg, { Circle, Line, Path, Text as SvgText, G } from 'react-native-svg';
 import { useTheme } from '../contexts/ThemeContext';
-import { useLayoutInsets } from '../constants/layout';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Header } from '../components/ui';
+import { useDsInsets } from '../constants/ds';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const DIAL = Math.min(SCREEN_W - 80, 300);
-
-// Vastu Shastra direction knowledge — deity (dikpala), element and guidance.
+// Vastu Shastra direction knowledge: deity (dikpala), element and guidance.
 const VASTU: {
-  key: string; label: string; labelHi: string; from: number; to: number;
+  key: string; label: string; labelHi: string; center: number;
   dikpala: string; element: string; good: string; avoid: string; color: string;
 }[] = [
-  { key: 'N',  label: 'North',      labelHi: 'उत्तर',        from: 337.5, to: 22.5,  dikpala: 'Kubera (धन)',        element: 'Water',        good: 'Cash locker, valuables, water source; keep light & open', avoid: 'Heavy storage, clutter, toilets', color: '#1565C0' },
-  { key: 'NE', label: 'North-East', labelHi: 'ईशान',         from: 22.5,  to: 67.5,  dikpala: 'Ishana (Shiva)',     element: 'Water + Ether', good: 'Puja room / mandir, meditation, study — the most sacred corner', avoid: 'Toilet, kitchen, heavy furniture, shoes', color: '#7C3AED' },
-  { key: 'E',  label: 'East',       labelHi: 'पूर्व',         from: 67.5,  to: 112.5, dikpala: 'Indra',              element: 'Air',          good: 'Main entrance, windows, morning surya arghya', avoid: 'Blocking walls, storage that darkens it', color: '#F59E0B' },
-  { key: 'SE', label: 'South-East', labelHi: 'आग्नेय',        from: 112.5, to: 157.5, dikpala: 'Agni',               element: 'Fire',         good: 'Kitchen (cook facing east), electrical appliances', avoid: 'Water tank, puja room, bedroom for couples', color: '#D94F00' },
-  { key: 'S',  label: 'South',      labelHi: 'दक्षिण',        from: 157.5, to: 202.5, dikpala: 'Yama',               element: 'Earth',        good: 'Heavy storage, master bedroom (head southward while sleeping)', avoid: 'Main entrance (unless vastu-corrected), water bodies', color: '#8B1A1A' },
-  { key: 'SW', label: 'South-West', labelHi: 'नैऋत्य',        from: 202.5, to: 247.5, dikpala: 'Nirriti',            element: 'Earth',        good: 'Master bedroom, heavy almirahs, family elders\' room', avoid: 'Kitchen, toilets, children\'s room, entrance', color: '#5D4037' },
-  { key: 'W',  label: 'West',       labelHi: 'पश्चिम',        from: 247.5, to: 292.5, dikpala: 'Varuna',             element: 'Water',        good: 'Dining, children\'s bedroom, study desks facing east', avoid: 'Main door if inauspicious per chart; excess openings', color: '#2D6A4F' },
-  { key: 'NW', label: 'North-West', labelHi: 'वायव्य',        from: 292.5, to: 337.5, dikpala: 'Vayu',               element: 'Air',          good: 'Guest room, unmarried daughters\' room, finished-goods storage', avoid: 'Puja room; long-term storage of valuables', color: '#455A64' },
+  { key: 'N',  label: 'North',      labelHi: 'उत्तर',  center: 0,   dikpala: 'Kubera (wealth)', element: 'Water',         good: 'Cash locker, valuables, water source; keep light & open', avoid: 'Heavy storage, clutter, toilets', color: '#1565C0' },
+  { key: 'NE', label: 'North-East', labelHi: 'ईशान',   center: 45,  dikpala: 'Ishana (Shiva)',  element: 'Water + Ether', good: 'Puja room / mandir, meditation, study: the most sacred corner', avoid: 'Toilet, kitchen, heavy furniture, shoes', color: '#7C3AED' },
+  { key: 'E',  label: 'East',       labelHi: 'पूर्व',   center: 90,  dikpala: 'Indra',           element: 'Air',           good: 'Main entrance, windows, morning surya arghya', avoid: 'Blocking walls, storage that darkens it', color: '#D97706' },
+  { key: 'SE', label: 'South-East', labelHi: 'आग्नेय', center: 135, dikpala: 'Agni',            element: 'Fire',          good: 'Kitchen (cook facing east), electrical appliances', avoid: 'Water tank, puja room, bedroom for couples', color: '#D94F00' },
+  { key: 'S',  label: 'South',      labelHi: 'दक्षिण', center: 180, dikpala: 'Yama',            element: 'Earth',         good: 'Heavy storage, master bedroom (sleep with head to the south)', avoid: 'Main entrance (unless vastu-corrected), water bodies', color: '#9F1239' },
+  { key: 'SW', label: 'South-West', labelHi: 'नैऋत्य', center: 225, dikpala: 'Nirriti',         element: 'Earth',         good: "Master bedroom, heavy almirahs, family elders' room", avoid: "Kitchen, toilets, children's room, entrance", color: '#78350F' },
+  { key: 'W',  label: 'West',       labelHi: 'पश्चिम', center: 270, dikpala: 'Varuna',          element: 'Water',         good: "Dining, children's bedroom, study desks facing east", avoid: 'Excess openings; main door without vastu advice', color: '#2D6A4F' },
+  { key: 'NW', label: 'North-West', labelHi: 'वायव्य', center: 315, dikpala: 'Vayu',            element: 'Air',           good: "Guest room, unmarried daughters' room, finished-goods storage", avoid: 'Puja room; long-term storage of valuables', color: '#475569' },
 ];
 
-function directionFor(deg: number) {
-  const d = ((deg % 360) + 360) % 360;
-  return VASTU.find(v => (v.from > v.to ? d >= v.from || d < v.to : d >= v.from && d < v.to)) || VASTU[0];
-}
+const norm = (d: number) => ((d % 360) + 360) % 360;
+const directionFor = (deg: number) => VASTU[Math.round(norm(deg) / 45) % 8];
+
+type Source = 'fused' | 'magnetometer' | 'none';
 
 export default function CompassScreen() {
   const { colors, isDark } = useTheme();
-  const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
+  const { screenBottom } = useDsInsets();
+  const { width } = useWindowDimensions();
+  const SIZE = Math.min(width - 48, 320);
+
   const [heading, setHeading] = useState(0);
-  const [available, setAvailable] = useState<boolean | null>(null);
+  const [source, setSource] = useState<Source | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null); // Android: 0 (unreliable) – 3 (high)
+  const [trueNorth, setTrueNorth] = useState(false);
+  const [held, setHeld] = useState<number | null>(null);
   const rotation = useRef(new Animated.Value(0)).current;
-  const lastDeg = useRef(0);
+  const smooth = useRef<number | null>(null);
+  const unwrapped = useRef(0);
+  const heldRef = useRef<number | null>(null);
+  heldRef.current = held;
+
+  // Circular low-pass filter: kills jitter without lagging across 359°→0°.
+  const feed = (raw: number) => {
+    if (heldRef.current != null) return;
+    const prev = smooth.current;
+    let next = raw;
+    if (prev != null) {
+      const delta = ((raw - prev + 540) % 360) - 180;
+      next = norm(prev + delta * 0.25);
+    }
+    smooth.current = next;
+    setHeading(next);
+    // Rotate the dial the short way round (no 360° spin at north).
+    const delta = ((((-next - unwrapped.current) % 360) + 540) % 360) - 180;
+    unwrapped.current += delta;
+    Animated.timing(rotation, { toValue: unwrapped.current, duration: 90, easing: Easing.linear, useNativeDriver: true }).start();
+  };
 
   useEffect(() => {
-    let sub: any;
+    let sub: { remove: () => void } | null = null;
+    let cancelled = false;
     (async () => {
-      const ok = await Magnetometer.isAvailableAsync();
-      setAvailable(ok);
-      if (!ok) return;
-      Magnetometer.setUpdateInterval(120);
-      sub = Magnetometer.addListener(({ x, y }) => {
-        // Convert magnetometer vector to compass heading (degrees from North).
-        let deg = Math.atan2(-x, y) * (180 / Math.PI);
-        deg = ((deg % 360) + 360) % 360;
-        setHeading(deg);
-        // Rotate the dial opposite to the heading, taking the short way around.
-        let target = -deg;
-        const prev = lastDeg.current;
-        while (target - prev > 180) target -= 360;
-        while (target - prev < -180) target += 360;
-        lastDeg.current = target;
-        Animated.timing(rotation, { toValue: target, duration: 120, easing: Easing.linear, useNativeDriver: true }).start();
-      });
+      // Preferred: Android's fused rotation-vector heading. It is tilt-compensated
+      // (works with the phone held upright) and gives true north when location
+      // is available, which is what Vastu directions are measured against.
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted' && !cancelled) {
+          sub = await Location.watchHeadingAsync((h) => {
+            const useTrue = h.trueHeading != null && h.trueHeading >= 0;
+            setTrueNorth(useTrue);
+            setAccuracy(typeof h.accuracy === 'number' ? h.accuracy : null);
+            feed(useTrue ? h.trueHeading : h.magHeading);
+          });
+          if (cancelled) sub.remove(); else setSource('fused');
+          return;
+        }
+      } catch {}
+      // Fallback: raw magnetometer (needs the phone flat).
+      try {
+        if (await Magnetometer.isAvailableAsync()) {
+          Magnetometer.setUpdateInterval(60);
+          sub = Magnetometer.addListener(({ x, y }) => feed(norm((Math.atan2(-x, y) * 180) / Math.PI)));
+          if (!cancelled) setSource('magnetometer');
+          return;
+        }
+      } catch {}
+      if (!cancelled) setSource('none');
     })();
-    return () => sub && sub.remove();
+    return () => { cancelled = true; sub?.remove(); };
   }, []);
 
-  const dir = directionFor(heading);
+  const shown = held ?? heading;
+  const dir = directionFor(shown);
   const spin = rotation.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] });
+  // Android reports 0 until the sensor first calls back, so only a confirmed
+  // LOW (1) reading triggers the calibration hint.
+  const lowAccuracy = Platform.OS === 'android' && accuracy === 1;
+
+  const toggleHold = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setHeld((h) => (h == null ? heading : null));
+  };
+
+  // ── Dial geometry (SVG, rotates as one piece) ──
+  const R = SIZE / 2;
+  const ticks = Array.from({ length: 72 }, (_, i) => i * 5);
+  const polar = (deg: number, r: number) => {
+    const a = ((deg - 90) * Math.PI) / 180;
+    return { x: R + r * Math.cos(a), y: R + r * Math.sin(a) };
+  };
+  const sector = (center: number, r0: number, r1: number) => {
+    const a = polar(center - 22.5, r1), b = polar(center + 22.5, r1), c = polar(center + 22.5, r0), d = polar(center - 22.5, r0);
+    return `M${a.x},${a.y} A${r1},${r1} 0 0 1 ${b.x},${b.y} L${c.x},${c.y} A${r0},${r0} 0 0 0 ${d.x},${d.y} Z`;
+  };
 
   return (
-    <View style={[st.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#4A148C', '#7B1FA2']}
-        style={[st.header, { paddingTop: headerPaddingTop }]}
-      >
-        <View style={st.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={st.backBtn} hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color="#FFF" />
-          </TouchableOpacity>
-          <View>
-            <Text style={st.headerTitle}>Vastu Compass</Text>
-            <Text style={st.headerSub}>वास्तु दिशा दर्शक</Text>
-          </View>
-        </View>
-      </LinearGradient>
-
-      <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: screenBottomPadding }} showsVerticalScrollIndicator={false}>
-        {available === false ? (
-          <View style={{ alignItems: 'center', marginTop: 60, paddingHorizontal: 40 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Header title="Vastu Compass" subtitle="वास्तु दिशा · find directions for your home" />
+      <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: screenBottom, paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+        {source === 'none' ? (
+          <View style={{ alignItems: 'center', marginTop: 60, paddingHorizontal: 20 }}>
             <MaterialCommunityIcons name="compass-off-outline" size={52} color={colors.textTertiary} />
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, marginTop: 12, textAlign: 'center' }}>
-              No magnetometer on this device
-            </Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 6, textAlign: 'center' }}>
-              This phone doesn't have the compass sensor needed for live direction.
-            </Text>
+            <Text style={[st.emptyTitle, { color: colors.text }]}>Compass sensor not available</Text>
+            <Text style={[st.emptySub, { color: colors.textSecondary }]}>This phone doesn't report a heading. Allow location access, or try on a phone with a compass sensor.</Text>
           </View>
         ) : (
           <>
-            {/* Live heading */}
-            <Text style={[st.headingDeg, { color: colors.text }]}>{Math.round(heading)}°</Text>
-            <Text style={[st.headingDir, { color: dir.color }]}>{dir.label} · {dir.labelHi}</Text>
-
-            {/* Dial */}
-            <View style={[st.dialWrap, { width: DIAL + 30, height: DIAL + 30 }]}>
-              {/* Fixed needle */}
-              <View style={st.needle}>
-                <MaterialCommunityIcons name="triangle" size={22} color={colors.primary} />
-              </View>
-              <Animated.View
-                style={[
-                  st.dial,
-                  {
-                    width: DIAL, height: DIAL, borderRadius: DIAL / 2,
-                    backgroundColor: colors.surface, borderColor: colors.cardBorder,
-                    transform: [{ rotate: spin }],
-                  },
-                ]}
-              >
-                {VASTU.map((v, i) => {
-                  const angle = (i * 45 * Math.PI) / 180;
-                  const r = DIAL / 2 - 34;
-                  return (
-                    <View
-                      key={v.key}
-                      style={{
-                        position: 'absolute',
-                        left: DIAL / 2 + r * Math.sin(angle) - 22,
-                        top: DIAL / 2 - r * Math.cos(angle) - 14,
-                        width: 44, alignItems: 'center',
-                      }}
-                    >
-                      <Text style={{ color: v.key === 'N' ? colors.festival : colors.text, fontWeight: '800', fontSize: v.key.length === 1 ? 16 : 12 }}>
-                        {v.key}
-                      </Text>
-                      <Text style={{ color: colors.textTertiary, fontSize: 8.5 }}>{v.labelHi}</Text>
-                    </View>
-                  );
-                })}
-                <View style={[st.dialCenter, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}>
-                  <Text style={{ fontSize: 22 }}>🕉️</Text>
+            {/* Readout */}
+            <View style={{ alignItems: 'center', marginTop: 6 }}>
+              <Text style={[st.deg, { color: colors.text }]}>{Math.round(shown)}°</Text>
+              <Text style={[st.dirName, { color: dir.color }]}>{dir.label} · {dir.labelHi}</Text>
+              <View style={st.chips}>
+                <View style={[st.chip, { borderColor: colors.cardBorder }]}>
+                  <MaterialCommunityIcons name={trueNorth ? 'earth' : 'magnet'} size={13} color={colors.textSecondary} />
+                  <Text style={[st.chipText, { color: colors.textSecondary }]}>{trueNorth ? 'True north' : 'Magnetic north'}</Text>
                 </View>
-              </Animated.View>
+                {source && (
+                  <View style={[st.chip, { borderColor: lowAccuracy ? '#F59E0B' : colors.cardBorder, backgroundColor: lowAccuracy ? '#F59E0B14' : 'transparent' }]}>
+                    <MaterialCommunityIcons name={lowAccuracy ? 'alert-outline' : 'check-circle-outline'} size={13} color={lowAccuracy ? '#D97706' : colors.tulsiGreen || '#2D6A4F'} />
+                    <Text style={[st.chipText, { color: lowAccuracy ? '#D97706' : colors.textSecondary }]}>{lowAccuracy ? 'Needs calibration' : source === 'fused' ? 'Tilt-corrected' : 'Hold phone flat'}</Text>
+                  </View>
+                )}
+              </View>
             </View>
 
-            {/* Direction guidance card */}
+            {/* Dial */}
+            <View style={{ width: SIZE, height: SIZE + 18, marginTop: 16, alignItems: 'center' }}>
+              {/* Fixed lubber line: the direction the top of the phone points */}
+              <View style={[st.lubber, { borderBottomColor: colors.primary }]} />
+              <Animated.View style={{ width: SIZE, height: SIZE, marginTop: 18, transform: [{ rotate: spin }] }}>
+                <Svg width={SIZE} height={SIZE}>
+                  <Circle cx={R} cy={R} r={R - 1} fill={colors.surface} stroke={colors.cardBorder} strokeWidth={1.5} />
+                  {VASTU.map((v) => (
+                    <Path key={v.key} d={sector(v.center, R * 0.56, R * 0.74)} fill={v.color} opacity={v.key === dir.key ? (isDark ? 0.55 : 0.4) : isDark ? 0.16 : 0.1} />
+                  ))}
+                  {ticks.map((t) => {
+                    const major = t % 30 === 0;
+                    const p0 = polar(t, R - 4), p1 = polar(t, R - (major ? 16 : 10));
+                    return <Line key={t} x1={p0.x} y1={p0.y} x2={p1.x} y2={p1.y} stroke={t === 0 ? '#DC2626' : colors.textTertiary} strokeWidth={major ? 2 : 1} />;
+                  })}
+                  {[30, 60, 120, 150, 210, 240, 300, 330].map((t) => {
+                    const p = polar(t, R - 28);
+                    return <SvgText key={t} x={p.x} y={p.y + 4} fontSize={10} fill={colors.textTertiary} textAnchor="middle">{t}</SvgText>;
+                  })}
+                  {VASTU.map((v) => {
+                    const cardinal = v.key.length === 1;
+                    const p = polar(v.center, R * 0.65);
+                    return (
+                      <G key={v.key}>
+                        <SvgText x={p.x} y={p.y + (cardinal ? 2 : 1)} fontSize={cardinal ? 17 : 12} fontWeight="800" fill={v.key === 'N' ? '#DC2626' : colors.text} textAnchor="middle">{v.key}</SvgText>
+                        <SvgText x={p.x} y={p.y + (cardinal ? 15 : 13)} fontSize={8.5} fill={colors.textSecondary} textAnchor="middle">{v.labelHi}</SvgText>
+                      </G>
+                    );
+                  })}
+                  <Circle cx={R} cy={R} r={R * 0.3} fill={colors.background} stroke={colors.cardBorder} strokeWidth={1} />
+                </Svg>
+              </Animated.View>
+              {/* Static centre (doesn't rotate) */}
+              <View pointerEvents="none" style={[st.centerMark, { top: 18 + R - 26, left: R - 26 }]}>
+                <Text style={{ fontSize: 24, color: colors.primary }}>ॐ</Text>
+              </View>
+            </View>
+
+            {/* Hold */}
+            <TouchableOpacity onPress={toggleHold} activeOpacity={0.85}
+              style={[st.holdBtn, held != null ? { backgroundColor: colors.primary } : { borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+              <MaterialCommunityIcons name={held != null ? 'lock' : 'lock-open-variant-outline'} size={17} color={held != null ? '#FFF' : colors.text} />
+              <Text style={{ color: held != null ? '#FFF' : colors.text, fontWeight: '800', fontSize: 14 }}>{held != null ? `Held at ${Math.round(held)}° · tap to release` : 'Hold this reading'}</Text>
+            </TouchableOpacity>
+
+            {/* Guidance */}
             <View style={[st.card, { backgroundColor: colors.surface, borderColor: dir.color + '55' }]}>
               <View style={st.cardHead}>
-                <View style={[st.cardBadge, { backgroundColor: dir.color + '16' }]}>
-                  <MaterialCommunityIcons name="compass-rose" size={20} color={dir.color} />
+                <View style={[st.badge, { backgroundColor: dir.color + '18' }]}>
+                  <Text style={{ color: dir.color, fontWeight: '800', fontSize: 15 }}>{dir.key}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[st.cardTitle, { color: colors.text }]}>{dir.label} ({dir.labelHi})</Text>
-                  <Text style={[st.cardSub, { color: colors.textSecondary }]}>Dikpala: {dir.dikpala} · Element: {dir.element}</Text>
+                  <Text style={[st.cardSub, { color: colors.textSecondary }]}>Dikpala {dir.dikpala} · {dir.element}</Text>
                 </View>
               </View>
               <View style={st.row}>
-                <MaterialCommunityIcons name="check-circle-outline" size={15} color="#2D6A4F" />
-                <Text style={[st.rowText, { color: colors.textSecondary }]}>{dir.good}</Text>
+                <MaterialCommunityIcons name="check-circle-outline" size={16} color={colors.tulsiGreen || '#2D6A4F'} />
+                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>Best for: </Text>{dir.good}</Text>
               </View>
               <View style={st.row}>
-                <MaterialCommunityIcons name="close-circle-outline" size={15} color={colors.festival} />
-                <Text style={[st.rowText, { color: colors.textSecondary }]}>{dir.avoid}</Text>
+                <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" />
+                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>Avoid: </Text>{dir.avoid}</Text>
               </View>
             </View>
 
-            <Text style={[st.tip, { color: colors.textTertiary }]}>
-              Hold the phone flat, away from magnets & metal. Wave it in a figure-8 to calibrate.
-            </Text>
+            <View style={[st.tips, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Text style={[st.tipsTitle, { color: colors.text }]}>How to read a room</Text>
+              <Text style={[st.tipText, { color: colors.textSecondary }]}>1. Stand at the centre of the room or home and point the top of the phone at the door or wall you want to check.</Text>
+              <Text style={[st.tipText, { color: colors.textSecondary }]}>2. Tap "Hold this reading" so you can read it comfortably.</Text>
+              <Text style={[st.tipText, { color: colors.textSecondary }]}>3. Keep away from fridges, speakers and steel almirahs. If it says "Needs calibration", move the phone in a figure-8 a few times.</Text>
+            </View>
           </>
         )}
       </ScrollView>
@@ -173,24 +231,24 @@ export default function CompassScreen() {
 }
 
 const st = StyleSheet.create({
-  container: { flex: 1 },
-  header: { paddingBottom: 16, paddingHorizontal: 20, borderBottomLeftRadius: 22, borderBottomRightRadius: 22 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 21, fontWeight: '800', color: '#FFF' },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  headingDeg: { fontSize: 44, fontWeight: '800', marginTop: 18 },
-  headingDir: { fontSize: 15, fontWeight: '800', marginTop: 2 },
-  dialWrap: { marginTop: 18, alignItems: 'center', justifyContent: 'center' },
-  needle: { position: 'absolute', top: -6, zIndex: 5, transform: [{ rotate: '180deg' }] },
-  dial: { borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  dialCenter: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  card: { marginTop: 22, marginHorizontal: 20, borderRadius: 18, borderWidth: 1.5, padding: 16, alignSelf: 'stretch' },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 10 },
-  cardBadge: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  deg: { fontSize: 52, fontWeight: '800', letterSpacing: -1 },
+  dirName: { fontSize: 16, fontWeight: '800', marginTop: -2 },
+  chips: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, borderWidth: 1 },
+  chipText: { fontSize: 11.5, fontWeight: '700' },
+  lubber: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftWidth: 10, borderRightWidth: 10, borderBottomWidth: 16, borderLeftColor: 'transparent', borderRightColor: 'transparent', zIndex: 3 },
+  centerMark: { position: 'absolute', width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
+  holdBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, height: 46, borderRadius: 100, marginTop: 18 },
+  card: { marginTop: 18, borderRadius: 18, borderWidth: 1.5, padding: 16, alignSelf: 'stretch' },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  badge: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   cardTitle: { fontSize: 16.5, fontWeight: '800' },
-  cardSub: { fontSize: 12, marginTop: 2 },
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 6 },
-  rowText: { flex: 1, fontSize: 12.5, lineHeight: 18 },
-  tip: { fontSize: 11.5, textAlign: 'center', marginTop: 14, paddingHorizontal: 44, lineHeight: 16 },
+  cardSub: { fontSize: 12.5, marginTop: 2 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 8 },
+  rowText: { flex: 1, fontSize: 13.5, lineHeight: 20 },
+  tips: { marginTop: 14, borderRadius: 18, borderWidth: 1, padding: 16, alignSelf: 'stretch', gap: 6 },
+  tipsTitle: { fontSize: 14.5, fontWeight: '800', marginBottom: 2 },
+  tipText: { fontSize: 13, lineHeight: 19 },
+  emptyTitle: { fontWeight: '800', fontSize: 16, marginTop: 12, textAlign: 'center' },
+  emptySub: { fontSize: 13, marginTop: 6, textAlign: 'center', lineHeight: 19 },
 });
