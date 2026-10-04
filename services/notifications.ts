@@ -12,6 +12,9 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { calculatePanchang } from './panchang';
+import { getFestivalsForDate, getFixedFestivals } from './festivals';
+import { getDailyGroomingAdvice } from './groomingRules';
 
 // Configure notification handler.
 // SDK 53+ splits the old `shouldShowAlert` into `shouldShowBanner` +
@@ -345,28 +348,107 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   return true;
 }
 
-// Schedule hourly notifications (up to 64 — Android limit)
-export async function scheduleHourlyNotifications(): Promise<void> {
-  // Cancel ONLY the previous hourly batch. cancelAll would also wipe the
-  // user's own calendar/notes reminders and the daily Jyotish reminder.
+// ─── USER PREFERENCES ────────────────────────────────────────────────
+// Mirrors the Settings switches (stored on the Firestore profile) locally so
+// the scheduler can honour them at app start without waiting on the network.
+export interface NotificationPrefs {
+  spiritual: boolean;
+  grooming: boolean;
+  festival: boolean;
+  ekadashi: boolean;
+  quietStart: number; // hour 0-23, hourly reminders pause from here…
+  quietEnd: number;   // …until here
+  lat: number;
+  lng: number;
+  gender: 'male' | 'female';
+  marriageStatus: 'married' | 'unmarried' | 'widowed';
+}
+
+const PREFS_KEY = 'sadhak_notif_prefs';
+const DEFAULT_PREFS: NotificationPrefs = {
+  spiritual: true, grooming: true, festival: true, ekadashi: true,
+  quietStart: 22, quietEnd: 6, lat: 28.6139, lng: 77.209, gender: 'male', marriageStatus: 'unmarried',
+};
+
+export async function getNotificationPrefs(): Promise<NotificationPrefs> {
+  try {
+    const raw = await AsyncStorage.getItem(PREFS_KEY);
+    return raw ? { ...DEFAULT_PREFS, ...JSON.parse(raw) } : DEFAULT_PREFS;
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+/** Build prefs from the profile (settings + location + gender). */
+export function prefsFromProfile(profile: any): NotificationPrefs {
+  const st = profile?.settings || {};
+  return {
+    spiritual: st.notifications !== false,
+    grooming: st.groomingReminders !== false,
+    festival: st.festivalReminders !== false,
+    ekadashi: st.ekadashiReminders !== false,
+    quietStart: DEFAULT_PREFS.quietStart,
+    quietEnd: DEFAULT_PREFS.quietEnd,
+    lat: profile?.location?.lat || DEFAULT_PREFS.lat,
+    lng: profile?.location?.lng || DEFAULT_PREFS.lng,
+    gender: profile?.gender || DEFAULT_PREFS.gender,
+    marriageStatus: profile?.marriageStatus || DEFAULT_PREFS.marriageStatus,
+  };
+}
+
+/** Save prefs and reschedule if anything relevant changed. */
+export async function applyNotificationPrefs(next: NotificationPrefs): Promise<void> {
+  const prev = await getNotificationPrefs();
+  await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next));
+  if (JSON.stringify(prev) === JSON.stringify(next)) return;
+  await scheduleHourlyNotifications();
+  await scheduleObservanceAlerts();
+}
+
+// App start, Settings changes and profile sync can all trigger a reschedule at
+// once; run them one at a time so two cancel+schedule passes never interleave
+// (which would leave duplicate notifications behind).
+let queue: Promise<unknown> = Promise.resolve();
+function serial<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queue.then(fn, fn);
+  queue = run.catch(() => {});
+  return run;
+}
+
+export function scheduleHourlyNotifications(): Promise<void> { return serial(scheduleHourlyNow); }
+export function scheduleObservanceAlerts(): Promise<void> { return serial(scheduleObservanceNow); }
+
+const inQuietHours = (hr: number, p: NotificationPrefs) =>
+  p.quietStart > p.quietEnd ? hr >= p.quietStart || hr < p.quietEnd : hr >= p.quietStart && hr < p.quietEnd;
+
+async function cancelByType(type: string): Promise<void> {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
   await Promise.all(
     scheduled
-      .filter((n) => (n.content?.data as any)?.type === 'spiritual_reminder')
+      .filter((n) => (n.content?.data as any)?.type === type)
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {})),
   );
+}
+
+// Schedule hourly notifications (up to 64 — Android limit)
+async function scheduleHourlyNow(): Promise<void> {
+  // Cancel ONLY the previous hourly batch. cancelAll would also wipe the
+  // user's own calendar/notes reminders and the daily Jyotish reminder.
+  await cancelByType('spiritual_reminder');
+
+  const prefs = await getNotificationPrefs();
+  const now = new Date();
+  // Turned off in Settings: nothing to schedule, but remember we checked.
+  if (!prefs.spiritual) { await AsyncStorage.setItem('lastNotifSchedule', now.toISOString()); return; }
 
   const hasPermission = await requestNotificationPermissions();
   if (!hasPermission) return;
 
   // Schedule hourly notifications for the next 48 hours, skipping quiet hours
-  // (10 PM – 6 AM) so nobody is woken up by a high-priority alert at night.
-  const now = new Date();
-
+  // (default 10 PM – 6 AM) so nobody is woken up by an alert at night.
   for (let i = 1; i <= 48; i++) {
     const triggerDate = new Date(now.getTime() + i * 60 * 60 * 1000); // Every hour
-    const hr = triggerDate.getHours();
-    if (hr >= 22 || hr < 6) continue;
+    if (inQuietHours(triggerDate.getHours(), prefs)) continue;
     const notif = await getUniqueNotification();
 
     await Notifications.scheduleNotificationAsync({
@@ -429,12 +511,70 @@ async function reapplyAstroReminder(): Promise<void> {
   if (r) { try { await scheduleDailyAstroReminder(r.hour, r.minute); } catch {} }
 }
 
+// ── Morning alerts for festivals, Ekadashi and grooming-restricted days ──
+// One combined notification at 6:30 AM on each relevant day (next 21 days),
+// computed from the same panchang + festival data the calendar uses.
+const OBSERVANCE_DAYS = 21;
+
+async function scheduleObservanceNow(): Promise<void> {
+  await cancelByType('observance');
+  const prefs = await getNotificationPrefs();
+  if (!prefs.festival && !prefs.ekadashi && !prefs.grooming) return;
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return;
+
+  const now = new Date();
+  for (let i = 0; i < OBSERVANCE_DAYS; i++) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, 6, 30, 0);
+    if (day.getTime() <= now.getTime()) continue;
+    let p;
+    try { p = calculatePanchang(day, prefs.lat, prefs.lng); } catch { continue; }
+
+    const lines: string[] = [];
+    let title = '';
+    if (prefs.festival) {
+      const fests = [
+        ...getFestivalsForDate(p.hinduMonth.name, p.tithi.name, p.tithi.paksha).filter((f) => !!f.tithi),
+        ...getFixedFestivals(day.getMonth() + 1, day.getDate()),
+      ].filter((f) => f.type === 'major' || f.type === 'minor' || f.type === 'sankranti');
+      if (fests.length) {
+        title = `🪔 Today: ${fests.map((f) => f.name).join(' · ')}`;
+        lines.push(fests[0].description);
+      }
+    }
+    if (prefs.ekadashi && (p.tithi.name || '').toLowerCase().includes('ekadashi')) {
+      if (!title) title = '🌙 Ekadashi today';
+      lines.push('A day for fasting, japa and remembering Vishnu.');
+    }
+    if (prefs.grooming) {
+      const g = getDailyGroomingAdvice(day, prefs.gender, prefs.marriageStatus, p.tithi.name);
+      if (g.overallStatus === 'forbidden') {
+        if (!title) title = '✂️ Grooming note for today';
+        lines.push('Traditionally not a day for haircut, shaving or nail-cutting.');
+      }
+    }
+    if (!title) continue;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body: lines.join(' '),
+        sound: 'default',
+        ...(Platform.OS === 'android' ? { channelId: 'sadhak-festivals' } : {}),
+        data: { type: 'observance', route: '/(tabs)/calendar' },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: day },
+    }).catch(() => {});
+  }
+}
+
 // Re-schedule if needed (call on app open)
 export async function ensureNotificationsScheduled(): Promise<void> {
   try {
     const lastSchedule = await AsyncStorage.getItem('lastNotifSchedule');
     if (!lastSchedule) {
       await scheduleHourlyNotifications();
+      await scheduleObservanceAlerts();
       await reapplyAstroReminder();
       return;
     }
@@ -445,6 +585,7 @@ export async function ensureNotificationsScheduled(): Promise<void> {
     // Re-schedule if more than 24 hours since last schedule
     if (hoursSince > 24) {
       await scheduleHourlyNotifications();
+      await scheduleObservanceAlerts();
       await reapplyAstroReminder();
     }
   } catch (e) {

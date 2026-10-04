@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal,
-  TextInput, Dimensions,
+  TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
@@ -17,9 +17,11 @@ import { getFestivalsForDate, getFixedFestivals, type Festival } from '../../ser
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLayoutInsets } from '../../constants/layout';
 
-const { width: SCREEN_W } = Dimensions.get('window');
 const GRID_PAD = 10;
-const CELL = Math.floor((SCREEN_W - 32 - GRID_PAD * 2) / 7);
+// Percent width, not a pixel guess from the screen width: the old math assumed
+// 16px side padding (the screen uses 20 + a border), so 7 cells overflowed,
+// the row wrapped after 6 and every date landed under the wrong weekday.
+const CELL = `${100 / 7}%` as const;
 const DAYS_SHORT = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 

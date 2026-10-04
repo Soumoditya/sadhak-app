@@ -48,6 +48,7 @@ export default function JyotishScreen() {
   const [place, setPlace] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [tzOffset, setTzOffset] = useState('5.5');
+  const [tzOther, setTzOther] = useState(false);
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
@@ -58,7 +59,7 @@ export default function JyotishScreen() {
     const [h, m] = (b.time || '06:00').split(':').map(Number);
     const td = new Date(); td.setHours(h, m, 0, 0); setTime(td);
     setHasTime(b.hasTime); setGender(b.gender); setPlace(b.place);
-    setCoords({ lat: b.lat, lng: b.lng }); setTzOffset(String(b.tzOffset));
+    setCoords({ lat: b.lat, lng: b.lng }); setTzOffset(String(b.tzOffset)); setTzOther(b.tzOffset !== 5.5);
   };
 
   // Load the saved chart (from the owner-only subcollection) on mount.
@@ -145,8 +146,10 @@ export default function JyotishScreen() {
   const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   const timeStr = `${pad(time.getHours())}:${pad(time.getMinutes())}`;
 
-  const geocode = async () => {
-    if (!place.trim()) { dialog.alert('Enter a place', 'Type your birth city/town first.'); return; }
+  // Returns the coordinates so "Compute" can locate the place itself when the
+  // user typed a city but didn't tap Locate.
+  const geocode = async (): Promise<{ lat: number; lng: number } | null> => {
+    if (!place.trim()) { dialog.alert('Enter a place', 'Type your birth city/town first.'); return null; }
     try {
       setGeocoding(true);
       const res = await fetch(
@@ -154,20 +157,24 @@ export default function JyotishScreen() {
         { headers: { 'User-Agent': 'SadhakApp/1.0 (soumodityapramanik@gmail.com)' } },
       );
       const arr = await res.json();
-      if (!arr?.length) { dialog.alert('Not found', 'Could not find that place — try adding the state/country.'); return; }
-      setCoords({ lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) });
+      if (!arr?.length) { dialog.alert('Not found', 'Could not find that place. Try adding the state or country.'); return null; }
+      const c = { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) };
+      setCoords(c);
       setPlace(arr[0].display_name.split(',').slice(0, 3).join(', '));
+      return c;
     } catch {
       dialog.alert('Network error', 'Could not look up the place. Check your connection.');
+      return null;
     } finally { setGeocoding(false); }
   };
 
   const saveBirth = async () => {
     if (!user?.uid) { dialog.alert('Sign in needed', 'Please sign in to save your birth chart.'); return; }
-    if (!coords) { dialog.alert('Set birth place', 'Tap "Locate" to pin your birth place on the map.'); return; }
+    const where = coords ?? (place.trim() ? await geocode() : null);
+    if (!where) { if (!place.trim()) dialog.alert('Set birth place', 'Type the city or town you were born in.'); return; }
     const tz = parseFloat(tzOffset);
     if (!Number.isFinite(tz) || tz < -12 || tz > 14) { dialog.alert('Timezone', 'Enter a valid timezone offset (e.g. 5.5 for India).'); return; }
-    const birth: BirthInput = { date: dateStr, time: timeStr, hasTime, place: place.trim(), lat: coords.lat, lng: coords.lng, tzOffset: tz, gender };
+    const birth: BirthInput = { date: dateStr, time: timeStr, hasTime, place: place.trim(), lat: where.lat, lng: where.lng, tzOffset: tz, gender };
     try {
       setSaving(true);
       birthEdited.current = true;
@@ -187,7 +194,13 @@ export default function JyotishScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Header title="Your Birth Details" subtitle="Used to compute your authentic Vedic chart" onBack={kundli ? () => setEditing(false) : undefined} />
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <View style={[s.privacy, { backgroundColor: colors.primary + '0E', borderColor: colors.primary + '25' }]}>
+            <MaterialCommunityIcons name="lock-outline" size={16} color={colors.primary} />
+            <Text style={{ color: colors.textSecondary, fontSize: 12.5, flex: 1, lineHeight: 18 }}>
+              Private to you. Birth details are stored only in your account and never shown on your profile.
+            </Text>
+          </View>
           <Text style={[s.label, { color: colors.textTertiary }]}>DATE OF BIRTH</Text>
           <TouchableOpacity style={[s.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} onPress={() => setShowDate(true)}>
             <MaterialCommunityIcons name="calendar" size={18} color={colors.primary} />
@@ -232,18 +245,33 @@ export default function JyotishScreen() {
               placeholder="City, State" placeholderTextColor={colors.textTertiary}
               value={place} onChangeText={(t) => { setPlace(t); setCoords(null); }}
             />
-            <TouchableOpacity onPress={geocode} style={[s.locateBtn, { backgroundColor: colors.primary }]}>
+            <TouchableOpacity onPress={() => { geocode(); }} style={[s.locateBtn, { backgroundColor: colors.primary }]}>
               {geocoding ? <ActivityIndicator size="small" color="#FFF" /> : <><MaterialCommunityIcons name="map-marker" size={16} color="#FFF" /><Text style={{ color: '#FFF', fontWeight: '800', fontSize: 12 }}>Locate</Text></>}
             </TouchableOpacity>
           </View>
           {coords && <Text style={{ color: colors.tulsiGreen || '#2D6A4F', fontSize: 11.5, marginTop: 4 }}>✓ {coords.lat.toFixed(3)}, {coords.lng.toFixed(3)}</Text>}
 
-          <Text style={[s.label, { color: colors.textTertiary }]}>TIMEZONE AT BIRTH (hours from UTC)</Text>
-          <TextInput
-            style={[s.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface, color: colors.text }]}
-            keyboardType="numbers-and-punctuation" value={tzOffset} onChangeText={setTzOffset} placeholder="5.5" placeholderTextColor={colors.textTertiary}
-          />
-          <Text style={{ color: colors.textTertiary, fontSize: 11.5, marginTop: 4 }}>India = 5.5. Change only if born in another timezone.</Text>
+          <Text style={[s.label, { color: colors.textTertiary }]}>TIMEZONE AT BIRTH</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {([['india', 'India (IST +5:30)'], ['other', 'Other']] as const).map(([k, label]) => {
+              const active = k === 'india' ? !tzOther : tzOther;
+              return (
+                <TouchableOpacity key={k} onPress={() => { setTzOther(k === 'other'); if (k === 'india') setTzOffset('5.5'); }}
+                  style={[s.genderChip, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary + '15' : colors.surface }]}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: active ? colors.primary : colors.text }}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {tzOther && (
+            <>
+              <TextInput
+                style={[s.field, { marginTop: 10, borderColor: colors.cardBorder, backgroundColor: colors.surface, color: colors.text }]}
+                keyboardType="numbers-and-punctuation" value={tzOffset} onChangeText={setTzOffset} placeholder="e.g. 5.75 or -5" placeholderTextColor={colors.textTertiary}
+              />
+              <Text style={{ color: colors.textTertiary, fontSize: 11.5, marginTop: 4 }}>Hours from UTC at the place of birth (Nepal 5.75, UK 0, New York -5).</Text>
+            </>
+          )}
 
           <TouchableOpacity onPress={saveBirth} disabled={saving} style={[s.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.7 : 1 }]}>
             {saving ? <ActivityIndicator color="#FFF" /> : <><MaterialCommunityIcons name="star-four-points" size={18} color="#FFF" /><Text style={s.saveBtnText}>Compute my chart</Text></>}
@@ -528,6 +556,7 @@ const s = StyleSheet.create({
   locateBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, borderRadius: 12, height: 52, justifyContent: 'center' },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 54, borderRadius: 14, marginTop: 26 },
   saveBtnText: { color: '#FFF', fontSize: 15.5, fontWeight: '800' },
+  privacy: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1 },
   card: { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 14 },
   cardKicker: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2, marginBottom: 12 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, gap: 12 },

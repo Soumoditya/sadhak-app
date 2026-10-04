@@ -4,12 +4,12 @@ import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { View, Animated, StyleSheet, Image, Dimensions, Text, Easing, Modal } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AuthProvider } from '../contexts/AuthContext';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { LanguageProvider } from '../contexts/LanguageContext';
 import { DialogProvider } from '../contexts/DialogContext';
 import * as SplashScreen from 'expo-splash-screen';
-import { ensureNotificationsScheduled } from '../services/notifications';
+import { ensureNotificationsScheduled, applyNotificationPrefs, prefsFromProfile } from '../services/notifications';
 import { requestFirstRunPermissions } from '../services/firstRunPermissions';
 
 SplashScreen.preventAutoHideAsync();
@@ -176,7 +176,15 @@ const splashStyles = StyleSheet.create({
 // ─── Root Layout Inner ─────────────────────────────────────────────────────
 function RootLayoutInner() {
   const { isDark, colors } = useTheme();
+  const { profile } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
+
+  // Keep scheduled alerts in line with the Settings switches + location.
+  const prefsKey = profile ? JSON.stringify(prefsFromProfile(profile)) : '';
+  useEffect(() => {
+    if (!profile) return;
+    applyNotificationPrefs(prefsFromProfile(profile)).catch(() => {});
+  }, [prefsKey]);
 
   useEffect(() => {
     // Hand off quickly from the native splash to our animated Modal splash, which

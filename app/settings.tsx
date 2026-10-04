@@ -108,13 +108,13 @@ export default function SettingsScreen() {
           {notifOpen && (
             <>
               <Divider />
-              <SettingsRow icon="bell-ring-outline" label="Spiritual reminders" right="switch" switchValue={s.notifications !== false} onSwitchChange={(v) => updateSetting('notifications', v)} />
+              <SettingsRow icon="bell-ring-outline" label="Spiritual reminders" detail="Through the day · paused 10 PM to 6 AM" right="switch" switchValue={s.notifications !== false} onSwitchChange={(v) => updateSetting('notifications', v)} />
               <Divider />
-              <SettingsRow icon="content-cut" label="Grooming alerts" right="switch" switchValue={s.groomingReminders !== false} onSwitchChange={(v) => updateSetting('groomingReminders', v)} />
+              <SettingsRow icon="content-cut" label="Grooming alerts" detail="6:30 AM on restricted days" right="switch" switchValue={s.groomingReminders !== false} onSwitchChange={(v) => updateSetting('groomingReminders', v)} />
               <Divider />
-              <SettingsRow icon="party-popper" label="Festival alerts" right="switch" switchValue={s.festivalReminders !== false} onSwitchChange={(v) => updateSetting('festivalReminders', v)} />
+              <SettingsRow icon="party-popper" label="Festival alerts" detail="6:30 AM on festival days" right="switch" switchValue={s.festivalReminders !== false} onSwitchChange={(v) => updateSetting('festivalReminders', v)} />
               <Divider />
-              <SettingsRow icon="moon-waning-crescent" label="Ekadashi alerts" right="switch" switchValue={s.ekadashiReminders !== false} onSwitchChange={(v) => updateSetting('ekadashiReminders', v)} />
+              <SettingsRow icon="moon-waning-crescent" label="Ekadashi alerts" detail="6:30 AM on Ekadashi" right="switch" switchValue={s.ekadashiReminders !== false} onSwitchChange={(v) => updateSetting('ekadashiReminders', v)} />
               <Divider />
               <SettingsRow icon="bell-check-outline" label="Send test notification" onPress={sendTestNotification} />
             </>

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -66,6 +66,11 @@ export default function HomeScreen() {
   // This pill is GROOMING guidance only (haircut/shave/nails per vaara) — not a
   // verdict on the whole day. Labelled + scissors-iconed so it reads that way.
   const groomingLabel = grooming.overallStatus === 'allowed' ? 'OK' : grooming.overallStatus === 'avoid' ? 'Caution' : 'Avoid';
+  // 4-column launcher grid sized from the measured width, so tiles never
+  // stretch (the old 3-col flexGrow grid blew the 10th tile up to full width).
+  const [gridW, setGridW] = useState(0);
+  const GAP = 10;
+  const tileW = gridW ? Math.floor((gridW - GAP * 3) / 4) : 0;
 
   return (
     <Screen scroll tabbed edges={{ top: true, bottom: false }}>
@@ -125,11 +130,31 @@ export default function HomeScreen() {
           </View>
           <View style={s.timeCol}>
             <MaterialCommunityIcons name="alert-circle-outline" size={15} color="#EF4444" />
-            <Text style={[s.timeLabel, { color: colors.textTertiary }]}>Rahu</Text>
-            <Text style={[s.timeValue, { color: '#EF4444' }]}>{panchang.rahuKaal.start.slice(0, 5)}</Text>
+            <Text style={[s.timeLabel, { color: colors.textTertiary }]}>Rahu Kaal</Text>
+            <Text style={[s.timeValue, { color: '#EF4444' }]}>{panchang.rahuKaal.start.slice(0, 5)}–{panchang.rahuKaal.end.slice(0, 5)}</Text>
           </View>
         </View>
       </Card>
+
+      {/* ═══ 2b. Personal Jyotish entry ═══ */}
+      <TouchableOpacity
+        onPress={() => router.push('/jyotish')}
+        activeOpacity={0.85}
+        style={[s.astro, { backgroundColor: isDark ? '#C49A2C14' : '#C49A2C10', borderColor: '#C49A2C40' }]}
+      >
+        <View style={[s.astroIcon, { backgroundColor: '#C49A2C22' }]}>
+          <MaterialCommunityIcons name="star-four-points" size={20} color="#C49A2C" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[s.astroTitle, { color: colors.text }]}>
+            {profile?.hasBirthChart ? "Your day in the stars" : 'Discover your birth chart'}
+          </Text>
+          <Text style={[s.astroSub, { color: colors.textSecondary }]} numberOfLines={1}>
+            {profile?.hasBirthChart ? "Today's guidance from your kundli" : 'Free Vedic kundli, dasha & daily guidance'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+      </TouchableOpacity>
 
       {/* ═══ 3. Quick actions — 4 primary tiles ═══ */}
       <Section title="Quick Access" compact>
@@ -164,11 +189,11 @@ export default function HomeScreen() {
 
       {/* ═══ 5. More — full feature tiles ═══ */}
       <Section title="More">
-        <View style={s.moreGrid}>
-          {MORE_MODULES.map((a) => (
+        <View style={[s.moreGrid, { gap: GAP }]} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
+          {!!tileW && MORE_MODULES.map((a) => (
             <TouchableOpacity
               key={a.key}
-              style={[s.moreItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+              style={[s.moreItem, { width: tileW, backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
               onPress={() => router.push(a.route as any)}
               activeOpacity={0.85}
             >
@@ -219,13 +244,20 @@ const s = StyleSheet.create({
 
   // Shloka
   shlokaLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2 },
-  shlokaText: { fontSize: 21, fontWeight: '700', lineHeight: 32, marginTop: 8, fontStyle: 'italic' },
+  // No italic: Devanagari has no true italic, so it renders as a synthetic slant.
+  shlokaText: { fontSize: 21, fontWeight: '700', lineHeight: 36, marginTop: 8 },
   shlokaTrans: { fontSize: 13.5, lineHeight: 20, marginTop: 6 },
   shlokaSrc: { fontSize: 11.5, fontWeight: '600', marginTop: 6 },
 
   // More grid
-  moreGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  moreItem: { width: '31%', flexGrow: 1, alignItems: 'center', paddingVertical: 16, borderRadius: DS.radius.lg, borderWidth: 1, gap: 8 },
-  moreIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  moreLabel: { fontSize: 12, fontWeight: '700' },
+  moreGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  moreItem: { alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, borderRadius: DS.radius.lg, borderWidth: 1, gap: 8 },
+  moreIcon: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  moreLabel: { fontSize: 11.5, fontWeight: '700' },
+
+  // Jyotish entry
+  astro: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: DS.space.md, padding: 14, borderRadius: DS.radius.lg, borderWidth: 1 },
+  astroIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  astroTitle: { fontSize: 15, fontWeight: '800' },
+  astroSub: { fontSize: 12.5, marginTop: 2 },
 });
