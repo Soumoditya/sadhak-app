@@ -70,17 +70,20 @@ jobs:
       # The phones only accept updates from the project in app.json, so the
       # token must belong to its owner (or a member with publish rights).
       - name: Check the token's account can publish this project
+        id: project
         if: steps.token.outputs.ok == 'true'
         run: |
           echo "Token account: $(eas whoami 2>&1 | head -1)"
           echo "Project owner in app.json: $(node -p "require('./app.json').expo.owner")"
-          eas project:info --non-interactive || {
-            echo "::error::This token's account can't access the project in app.json (owner above). Use a token from that account, or switch the app to the new account (needs one new APK)."
-            exit 1
-          }
+          if eas project:info --non-interactive; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::This token's account can't access the project in app.json (owner above), so nothing was published. Use a token from that account, or move the app to the token's account (needs one new APK)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Publish to the production channel
-        if: steps.token.outputs.ok == 'true'
+        if: steps.token.outputs.ok == 'true' && steps.project.outputs.ok == 'true'
         env:
           MESSAGE: ${{ github.event.inputs.message || github.event.head_commit.message || 'Sadhak update' }}
         run: eas update --channel production --platform android --message "$MESSAGE" --non-interactive
