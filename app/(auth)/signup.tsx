@@ -1,22 +1,19 @@
 import React, { useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView,
-  Platform, ScrollView, Image,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
-import { Button } from '../../components/ui';
+import { Button, Icon } from '../../components/ui';
+import { AuthBrand, AuthField, GoogleButton, OrDivider } from '../../components/ui/AuthUI';
 import { DS, useDsInsets } from '../../constants/ds';
-
 import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function SignupScreen() {
   const { tx } = useLanguage();
 
-  const { signUpWithEmail } = useAuth();
+  const { signUpWithEmail, signInWithGoogle } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
   const { insets } = useDsInsets();
@@ -25,7 +22,6 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
@@ -54,115 +50,62 @@ export default function SignupScreen() {
     } finally { setLoading(false); }
   };
 
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const google = async () => {
+    setGoogleBusy(true);
+    try {
+      const ok = await signInWithGoogle();
+      if (ok) router.replace('/(auth)/profile-setup');
+    } catch (e: any) {
+      dialog.alert('Sign up failed', String(e?.message || 'Google sign-in failed.').slice(0, 160));
+    } finally { setGoogleBusy(false); }
+  };
+
+  const busy = loading || googleBusy;
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24, paddingHorizontal: DS.layout.screenPaddingH }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Back */}
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[st.backBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-            hitSlop={8}
-          >
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
+      <KeyboardAwareScrollView
+        bottomOffset={24}
+        contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 28, paddingHorizontal: DS.layout.screenPaddingH }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/login'))}
+          style={[st.backBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} hitSlop={8} accessibilityLabel="Back">
+          <Icon name="caret-left" size={20} color={colors.text} weight="regular" />
+        </TouchableOpacity>
+
+        <AuthBrand title={tx('Create your account')} subtitle={tx('Begin your daily practice with Sadhak.')} />
+
+        <GoogleButton onPress={google} loading={googleBusy} disabled={busy} />
+        <OrDivider />
+
+        <AuthField label={tx('Full name')} icon="user-circle" placeholder={tx('Your name')} value={name} onChangeText={setName} textContentType="name" returnKeyType="next" />
+        <AuthField label={tx('Email')} icon="envelope-simple" placeholder="you@example.com" value={email} onChangeText={setEmail}
+          keyboardType="email-address" autoCapitalize="none" autoCorrect={false} textContentType="emailAddress" returnKeyType="next" />
+        <AuthField label={tx('Password')} icon="lock-key" secure placeholder={tx('At least 8 characters, with a number')} value={password} onChangeText={setPassword} textContentType="newPassword" returnKeyType="next" />
+        <AuthField label={tx('Confirm password')} icon="shield-check" secure placeholder={tx('Repeat password')} value={confirm} onChangeText={setConfirm} onSubmitEditing={submit} returnKeyType="go" />
+
+        <View style={{ marginTop: 8 }}>
+          <Button title={tx('Create Account')} loading={loading} disabled={busy} onPress={submit} />
+        </View>
+
+        <Text style={[st.legal, { color: colors.textTertiary }]}>{tx("By creating an account, you agree to Sadhak's terms and privacy policy.")}</Text>
+
+        <View style={st.switchRow}>
+          <Text style={{ color: colors.textSecondary, fontSize: 15 }}>{tx('Already have an account?')} </Text>
+          <TouchableOpacity onPress={() => router.replace('/(auth)/login')} hitSlop={8}>
+            <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '800' }}>{tx('Sign in')}</Text>
           </TouchableOpacity>
-
-          {/* Brand */}
-          <View style={st.brand}>
-            <Image source={require('../../assets/images/emblem.png')} style={st.emblem} />
-          </View>
-
-          {/* Title */}
-          <Text style={[st.title, { color: colors.text }]}>{tx('Create your account')}</Text>
-          <Text style={[st.sub, { color: colors.textSecondary }]}>{tx('Begin your daily practice with Sadhak.')}</Text>
-
-          {/* Name */}
-          <Text style={[st.label, { color: colors.textTertiary }]}>{tx('FULL NAME')}</Text>
-          <View style={[st.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-            <Ionicons name="person-outline" size={18} color={colors.textTertiary} />
-            <TextInput
-              style={[st.input, { color: colors.text }]}
-              placeholder={tx('Your name')}
-              placeholderTextColor={colors.textTertiary}
-              value={name} onChangeText={setName}
-            />
-          </View>
-
-          {/* Email */}
-          <Text style={[st.label, { color: colors.textTertiary }]}>EMAIL</Text>
-          <View style={[st.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-            <Ionicons name="mail-outline" size={18} color={colors.textTertiary} />
-            <TextInput
-              style={[st.input, { color: colors.text }]}
-              placeholder="you@example.com"
-              placeholderTextColor={colors.textTertiary}
-              value={email} onChangeText={setEmail}
-              keyboardType="email-address" autoCapitalize="none" autoCorrect={false}
-            />
-          </View>
-
-          {/* Password */}
-          <Text style={[st.label, { color: colors.textTertiary }]}>PASSWORD</Text>
-          <View style={[st.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-            <Ionicons name="lock-closed-outline" size={18} color={colors.textTertiary} />
-            <TextInput
-              style={[st.input, { color: colors.text }]}
-              placeholder={tx('At least 8 characters, with a number')}
-              placeholderTextColor={colors.textTertiary}
-              value={password} onChangeText={setPassword}
-              secureTextEntry={!showPw}
-            />
-            <TouchableOpacity onPress={() => setShowPw((v) => !v)} hitSlop={8}>
-              <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Confirm */}
-          <Text style={[st.label, { color: colors.textTertiary }]}>{tx('CONFIRM PASSWORD')}</Text>
-          <View style={[st.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-            <Ionicons name="shield-checkmark-outline" size={18} color={colors.textTertiary} />
-            <TextInput
-              style={[st.input, { color: colors.text }]}
-              placeholder={tx('Repeat password')}
-              placeholderTextColor={colors.textTertiary}
-              value={confirm} onChangeText={setConfirm}
-              secureTextEntry={!showPw}
-              onSubmitEditing={submit}
-            />
-          </View>
-
-          <View style={{ marginTop: 24 }}>
-            <Button title={tx('Create Account')} loading={loading} disabled={loading} onPress={submit} />
-          </View>
-
-          <Text style={[st.legal, { color: colors.textTertiary }]}>{tx('By creating an account, you agree to Sadhak\'s terms and privacy policy.')}</Text>
-
-          <View style={st.signin}>
-            <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>{tx('Already have an account?')} </Text>
-            <TouchableOpacity onPress={() => router.replace('/(auth)/login')} hitSlop={8}>
-              <Text style={{ color: colors.primary, fontSize: 13.5, fontWeight: '800' }}>{tx('Sign in')}</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
 
 const st = StyleSheet.create({
   container: { flex: 1 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
-  brand: { alignItems: 'center', marginTop: 12, marginBottom: 20 },
-  emblem: { width: 56, height: 56, borderRadius: 28 },
-  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
-  sub: { fontSize: 14, marginTop: 6, marginBottom: 22 },
-  label: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8, marginTop: 6 },
-  field: { flexDirection: 'row', alignItems: 'center', gap: 10, height: DS.layout.fieldHeight, borderRadius: DS.radius.lg, borderWidth: 1, paddingHorizontal: 16, marginBottom: 12 },
-  input: { flex: 1, fontSize: 15.5 },
-  legal: { fontSize: 11.5, textAlign: 'center', marginTop: 16, lineHeight: 16 },
-  signin: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
+  backBtn: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  legal: { fontSize: 12.5, lineHeight: 18, textAlign: 'center', marginTop: 16 },
+  switchRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
 });

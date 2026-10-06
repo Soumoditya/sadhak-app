@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { View, Animated, StyleSheet, Image, Dimensions, Text, Easing, Modal } from 'react-native';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
@@ -205,6 +206,10 @@ function RootLayoutInner() {
         <Stack.Screen name="aarti" options={{ headerShown: false }} />
         <Stack.Screen name="admin" options={{ headerShown: false }} />
         <Stack.Screen name="chatroom" options={{ headerShown: false }} />
+        <Stack.Screen name="edit-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="user/[uid]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="posts" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="follows" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="feed" options={{ headerShown: false }} />
         <Stack.Screen name="reader" options={{ headerShown: false }} />
         <Stack.Screen name="play" options={{ headerShown: false }} />
@@ -248,6 +253,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
       <ThemeProvider>
         <LanguageProvider>
           <DialogProvider>
@@ -259,6 +265,7 @@ export default function RootLayout() {
           </DialogProvider>
         </LanguageProvider>
       </ThemeProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }

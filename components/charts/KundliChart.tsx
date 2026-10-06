@@ -49,14 +49,14 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
   };
 
   // Lay out the grahas of one cell around its centre.
-  const cell = (list: ChartGraha[], cx: number, cy: number, maxW: number, keyBase: string, extraTop = 0, tight = false) => {
+  const cell = (list: ChartGraha[], cx: number, cy: number, maxW: number, keyBase: string, extraTop = 0, tight = false, maxCols = 3) => {
     const n = list.length;
     if (!n) return null;
     const gap = tight ? 19 : 26;
-    const cols = n > 2 ? Math.min(3, Math.max(2, Math.floor(maxW / gap))) : 1;
+    const cols = n > 2 ? Math.min(maxCols, Math.max(2, Math.floor(maxW / gap))) : 1;
     const rows = Math.ceil(n / cols);
     const fs = tight ? (n > 2 ? 9.5 : 11) : n > 4 ? 10.5 : 12.5;
-    const lh = fs + (tight ? 2 : 3);
+    const lh = fs + (tight ? 4.5 : 4);
     const y0 = cy - ((rows - 1) * lh) / 2 + fs * 0.35 + extraTop;
     return list.map((g, i) => {
       const r = Math.floor(i / cols), c = i % cols;
@@ -78,8 +78,22 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
     </>
   );
 
+  // Sign number, always in brackets and in the same corner of its cell.
+  const num = (sign: number, x: number, y: number, anchor: 'start' | 'middle' | 'end' = 'middle', lagna = false, withAs = false) => (
+    <SvgText x={x} y={y} fontSize={9.5} fontWeight={lagna ? '800' : '700'} fill={lagna ? colors.primary : colors.textTertiary} textAnchor={anchor}>
+      ({sign + 1}){withAs ? ` ${abbr.Lagna}` : ''}
+    </SvgText>
+  );
+
   if (style === 'north') {
     const MID = S / 2;
+    // Inner corner of each house (towards the centre); the number sits there
+    // and the planets keep to the outer, roomier part of the cell.
+    const APEX: Record<number, [number, number]> = {
+      1: [0.5, 0.5], 4: [0.5, 0.5], 7: [0.5, 0.5], 10: [0.5, 0.5],
+      2: [0.25, 0.25], 3: [0.25, 0.25], 5: [0.25, 0.75], 6: [0.25, 0.75],
+      8: [0.75, 0.75], 9: [0.75, 0.75], 11: [0.75, 0.25], 12: [0.75, 0.25],
+    };
     // Centroids for houses 1..12 and their polygons (for the lagna tint).
     const POS: Record<number, [number, number]> = {
       1: [0.5, 0.25], 2: [0.25, 0.1], 3: [0.1, 0.25], 4: [0.25, 0.5], 5: [0.1, 0.75], 6: [0.25, 0.9],
@@ -97,15 +111,23 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
         <Line x1={0} y1={MID} x2={MID} y2={0} {...line} />
         {Array.from({ length: 12 }, (_, i) => i + 1).map((house) => {
           const [fx, fy] = POS[house];
+          const [ax, ay] = APEX[house];
           const sign = (lagnaSignIndex + house - 1) % 12;
-          const corner = [2, 3, 5, 6, 8, 9, 11, 12].includes(house);
+          const diamond = [1, 4, 7, 10].includes(house);
+          const side = [3, 5, 9, 11].includes(house);
+          const k = diamond ? 0.3 : 0.32;
+          const nx = (ax + (fx - ax) * k) * S;
+          const ny = (ay + (fy - ay) * k) * S + 3.5;
+          const list = bySign[sign];
+          // Planets: diamonds stay at the centroid nudged outward; triangles
+          // likewise, with side triangles stacking in at most two columns.
+          const px = (fx + (fx - ax) * (diamond ? 0.12 : side ? 0.08 : 0)) * S;
+          const py = (fy + (fy - ay) * (diamond ? 0.12 : side ? 0 : 0.1)) * S + 2;
           return (
             <G key={house}>
-              <SvgText x={fx * S} y={fy * S + (house === 1 ? -22 : corner ? -12 : -20)} fontSize={9.5} fontWeight="700" fill={colors.textTertiary} textAnchor="middle">
-                {sign + 1}
-              </SvgText>
-              {house === 1 && <SvgText x={MID} y={fy * S + 34} fontSize={9} fontWeight="800" fill={colors.primary} textAnchor="middle">{abbr.Lagna}</SvgText>}
-              {cell(bySign[sign], fx * S, fy * S + 2, corner ? 52 : 80, `h${house}`, 0, corner && bySign[sign].length > 2)}
+              {num(sign, nx, ny, 'middle', house === 1)}
+              {house === 1 && <SvgText x={MID} y={ny - 12} fontSize={9} fontWeight="800" fill={colors.primary} textAnchor="middle">{abbr.Lagna}</SvgText>}
+              {cell(list, px, py, diamond ? 80 : side ? 40 : 60, `h${house}`, 0, !diamond && list.length > 2, side ? 2 : 3)}
             </G>
           );
         })}
@@ -126,8 +148,8 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
             <G key={sign}>
               <Rect x={x} y={y} width={c} height={c} fill={isLagna ? colors.primary : 'transparent'} fillOpacity={isLagna ? 0.09 : 0} stroke={colors.primary} strokeOpacity={0.45} strokeWidth={1.1} />
               {isLagna && <Line x1={x} y1={y + 16} x2={x + 16} y2={y} stroke={colors.primary} strokeWidth={1.6} />}
-              <SvgText x={x + c - 6} y={y + 12} fontSize={9} fontWeight="700" fill={colors.textTertiary} textAnchor="end">{sign + 1}</SvgText>
-              {cell(bySign[sign], x + c / 2, y + c / 2 + 4, c - 8, `s${sign}`)}
+              {num(sign, x + c - 5, y + 12, 'end', isLagna)}
+              {cell(bySign[sign], x + c / 2, y + c / 2 + 5, c - 8, `s${sign}`)}
             </G>
           );
         })}
@@ -161,13 +183,28 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
         const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
         const tri = pts.length === 3;
         const isLagna = sign === lagnaSignIndex;
+        // Triangles: the number goes in the right-angle corner, planets in
+        // the opposite (wider) part. Squares: number top-right like South.
+        let label: React.ReactNode;
+        let px = cx, py = cy + 4;
+        if (tri) {
+          const v = pts.find((p) => pts.filter((q) => q !== p && (q[0] === p[0] || q[1] === p[1])).length === 2) || pts[0];
+          // Tuck the number into the corner: anchor away from the walls.
+          const right = v[0] > cx, below = v[1] > cy;
+          label = num(sign, v[0] + (right ? -5 : 5), v[1] + (below ? -6 : 13), right ? 'end' : 'start', isLagna, isLagna);
+          px = cx + (cx - v[0]) * 0.08;
+          py = cy + (cy - v[1]) * 0.08 + 4;
+        } else {
+          const maxX = Math.max(...pts.map((p) => p[0])), minY = Math.min(...pts.map((p) => p[1]));
+          label = num(sign, maxX - 5, minY + 12, 'end', isLagna);
+          py = cy + 6;
+        }
         return (
           <G key={sign}>
             <Polygon points={pts.map((p) => p.join(',')).join(' ')} fill={isLagna ? colors.primary : 'transparent'} fillOpacity={isLagna ? 0.1 : 0} stroke={colors.primary} strokeOpacity={0.45} strokeWidth={1.1} />
-            <SvgText x={cx} y={cy - (tri ? 10 : 22)} fontSize={9} fontWeight="700" fill={isLagna ? colors.primary : colors.textTertiary} textAnchor="middle">
-              {isLagna ? `${sign + 1} · ${abbr.Lagna}` : sign + 1}
-            </SvgText>
-            {cell(bySign[sign], cx, cy + (tri ? 6 : 2), tri ? 40 : 84, `e${sign}`, 0, tri)}
+            {label}
+            {isLagna && !tri && <SvgText x={Math.min(...pts.map((p) => p[0])) + 6} y={Math.min(...pts.map((p) => p[1])) + 12} fontSize={9} fontWeight="800" fill={colors.primary}>{abbr.Lagna}</SvgText>}
+            {cell(bySign[sign], px, py, tri ? 52 : 84, `e${sign}`, 0, tri)}
           </G>
         );
       })}

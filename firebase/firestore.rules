@@ -26,6 +26,18 @@ service cloud.firestore {
       match /{sub=**} {
         allow read, write: if isOwner(uid);
       }
+
+      // Follow graph: anyone signed in can see who follows whom.
+      // users/{uid}/followers/{fid} is written by the follower fid;
+      // users/{uid}/following/{tid} by the owner uid.
+      match /followers/{fid} {
+        allow read: if signedIn();
+        allow create, delete: if isOwner(fid);
+      }
+      match /following/{tid} {
+        allow read: if signedIn();
+        allow create, delete: if isOwner(uid);
+      }
     }
 
     // Username registry for uniqueness checks.
@@ -39,6 +51,16 @@ service cloud.firestore {
     match /library/{docId} {
       allow read: if signedIn();
       allow write: if isAdmin();
+      // Anyone signed in may bump only the rating totals and download count.
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingSum', 'ratingCount', 'downloadCount']);
+
+      // One rating per person per book.
+      match /ratings/{uid} {
+        allow read: if signedIn();
+        allow create, update, delete: if isOwner(uid)
+          && (request.method == 'delete' || (request.resource.data.stars is int && request.resource.data.stars >= 1 && request.resource.data.stars <= 5));
+      }
     }
 
     // User submissions pending approval — uploader or admin can read; uploader creates; admin moderates.
@@ -62,11 +84,14 @@ service cloud.firestore {
       allow update, delete: if signedIn() && (resource.data.addedBy == request.auth.uid || isAdmin());
     }
 
-    // Future: community posts (Instagram-style feed) — read by all signed-in, write by author.
+    // Community posts — read by all signed-in, write by author. Others may
+    // only change the like and comment counters.
     match /posts/{postId} {
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
       allow update, delete: if signedIn() && (resource.data.authorId == request.auth.uid || isAdmin());
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount', 'likedBy', 'commentCount']);
       match /{sub=**} {
         allow read: if signedIn();
         allow write: if signedIn();

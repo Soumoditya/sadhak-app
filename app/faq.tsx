@@ -6,6 +6,7 @@ import { Header } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
 
 import { useLanguage } from '../contexts/LanguageContext';
+import { APP_VERSION } from '../constants/appInfo';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -197,7 +198,7 @@ export default function FAQScreen() {
         </View>
       </View>
 
-      <Text style={[styles.version, { color: colors.textTertiary }]}>{tx('Sadhak v1.6.0 • Made with 🙏 in India')}</Text>
+      <Text style={[styles.version, { color: colors.textTertiary }]}>{`${tx('Sadhak v')}${APP_VERSION} • ${tx('Made with 🙏 in India')}`}</Text>
       <View style={{ height: 40 }} />
       </ScrollView>
     </View>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Modal, Alert, Dimensions, Platform, Animated, KeyboardAvoidingView,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Modal, Alert, Dimensions, Platform, Animated,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
@@ -588,7 +588,7 @@ export default function NotesScreen() {
           )}
 
           {/* Editor body */}
-          <KeyboardAvoidingView style={{ flex: 1, paddingBottom: kb }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
             <ScrollView style={st.editorBody} keyboardShouldPersistTaps="handled">
               <TextInput
                 style={[st.editorTitle, { color: colors.text }]}

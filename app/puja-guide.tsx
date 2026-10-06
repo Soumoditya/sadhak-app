@@ -16,7 +16,7 @@ import { toneSolid } from '../constants/theme';
 
 export default function PujaGuideScreen() {
   const { colors, isDark, tone } = useTheme();
-  const { t: tr, tx } = useLanguage();
+  const { t: tr, tx, native, language } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [guide, setGuide] = useState<PujaGuide | null>(null);
 
@@ -50,32 +50,32 @@ export default function PujaGuideScreen() {
             ) : (
               <MaterialCommunityIcons name={guide.icon as any} size={36} color="#FFD700" />
             )}
-            <Text style={st.dTitle}>{guide.deity}</Text>
-            <Text style={st.dTitleHi}>{guide.deityHi}</Text>
+            <Text style={st.dTitle}>{native(guide.deity, guide.deityHi)}</Text>
+            {language === 'en' && <Text style={st.dTitleHi}>{guide.deityHi}</Text>}
             <View style={st.dDayChip}>
               <MaterialCommunityIcons name="calendar-star" size={13} color="#FFF" />
-              <Text style={st.dDayText}>{guide.day}</Text>
+              <Text style={st.dDayText}>{tx(guide.day)}</Text>
             </View>
           </LinearGradient>
 
           {/* Samagri checklist */}
           <Section title={tx('Samagri — what you need')} icon="basket-outline" color={colors.primary} colors={colors}>
             {guide.samagri.map((s, i) => (
-              <Row key={i} icon="checkbox-blank-circle-outline" color={colors.primary} text={s} colors={colors} />
+              <Row key={i} icon="checkbox-blank-circle-outline" color={colors.primary} text={tx(s)} colors={colors} />
             ))}
           </Section>
 
           {/* Offerings */}
           <Section title={tx('Favourite offerings')} icon="flower-outline" color="#2D6A4F" colors={colors}>
             {guide.offerings.map((s, i) => (
-              <Row key={i} icon="heart-outline" color="#2D6A4F" text={s} colors={colors} />
+              <Row key={i} icon="heart-outline" color="#2D6A4F" text={tx(s)} colors={colors} />
             ))}
           </Section>
 
           {/* Strictly avoid */}
           <Section title={tx('Strictly avoid')} icon="cancel" color={colors.festival} colors={colors} accent>
             {guide.strictlyAvoid.map((s, i) => (
-              <Row key={i} icon="close-circle-outline" color={colors.festival} text={s} colors={colors} />
+              <Row key={i} icon="close-circle-outline" color={colors.festival} text={tx(s)} colors={colors} />
             ))}
           </Section>
 
@@ -86,7 +86,7 @@ export default function PujaGuideScreen() {
                 <View style={[st.stepNo, { backgroundColor: '#7C3AED18' }]}>
                   <Text style={{ color: '#7C3AED', fontWeight: '800', fontSize: 11 }}>{i + 1}</Text>
                 </View>
-                <Text style={[st.rowText, { color: colors.textSecondary }]}>{s}</Text>
+                <Text style={[st.rowText, { color: colors.textSecondary }]}>{tx(s)}</Text>
               </View>
             ))}
           </Section>
@@ -152,9 +152,9 @@ export default function PujaGuideScreen() {
                 <MaterialCommunityIcons name={g.icon as any} size={26} color={tone(g.color).fg} />
               )}
             </View>
-            <Text style={[st.cardTitle, { color: colors.text }]} numberOfLines={1}>{g.deity.replace('Lord ', '').replace('Goddess ', '').replace('Maa ', '')}</Text>
-            <Text style={[st.cardHi, { color: tone(g.color).fg }]}>{g.deityHi}</Text>
-            <Text style={[st.cardDay, { color: colors.textTertiary }]} numberOfLines={1}>{g.day}</Text>
+            <Text style={[st.cardTitle, { color: colors.text }]} numberOfLines={1}>{language === 'en' ? g.deity.replace('Lord ', '').replace('Goddess ', '').replace('Maa ', '') : native(g.deity, g.deityHi)}</Text>
+            {language === 'en' && <Text style={[st.cardHi, { color: tone(g.color).fg }]}>{g.deityHi}</Text>}
+            <Text style={[st.cardDay, { color: colors.textTertiary }]} numberOfLines={1}>{tx(g.day)}</Text>
           </TouchableOpacity>
           );
         })}

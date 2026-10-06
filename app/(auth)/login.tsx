@@ -1,31 +1,27 @@
 import React, { useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView,
-  Platform, ScrollView, Image,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 import { Button } from '../../components/ui';
+import { AuthBrand, AuthField, GoogleButton, OrDivider } from '../../components/ui/AuthUI';
 import { DS, useDsInsets } from '../../constants/ds';
-
 import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function LoginScreen() {
   const { tx } = useLanguage();
 
-  const { signInWithEmail, signInAsGuest, resolveLoginEmail } = useAuth();
+  const { signInWithEmail, signInAsGuest, resolveLoginEmail, signInWithGoogle } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
   const { insets } = useDsInsets();
 
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [guest, setGuest] = useState(false);
 
@@ -74,95 +70,56 @@ export default function LoginScreen() {
     } finally { setGuest(false); }
   };
 
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const google = async () => {
+    setGoogleBusy(true);
+    try {
+      const ok = await signInWithGoogle();
+      if (ok) router.replace('/(tabs)');
+    } catch (e: any) {
+      dialog.alert('Sign in failed', String(e?.message || 'Google sign-in failed.').slice(0, 160));
+    } finally { setGoogleBusy(false); }
+  };
+
+  const busy = signingIn || guest || googleBusy;
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24, paddingHorizontal: DS.layout.screenPaddingH }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Brand mark — compact, understated */}
-          <View style={st.brand}>
-            <Image source={require('../../assets/images/emblem.png')} style={st.emblem} />
-            <Text style={[st.wordmark, { color: colors.text }]}>{tx('Sadhak')}</Text>
-          </View>
+      <KeyboardAwareScrollView
+        bottomOffset={24}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingTop: insets.top + 28, paddingBottom: insets.bottom + 28, paddingHorizontal: DS.layout.screenPaddingH }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <AuthBrand title={tx('Welcome back')} subtitle={tx('Sign in to continue your practice.')} />
 
-          {/* Form title */}
-          <Text style={[st.title, { color: colors.text }]}>{tx('Welcome back')}</Text>
-          <Text style={[st.sub, { color: colors.textSecondary }]}>{tx('Sign in to continue your practice.')}</Text>
+        <GoogleButton onPress={google} loading={googleBusy} disabled={busy} />
+        <OrDivider />
 
-          {/* Email / username */}
-          <Text style={[st.label, { color: colors.textTertiary }]}>{tx('EMAIL OR USERNAME')}</Text>
-          <View style={[st.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-            <Ionicons name="person-outline" size={18} color={colors.textTertiary} />
-            <TextInput
-              style={[st.input, { color: colors.text }]}
-              placeholder="you@example.com"
-              placeholderTextColor={colors.textTertiary}
-              value={id} onChangeText={setId}
-              keyboardType="email-address" autoCapitalize="none" autoCorrect={false}
-              returnKeyType="next"
-            />
-          </View>
+        <AuthField label={tx('Email or username')} icon="user-circle" placeholder="you@example.com" value={id} onChangeText={setId}
+          keyboardType="email-address" autoCapitalize="none" autoCorrect={false} returnKeyType="next" textContentType="username" />
+        <AuthField label={tx('Password')} icon="lock-key" secure placeholder="••••••••" value={password} onChangeText={setPassword}
+          returnKeyType="go" onSubmitEditing={signIn} textContentType="password" />
 
-          {/* Password */}
-          <Text style={[st.label, { color: colors.textTertiary }]}>PASSWORD</Text>
-          <View style={[st.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-            <Ionicons name="lock-closed-outline" size={18} color={colors.textTertiary} />
-            <TextInput
-              style={[st.input, { color: colors.text }]}
-              placeholder="••••••••"
-              placeholderTextColor={colors.textTertiary}
-              value={password} onChangeText={setPassword}
-              secureTextEntry={!showPw}
-              returnKeyType="go" onSubmitEditing={signIn}
-            />
-            <TouchableOpacity onPress={() => setShowPw((v) => !v)} hitSlop={8}>
-              <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
+        <TouchableOpacity onPress={forgot} hitSlop={8} style={{ alignSelf: 'flex-end', marginTop: -4, marginBottom: 22 }}>
+          <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>{tx('Forgot password?')}</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity onPress={forgot} hitSlop={8} style={{ alignSelf: 'flex-end', marginTop: 12, marginBottom: 22 }}>
-            <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>{tx('Forgot password?')}</Text>
+        <Button title={tx('Sign In')} onPress={signIn} loading={signingIn} disabled={busy} />
+        <View style={{ height: 12 }} />
+        <Button title={tx('Continue as Guest')} variant="ghost" onPress={asGuest} loading={guest} disabled={busy} />
+
+        <View style={st.switchRow}>
+          <Text style={{ color: colors.textSecondary, fontSize: 15 }}>{tx("Don't have an account?")} </Text>
+          <TouchableOpacity onPress={() => router.push('/(auth)/signup')} hitSlop={8}>
+            <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '800' }}>{tx('Sign up')}</Text>
           </TouchableOpacity>
-
-          <Button title={tx('Sign In')} onPress={signIn} loading={signingIn} disabled={signingIn || guest} />
-
-          {/* Divider */}
-          <View style={st.dividerRow}>
-            <View style={[st.dividerLine, { backgroundColor: colors.divider }]} />
-            <Text style={[st.dividerText, { color: colors.textTertiary }]}>or</Text>
-            <View style={[st.dividerLine, { backgroundColor: colors.divider }]} />
-          </View>
-
-          <Button title={tx('Continue as Guest')} variant="secondary" onPress={asGuest} loading={guest} disabled={signingIn || guest} />
-
-          {/* Sign up link */}
-          <View style={st.signup}>
-            <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>{tx('Don\'t have an account?')} </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/signup')} hitSlop={8}>
-              <Text style={{ color: colors.primary, fontSize: 13.5, fontWeight: '800' }}>{tx('Sign up')}</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
 
 const st = StyleSheet.create({
   container: { flex: 1 },
-  brand: { alignItems: 'center', marginBottom: 30 },
-  emblem: { width: 64, height: 64, borderRadius: 32 },
-  wordmark: { fontSize: 22, fontWeight: '800', letterSpacing: 4, marginTop: 12 },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  sub: { fontSize: 14.5, marginTop: 6, marginBottom: 24 },
-  label: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
-  field: { flexDirection: 'row', alignItems: 'center', gap: 10, height: DS.layout.fieldHeight, borderRadius: DS.radius.lg, borderWidth: 1, paddingHorizontal: 16, marginBottom: 14 },
-  input: { flex: 1, fontSize: 15.5 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
-  dividerLine: { flex: 1, height: 1 },
-  dividerText: { fontSize: 12, fontWeight: '600' },
-  signup: { flexDirection: 'row', justifyContent: 'center', marginTop: 26 },
+  switchRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
 });

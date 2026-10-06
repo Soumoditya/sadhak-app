@@ -32,7 +32,7 @@ type Source = 'fused' | 'motion' | 'magnetometer' | 'none';
 
 export default function CompassScreen() {
   const { colors, isDark } = useTheme();
-  const { t: tr, tx } = useLanguage();
+  const { t: tr, tx, native, language } = useLanguage();
   const { screenBottom } = useDsInsets();
   const { width } = useWindowDimensions();
   const SIZE = Math.min(width - 48, 320);
@@ -163,7 +163,7 @@ export default function CompassScreen() {
             {/* Readout */}
             <View style={{ alignItems: 'center', marginTop: 6 }}>
               <Text style={[st.deg, { color: colors.text }]}>{Math.round(shown)}°</Text>
-              <Text style={[st.dirName, { color: dir.color }]}>{dir.label} · {dir.labelHi}</Text>
+              <Text style={[st.dirName, { color: dir.color }]}>{native(dir.label, dir.labelHi)}</Text>
               <View style={st.chips}>
                 <View style={[st.chip, { borderColor: colors.cardBorder }]}>
                   <MaterialCommunityIcons name={trueNorth ? 'earth' : 'magnet'} size={13} color={colors.textSecondary} />
@@ -230,17 +230,17 @@ export default function CompassScreen() {
                   <Text style={{ color: dir.color, fontWeight: '800', fontSize: 15 }}>{dir.key}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[st.cardTitle, { color: colors.text }]}>{dir.label} ({dir.labelHi})</Text>
-                  <Text style={[st.cardSub, { color: colors.textSecondary }]}>{tx('Dikpala')} {dir.dikpala}· {dir.element}</Text>
+                  <Text style={[st.cardTitle, { color: colors.text }]}>{native(dir.label, dir.labelHi)}{language === 'en' ? ` (${dir.labelHi})` : ''}</Text>
+                  <Text style={[st.cardSub, { color: colors.textSecondary }]}>{tx('Dikpala')} {tx(dir.dikpala)} · {tx(dir.element)}</Text>
                 </View>
               </View>
               <View style={st.row}>
                 <MaterialCommunityIcons name="check-circle-outline" size={16} color={colors.tulsiGreen || '#2D6A4F'} />
-                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>{tx('Best for:')} </Text>{dir.good}</Text>
+                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>{tx('Best for:')} </Text>{tx(dir.good)}</Text>
               </View>
               <View style={st.row}>
                 <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" />
-                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>{tx('Avoid:')} </Text>{dir.avoid}</Text>
+                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>{tx('Avoid:')} </Text>{tx(dir.avoid)}</Text>
               </View>
             </View>
 

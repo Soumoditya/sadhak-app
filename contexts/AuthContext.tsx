@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { router } from 'expo-router';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { GOOGLE_WEB_CLIENT_ID } from '../constants/appInfo';
 import { linkWithCredential, sendEmailVerification, signOut as fbSignOut, deleteUser as fbDeleteUser, signInAnonymously as fbAnon } from 'firebase/auth';
 import {
   auth,
@@ -16,6 +18,8 @@ import {
   deleteDoc,
   serverTimestamp,
   EmailAuthProvider,
+  GoogleAuthProvider,
+  signInWithCredential,
   collection,
   getDocs,
   User,
@@ -76,6 +80,8 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   /** Email for an email-or-username login id (usernames are looked up). */
   resolveLoginEmail: (id: string) => Promise<string>;
+  /** Google account sign-in. Resolves false if the user cancelled. */
+  signInWithGoogle: () => Promise<boolean>;
   signUpWithEmail: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
@@ -93,6 +99,7 @@ const AuthContext = createContext<AuthContextType>({
   signInAsGuest: async () => {},
   signInWithEmail: async () => {},
   resolveLoginEmail: async (id: string) => id,
+  signInWithGoogle: async () => false,
   signUpWithEmail: async () => {},
   logout: async () => {},
   updateProfile: async () => {},
@@ -191,13 +198,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-      setProfile(newProfile);
-      await AsyncStorage.setItem('userProfile', JSON.stringify(newProfile));
-      return newProfile;
+      // serverTimestamp() is only a placeholder locally; keep real dates in state
+      // so "Since" etc. don't show NaN until the next app start.
+      const local = { ...newProfile, createdAt: Date.now(), lastActive: Date.now() };
+      setProfile(local);
+      await AsyncStorage.setItem('userProfile', JSON.stringify(local));
+      return local;
     } catch (error) {
       console.error('Error creating profile:', error);
-      setProfile(newProfile);
-      return newProfile;
+      const local = { ...newProfile, createdAt: Date.now(), lastActive: Date.now() };
+      setProfile(local);
+      return local;
     }
   };
 
@@ -274,6 +285,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async (): Promise<boolean> => {
+    if (!GOOGLE_WEB_CLIENT_ID) throw new Error('Google sign-in is being set up. Please use email for now.');
+    GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    const res: any = await GoogleSignin.signIn();
+    if (res?.type === 'cancelled') return false;
+    const idToken = res?.data?.idToken ?? res?.idToken;
+    if (!idToken) throw new Error('Google did not return a sign-in token.');
+    const credential = GoogleAuthProvider.credential(idToken);
+    const current = auth.currentUser;
+    if (current?.isAnonymous) {
+      // Keep a guest's data by upgrading the guest account.
+      try {
+        const cred = await linkWithCredential(current, credential);
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          isGuest: false, email: cred.user.email, displayName: cred.user.displayName || 'Sadhak', profilePicUrl: cred.user.photoURL || null,
+        }, { merge: true });
+        await fetchProfile(cred.user.uid);
+        return true;
+      } catch (e: any) {
+        if (e?.code !== 'auth/credential-already-in-use') throw e;
+        // That Google account already has a Sadhak account: sign into it.
+      }
+    }
+    await signInWithCredential(auth, credential);
+    return true;
+  };
+
   // Sign up with email. A guest who signs up keeps their uid and data: the
   // anonymous account is upgraded in place instead of being abandoned.
   const signUpWithEmail = async (email: string, password: string, name: string) => {
@@ -302,6 +341,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
+      GoogleSignin.signOut().catch(() => {});
       setProfile(null);
       await AsyncStorage.removeItem('userProfile');
       // Leave whatever screen we were on (Settings) for the login screen.
@@ -374,6 +414,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInAsGuest,
     signInWithEmail,
     resolveLoginEmail,
+    signInWithGoogle,
     signUpWithEmail,
     logout,
     updateProfile,

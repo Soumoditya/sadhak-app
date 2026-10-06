@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Image,
-  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -105,7 +105,7 @@ export default function CreatePostScreen() {
         }
       />
 
-      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: kb }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: screenBottomPadding }} keyboardShouldPersistTaps="handled">
           {/* Author row */}
           <View style={styles.authorRow}>

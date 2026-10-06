@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import Avatar from '../../components/community/Avatar';
+import { subscribeDms } from '../../services/social';
 import { db, rtdb, collection, getDocs, addDoc, serverTimestamp, ref, onValue, off } from '../../config/firebase';
 import { Screen, Card, Button, Diya, Icon, fromMaterial, AppBar } from '../../components/ui';
 import { DS, useDsInsets } from '../../constants/ds';
@@ -14,7 +17,8 @@ type ChatTab = 'rooms' | 'dms' | 'groups' | 'channels';
 
 interface Room {
   id: string; name: string; description: string;
-  type: 'public' | 'group' | 'broadcast';
+  type: 'public' | 'group' | 'broadcast' | 'dm';
+  pfp?: string | null;
   icon: string; color: string;
   lastMessage?: string; lastMessageTime?: number; memberCount?: number; createdBy?: string;
 }
@@ -48,6 +52,15 @@ export default function CommunityScreen() {
   const [rooms, setRooms] = useState<Room[]>(DEFAULT_ROOMS);
   const [groups, setGroups] = useState<Room[]>([]);
   const [channels, setChannels] = useState<Room[]>([]);
+  const [dms, setDms] = useState<Room[]>([]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    return subscribeDms(user.uid, (list) => setDms(list.map((d) => ({
+      id: d.roomId, name: d.otherName, description: '', type: 'dm', icon: 'account', color: '#C2410C',
+      pfp: d.otherPfp, lastMessage: d.lastMessage, lastMessageTime: d.lastMessageTime,
+    }))));
+  }, [user?.uid]);
   const [q, setQ] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [cName, setCName] = useState('');
@@ -105,7 +118,7 @@ export default function CommunityScreen() {
   const openRoom = (r: Room) => router.push({ pathname: '/chatroom', params: { roomId: r.id, roomName: r.name, roomType: r.type } });
 
   const list = useMemo(() => {
-    const items = tab === 'rooms' ? rooms : tab === 'groups' ? groups : tab === 'channels' ? channels : [];
+    const items = tab === 'rooms' ? rooms : tab === 'groups' ? groups : tab === 'channels' ? channels : dms;
     const query = q.trim().toLowerCase();
     return query ? items.filter(r => r.name.toLowerCase().includes(query) || (r.description || '').toLowerCase().includes(query)) : items;
   }, [tab, rooms, groups, channels, q]);
@@ -192,7 +205,9 @@ export default function CommunityScreen() {
             activeOpacity={0.75}
           >
             <View style={[s.roomIcon, { backgroundColor: tone(item.color).bg }]}>
-              {item.icon === 'candle' ? (
+              {item.type === 'dm' ? (
+                <Avatar uri={item.pfp} name={item.name} size={42} />
+              ) : item.icon === 'candle' ? (
                 <Diya size={22} color={tone(item.color).fg} />
               ) : fromMaterial(item.icon) ? (
                 <Icon name={fromMaterial(item.icon)!} size={24} color={tone(item.color).fg} />
@@ -202,7 +217,7 @@ export default function CommunityScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <View style={s.roomTop}>
-                <Text style={[s.roomName, { color: colors.text }]} numberOfLines={1}>{tx(item.name)}</Text>
+                <Text style={[s.roomName, { color: colors.text }]} numberOfLines={1}>{item.type === 'dm' ? item.name : tx(item.name)}</Text>
                 {!!item.lastMessageTime && (
                   <Text style={[s.roomTime, { color: colors.textTertiary }]}>{relTime(item.lastMessageTime)}</Text>
                 )}
@@ -218,7 +233,7 @@ export default function CommunityScreen() {
             <View style={s.empty}>
               <MaterialCommunityIcons name="message-outline" size={36} color={colors.textTertiary} />
               <Text style={[s.emptyTitle, { color: colors.text }]}>{tx('No direct messages yet')}</Text>
-              <Text style={[s.emptySub, { color: colors.textSecondary }]}>{tx('Find fellow Sadhaks in the feed and start a conversation.')}</Text>
+              <Text style={[s.emptySub, { color: colors.textSecondary }]}>{tx('Open someone’s profile from the feed and tap Message.')}</Text>
             </View>
           ) : (
             <View style={s.empty}>
@@ -234,7 +249,7 @@ export default function CommunityScreen() {
 
       {/* Create modal */}
       <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <View style={s.sheetOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={s.sheetOverlay}>
           <View style={[s.sheet, { backgroundColor: colors.surface, paddingBottom: 24 + insets.bottom }]}>
             <View style={[s.sheetHandle, { backgroundColor: colors.divider }]} />
             <Text style={[s.sheetTitle, { color: colors.text }]}>{tx('New')} {cType === 'broadcast' ? 'Channel' : 'Group'}</Text>
@@ -275,7 +290,7 @@ export default function CommunityScreen() {
               <Button title={tx('Create')} loading={saving} disabled={!cName.trim()} onPress={create} style={{ flex: 1 }} />
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </Screen>
   );

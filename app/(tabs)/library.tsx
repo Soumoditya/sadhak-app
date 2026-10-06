@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
   FlatList, Modal, Alert, ActivityIndicator, Linking, Platform, Dimensions,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +19,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useLayoutInsets } from '../../constants/layout';
 import { AppBar, Icon } from '../../components/ui';
+import { myRating, rateBook, average, ratingScore } from '../../services/ratings';
+import { increment } from 'firebase/firestore';
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: 'bookshelf', color: '#C2410C' },
@@ -32,7 +35,7 @@ const CATEGORIES = [
 ];
 
 type ViewMode = 'grid' | 'list';
-type SortMode = 'newest' | 'title' | 'popular';
+type SortMode = 'newest' | 'top' | 'popular' | 'title';
 
 interface LibraryItem {
   id: string;
@@ -47,6 +50,8 @@ interface LibraryItem {
   uploadedAt: any;
   downloadCount: number;
   status?: string;
+  ratingSum?: number;
+  ratingCount?: number;
 }
 
 export default function LibraryScreen() {
@@ -69,6 +74,44 @@ export default function LibraryScreen() {
   const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [showReviewQueue, setShowReviewQueue] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [rateFor, setRateFor] = useState<LibraryItem | null>(null);
+  const [myStars, setMyStars] = useState(0);
+  const [savingRate, setSavingRate] = useState(false);
+
+  const openRate = async (book: LibraryItem) => {
+    if (!user) return;
+    setRateFor(book); setMyStars(0);
+    setMyStars(await myRating(book.id, user.uid));
+  };
+
+  const submitRate = async (stars: number) => {
+    if (!user || !rateFor) return;
+    setSavingRate(true);
+    const prev = await myRating(rateFor.id, user.uid);
+    try {
+      await rateBook(rateFor.id, user.uid, stars, prev);
+      setBooks((list) => list.map((b) => b.id === rateFor.id
+        ? { ...b, ratingSum: (b.ratingSum || 0) + stars - prev, ratingCount: (b.ratingCount || 0) + (prev ? 0 : 1) }
+        : b));
+      setMyStars(stars);
+      setTimeout(() => setRateFor(null), 350);
+    } catch (e: any) {
+      dialog.alert('Could not save rating', String(e?.message || e).slice(0, 200));
+    } finally { setSavingRate(false); }
+  };
+
+  const Stars = ({ book, size = 12 }: { book: LibraryItem; size?: number }) => {
+    const avg = average(book.ratingSum, book.ratingCount);
+    return (
+      <TouchableOpacity onPress={() => openRate(book)} hitSlop={8} style={st.starsRow} accessibilityLabel={tx('Rate this book')}>
+        <MaterialCommunityIcons name={avg ? 'star' : 'star-outline'} size={size + 2} color="#E8A317" />
+        <Text style={[st.starsText, { color: avg ? colors.text : colors.textTertiary }]}>
+          {avg ? `${avg.toFixed(1)}` : tx('Rate')}
+        </Text>
+        {!!book.ratingCount && <Text style={[st.starsCount, { color: colors.textTertiary }]}>({book.ratingCount})</Text>}
+      </TouchableOpacity>
+    );
+  };
 
   useEffect(() => { fetchBooks(); if (isAdmin) fetchSubmissions(); }, []);
 
@@ -125,6 +168,7 @@ export default function LibraryScreen() {
     .sort((a, b) => {
       if (sortMode === 'title') return (a.title || '').localeCompare(b.title || '');
       if (sortMode === 'popular') return (b.downloadCount || 0) - (a.downloadCount || 0);
+      if (sortMode === 'top') return ratingScore(b.ratingSum, b.ratingCount) - ratingScore(a.ratingSum, a.ratingCount);
       return 0; // newest is already the default order
     });
 
@@ -201,7 +245,7 @@ export default function LibraryScreen() {
       const fileUri = FileSystem.documentDirectory + fileName;
       const download = await FileSystem.downloadAsync(book.cloudinaryUrl, fileUri);
       if (download.status !== 200) throw new Error(`Server replied HTTP ${download.status}.`);
-      try { await updateDoc(doc(db, 'library', book.id), { downloadCount: (book.downloadCount || 0) + 1 }); } catch (e) {}
+      try { await updateDoc(doc(db, 'library', book.id), { downloadCount: increment(1) }); } catch (e) {}
       dialog.alert('Downloaded', `"${book.title}" is saved offline. What next?`, [
         { text: 'Read now', onPress: () => openPDF(download.uri, book.title) },
         { text: 'Share / save', onPress: async () => { try { await Sharing.shareAsync(download.uri); } catch {} } },
@@ -255,7 +299,7 @@ export default function LibraryScreen() {
           <Text style={[st.gridTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
           <Text style={[st.gridAuthor, { color: colors.textSecondary }]} numberOfLines={1}>{item.author}</Text>
           <View style={st.gridMeta}>
-            <Text style={[st.gridSize, { color: colors.textTertiary }]}>{formatFileSize(item.fileSize)}</Text>
+            <Stars book={item} />
             <TouchableOpacity onPress={() => downloadPDF(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               {isDownloading ? <ActivityIndicator size="small" color={colors.primary} /> :
                 <MaterialCommunityIcons name="download" size={18} color={colors.primary} />}
@@ -275,6 +319,7 @@ export default function LibraryScreen() {
           <Text style={[st.bookAuthor, { color: colors.textSecondary }]}>{item.author}</Text>
           {item.description ? <Text style={[st.bookDesc, { color: colors.textTertiary }]} numberOfLines={1}>{item.description}</Text> : null}
           <View style={st.bookMeta}>
+            <Stars book={item} />
             <Text style={[st.bookSize, { color: colors.textTertiary }]}>{formatFileSize(item.fileSize)}</Text>
             {(item.downloadCount || 0) > 0 && (
               <View style={st.downloadBadge}>
@@ -327,8 +372,9 @@ export default function LibraryScreen() {
       <View style={st.sortRow}>
         {([
           { mode: 'newest' as SortMode, label: 'Newest', icon: 'clock-outline' },
-          { mode: 'title' as SortMode, label: 'A-Z', icon: 'sort-alphabetical-ascending' },
+          { mode: 'top' as SortMode, label: 'Top rated', icon: 'star' },
           { mode: 'popular' as SortMode, label: 'Popular', icon: 'fire' },
+          { mode: 'title' as SortMode, label: 'A-Z', icon: 'sort-alphabetical-ascending' },
         ]).map(({ mode, label, icon }) => {
           const active = sortMode === mode;
           return (
@@ -389,9 +435,29 @@ export default function LibraryScreen() {
         </LinearGradient>
       </TouchableOpacity>
 
+      {/* Rating sheet */}
+      <Modal visible={!!rateFor} transparent animationType="fade" onRequestClose={() => setRateFor(null)} statusBarTranslucent navigationBarTranslucent>
+        <TouchableOpacity style={st.rateOverlay} activeOpacity={1} onPress={() => setRateFor(null)}>
+          <View style={[st.rateCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Text style={[st.rateTitle, { color: colors.text }]} numberOfLines={2}>{rateFor?.title}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
+              {rateFor && rateFor.ratingCount ? `${average(rateFor.ratingSum, rateFor.ratingCount).toFixed(1)} ★ · ${rateFor.ratingCount} ${tx('ratings')}` : tx('Be the first to rate this book.')}
+            </Text>
+            <View style={st.rateStars}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <TouchableOpacity key={n} onPress={() => submitRate(n)} disabled={savingRate} hitSlop={6} accessibilityLabel={`${n}`}>
+                  <MaterialCommunityIcons name={n <= myStars ? 'star' : 'star-outline'} size={40} color="#E8A317" />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={{ color: colors.textTertiary, fontSize: 12.5 }}>{savingRate ? tx('Saving…') : myStars ? tx('Your rating. Tap to change.') : tx('Tap a star to rate.')}</Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Upload Modal */}
       <Modal visible={uploadModal} transparent animationType="slide">
-        <View style={st.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={st.modalOverlay}>
           <View style={[st.modalContent, { backgroundColor: colors.surface, paddingBottom: 24 + bottomInset }]}>
             <View style={st.modalHeader}>
               <Text style={[st.modalTitle, { color: colors.text }]}>{isAdmin ? 'Upload PDF' : 'Submit PDF for Review'}</Text>
@@ -453,7 +519,7 @@ export default function LibraryScreen() {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Admin Review Queue Modal */}
@@ -513,7 +579,14 @@ const st = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 12, paddingHorizontal: 14, height: 44, borderRadius: 12, borderWidth: 1, gap: 8 },
   searchInput: { flex: 1, fontSize: 14 },
 
-  sortRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 10, gap: 6 },
+  starsRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  starsText: { fontSize: 12, fontWeight: '800' },
+  starsCount: { fontSize: 11 },
+  rateOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 28 },
+  rateCard: { borderRadius: 24, borderWidth: 1, padding: 22, alignItems: 'center' },
+  rateTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  rateStars: { flexDirection: 'row', gap: 6, marginVertical: 18 },
+  sortRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, paddingTop: 10, gap: 6 },
   sortChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   sortText: { fontSize: 12, fontWeight: '600' },
 

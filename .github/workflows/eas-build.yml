@@ -5,6 +5,7 @@
 #
 # Needed only when native things change (new native library, permissions,
 # icon, splash, app version). Everything else ships with "Publish OTA update".
+# Last native build: 1.14.0 (Google sign-in, keyboard controller, new icon).
 name: Build APK (EAS)
 
 on:

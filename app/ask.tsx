@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Platform, ActivityIndicator, Image,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -128,12 +128,10 @@ export default function AskScreen() {
       />
 
       <KeyboardAvoidingView
-        style={{ flex: 1, paddingBottom: kb }}
-        // Android: rely on native windowSoftInputMode=adjustResize. The old
-        // behavior='height' + top-inset offset double-counted and left a large
-        // gap between the composer and keyboard after dismiss. iOS still needs padding.
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        style={{ flex: 1 }}
+        // keyboard-controller: tracks the real keyboard height on edge-to-edge
+        // Android, so the composer always sits right above the keyboard.
+        behavior="padding"
       >
         {messages.length === 0 ? (
           <View style={st.emptyWrap}>

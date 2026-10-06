@@ -26,6 +26,26 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.14.0',
+    date: '2026-10-06',
+    title: 'Live Today card, community and full Hindi & Bengali',
+    changes: [
+      'Today card: live clock, current hora and choghadiya, next tithi and nakshatra, festival countdown',
+      'Your day in the stars on Home from your own kundli, plus a Continue japa shortcut',
+      'Calendar: swipe between months, clear festival colours, national holidays and important days, a day card that explains the day',
+      'Reminders at sensible times (evening before, sunrise, morning) instead of a fixed 6 AM',
+      'Sign in with Google; new sign-in and sign-up screens; typing is never hidden by the keyboard',
+      'Follow people, open their profiles and send direct messages',
+      'Posts open as an Instagram-style feed with comments; Explore sorts by Hot, New and Top',
+      'Chat: react with any emoji, reply, copy and delete from one long-press sheet',
+      'Edit profile is one full screen, with your @username inside it',
+      'Jyotish: only the yogas and doshas you have, sign numbers in brackets, readings in your language',
+      'Library: rate books and sort by Top rated',
+      'Wiki, puja guides, recipes, Ayurveda, Vastu and festival details in Hindi and Bengali',
+      'App icon without the dark ring',
+    ],
+  },
+  {
     version: '1.13.0',
     date: '2026-10-06',
     title: 'A new look, everywhere',
@@ -146,3 +166,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
 ];
+
+// Google sign-in: the OAuth "Web client ID" from Firebase → Authentication →
+// Sign-in method → Google → Web SDK configuration. Not a secret.
+export const GOOGLE_WEB_CLIENT_ID = '779861206772-pc7i8tbg3c8at9ttlvemm160t90u5453.apps.googleusercontent.com';

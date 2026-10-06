@@ -76,7 +76,7 @@ export interface PanchangData {
 }
 
 // Tithi names in English and Hindi
-const TITHI_NAMES = [
+export const TITHI_NAMES = [
   { en: 'Pratipada', hi: 'प्रतिपदा' },
   { en: 'Dwitiya', hi: 'द्वितीया' },
   { en: 'Tritiya', hi: 'तृतीया' },
@@ -110,7 +110,7 @@ const TITHI_NAMES = [
 ];
 
 // Nakshatra names
-const NAKSHATRA_NAMES = [
+export const NAKSHATRA_NAMES = [
   { en: 'Ashwini', hi: 'अश्विनी', lord: 'Ketu' },
   { en: 'Bharani', hi: 'भरणी', lord: 'Venus' },
   { en: 'Krittika', hi: 'कृत्तिका', lord: 'Sun' },

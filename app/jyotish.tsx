@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
   ActivityIndicator, Platform, BackHandler, Switch, useWindowDimensions, InteractionManager,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -20,14 +21,26 @@ import {
 } from '../services/jyotish';
 import { downloadKundliPdf, shareKundliPdf } from '../services/jyotishPdf';
 import { openFile } from '../services/downloads';
-import { grahaFlags, analyse, saturnPeriods, antardashas, extraBirthDetails, fmtDeg, localPrediction, type SaturnPeriod } from '../services/jyotishExtras';
+import { cacheNatal } from '../services/natalCache';
+import { HORA_HI } from '../services/hora';
+import { NAKSHATRA_NAMES } from '../services/panchang';
+import { grahaFlags, analyse, SIGNS, SIGNS_HI, type Loc, saturnPeriods, antardashas, extraBirthDetails, fmtDeg, localPrediction, type SaturnPeriod } from '../services/jyotishExtras';
 import { calculatePanchang } from '../services/panchang';
 import { scheduleDailyAstroReminder, cancelDailyAstroReminder, getAstroReminder } from '../services/notifications';
 
 export default function JyotishScreen() {
   const { user, profile, updateProfile } = useAuth();
   const { colors, tones } = useTheme();
-  const { t: tr, tx, language, display } = useLanguage();
+  const { t: tr, tx, language, display, native, locale } = useLanguage();
+  // Localiser for the on-device readings (yogas, doshas, guidance).
+  const loc = useMemo<Loc>(() => ({
+    t: (str, v) => { const base = tx(str); return v ? base.replace(/\{(\w+)\}/g, (_, k) => (v[k] != null ? String(v[k]) : `{${k}}`)) : base; },
+    planet: (n) => native(n, HORA_HI[n]),
+    sign: (i) => native(SIGNS[i], SIGNS_HI[i]),
+    nak: (i) => native(NAKSHATRA_NAMES[i].en, NAKSHATRA_NAMES[i].hi),
+    ord: (n) => (language === 'hi' || language === 'mr' ? `${n}वें` : language === 'bn' || language === 'as' ? `${n} নম্বর` : `${n}${['th', 'st', 'nd', 'rd'][((n % 100) - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th'}`),
+    locale,
+  }), [tx, native, language, locale]);
   const { width } = useWindowDimensions();
   const dialog = useDialog();
   const { screenBottom } = useDsInsets();
@@ -42,7 +55,6 @@ export default function JyotishScreen() {
   const [aiBusy, setAiBusy] = useState(false);
   const [chartStyle, setChartStyle] = useState<ChartStyle>(language === 'bn' || language === 'as' || language === 'od' ? 'east' : 'north');
   const [openMaha, setOpenMaha] = useState<string | null>(null);
-  const [showAllYogas, setShowAllYogas] = useState(false);
   const [saturn, setSaturn] = useState<SaturnPeriod[]>([]);
   const [savedBirth, setSavedBirth] = useState<BirthInput | null>(null);
   const birthEdited = useRef(false); // set once the user saves new birth details
@@ -80,7 +92,7 @@ export default function JyotishScreen() {
       if (!user?.uid) { setLoading(false); setEditing(true); return; }
       const natal = await loadNatal(user.uid);
       if (!active) return;
-      if (natal) { prefill(natal.birth); setKundli(natal.kundli); setSavedBirth(natal.birth); } else { setEditing(true); }
+      if (natal) { prefill(natal.birth); setKundli(natal.kundli); setSavedBirth(natal.birth); cacheNatal(user.uid, natal.kundli); } else { setEditing(true); }
       setLoading(false);
       // The running dasha + Sade Sati depend on today's date; refresh a stale
       // cached chart quietly so they don't stay frozen at the first compute.
@@ -90,6 +102,7 @@ export default function JyotishScreen() {
           // Don't clobber a chart the user re-entered while this was in flight.
           if (!birthEdited.current) {
             await saveKundli(user.uid, natal.birth, fresh);
+            cacheNatal(user.uid, fresh);
             if (active && !birthEdited.current) setKundli(fresh);
           }
         } catch {}
@@ -146,7 +159,7 @@ export default function JyotishScreen() {
 
   // On-device analysis: flags, yogas/doshas, birth panchang, Saturn periods.
   const flags = useMemo(() => (kundli ? grahaFlags(kundli) : {}), [kundli]);
-  const analysis = useMemo(() => (kundli ? analyse(kundli) : { yogas: [], doshas: [] }), [kundli]);
+  const analysis = useMemo(() => (kundli ? analyse(kundli, loc) : { yogas: [], doshas: [] }), [kundli, loc]);
   const birthPanchang = useMemo<[string, string][]>(() => {
     if (!savedBirth) return [];
     try {
@@ -174,11 +187,13 @@ export default function JyotishScreen() {
   const showPeriod = (period: PredictionPeriod) => {
     if (!kundli) return;
     setPredPeriod(period);
-    setPred(localPrediction(kundli, period));
+    setPred(localPrediction(kundli, period, new Date(), loc));
     setPredSource('local');
     const seq = ++aiSeq.current;
     setAiBusy(true);
     const first = profile?.displayName?.split(' ')[0];
+    // The AI reading is English-only; other languages keep the on-device one.
+    if (language !== 'en') { setAiBusy(false); return; }
     const ai = period === 'daily' && user?.uid ? getCachedDaily(user.uid, kundli, first) : getPrediction(kundli, period, first);
     const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 25000));
     Promise.race([ai, timeout])
@@ -186,7 +201,7 @@ export default function JyotishScreen() {
       .catch(() => {})
       .finally(() => { if (seq === aiSeq.current) setAiBusy(false); });
   };
-  useEffect(() => { if (kundli) showPeriod('daily'); }, [kundli, user?.uid]);
+  useEffect(() => { if (kundli) showPeriod(predPeriod || 'daily'); }, [kundli, user?.uid, language]);
 
   // While editing an existing chart, back (header or hardware) cancels the edit
   // instead of leaving the screen.
@@ -239,6 +254,7 @@ export default function JyotishScreen() {
       const k = await computeAndSaveKundli(user.uid, birth);
       await updateProfile({ hasBirthChart: true } as any); // non-sensitive flag
       setKundli(k); setSavedBirth(birth);
+      if (user?.uid) cacheNatal(user.uid, k);
       setEditing(false);
     } catch (e: any) {
       dialog.alert('Could not save', String(e?.message || e).slice(0, 160));
@@ -250,7 +266,7 @@ export default function JyotishScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Header title={tx('Your Birth Details')} subtitle={tx('Used to compute your authentic Vedic chart')} onBack={kundli ? () => setEditing(false) : undefined} />
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView bottomOffset={24} contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={[s.privacy, { backgroundColor: colors.primary + '0E', borderColor: colors.primary + '25' }]}>
             <MaterialCommunityIcons name="lock-outline" size={16} color={colors.primary} />
             <Text style={{ color: colors.textSecondary, fontSize: 12.5, flex: 1, lineHeight: 18 }}>{tx(
@@ -333,7 +349,7 @@ export default function JyotishScreen() {
             {saving ? <ActivityIndicator color="#FFF" /> : <><MaterialCommunityIcons name="star-four-points" size={18} color="#FFF" /><Text style={s.saveBtnText}>{tx('Compute my chart')}</Text></>}
           </TouchableOpacity>
           {kundli && <TouchableOpacity onPress={() => setEditing(false)} style={{ alignItems: 'center', marginTop: 14 }}><Text style={{ color: colors.textSecondary }}>{tx('Cancel')}</Text></TouchableOpacity>}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
     );
   }
@@ -362,6 +378,7 @@ export default function JyotishScreen() {
   const sadePast = [...saturn].reverse().find((p) => p.kind === 'sadeSati' && p.end <= new Date());
   const dhaiyaNext = saturn.find((p) => p.kind !== 'sadeSati' && p.end > new Date());
   const presentYogas = analysis.yogas.filter((y) => y.present);
+  const presentDoshas = analysis.doshas.filter((d) => d.present);
   const chartData = chartTab === 'd1' ? null : chartTab === 'd9' ? kundli.charts?.d9 : chartTab === 'd10' ? kundli.charts?.d10 : kundli.charts?.moon;
   const pct = (s: string, e: string) => {
     const a = new Date(s + 'T00:00:00').getTime(), z = new Date(e + 'T00:00:00').getTime();
@@ -369,8 +386,8 @@ export default function JyotishScreen() {
   };
   const deva = language === 'hi' || language === 'mr';
   const infoRows: [string, string][] = [
-    ['Lagna (Ascendant)', `${b.lagna} · ${b.lagnaHi}`], ['Rashi (Moon sign)', `${b.rashi} · lord ${b.rashiLord}`],
-    ['Nakshatra', `${b.nakshatra} · pada ${b.pada}`], ['Nakshatra lord', b.nakLord],
+    ['Lagna (Ascendant)', native(b.lagna, b.lagnaHi)], ['Rashi (Moon sign)', `${native(b.rashi, b.rashiHi)} · ${loc.planet(b.rashiLord)}`],
+    ['Nakshatra', `${native(b.nakshatra, b.nakshatraHi)} · ${tx('pada')} ${b.pada}`], ['Nakshatra lord', loc.planet(b.nakLord)],
     ...extraBirthDetails(kundli),
     ['Gana', b.gana], ['Nadi', b.nadi], ['Yoni', b.yoni], ['Deity', b.deity],
     ...birthPanchang,
@@ -379,31 +396,18 @@ export default function JyotishScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title={tr('f.jyotish')} subtitle={`${b.rashi} · ${b.nakshatra}`} right={
+      <Header title={tr('f.jyotish')} subtitle={`${native(b.rashi, b.rashiHi)} · ${native(b.nakshatra, b.nakshatraHi)}`} right={
         <TouchableOpacity onPress={() => setEditing(true)} hitSlop={8} accessibilityLabel="Edit birth details"
           style={[s.iconBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <Icon name="note-pencil" size={18} color={colors.text} />
         </TouchableOpacity>
       } />
       <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 4, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
-        {/* Summary */}
-        <View style={[s.hero, { backgroundColor: tones.haldi.bg, borderColor: tones.haldi.fg + '33' }]}>
-          {[
-            [tx('Lagna'), deva ? b.lagnaHi : b.lagna],
-            [tx('Rashi'), deva ? b.rashiHi : b.rashi],
-            [tx('Nakshatra'), deva ? b.nakshatraHi : b.nakshatra],
-          ].map(([k, v]) => (
-            <View key={k} style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={[s.heroKey, { color: tones.haldi.fg }]}>{k}</Text>
-              <Text style={[s.heroVal, { color: colors.text }, deva && { fontFamily: DS.font.deva, fontWeight: 'normal' }]} numberOfLines={1} adjustsFontSizeToFit>{v}</Text>
-            </View>
-          ))}
-        </View>
         <View style={s.chipRow}>
           {maha && (
             <View style={[s.statusChip, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <Icon name="hourglass" size={14} color={colors.primary} />
-              <Text style={[s.statusText, { color: colors.text }]}>{maha.lord}{antar ? ` / ${antar.lord}` : ''} {tx('dasha')}</Text>
+              <Text style={[s.statusText, { color: colors.text }]}>{loc.planet(maha.lord)}{antar ? ` / ${loc.planet(antar.lord)}` : ''} {tx('dasha')}</Text>
             </View>
           )}
           <View style={[s.statusChip, { backgroundColor: sadeNow ? tones.kumkum.bg : colors.surface, borderColor: sadeNow ? tones.kumkum.fg + '44' : colors.cardBorder }]}>
@@ -438,6 +442,11 @@ export default function JyotishScreen() {
               );
             })}
           </View>
+          <Text style={[s.glance, { color: colors.text }]} numberOfLines={2}>
+            {tx('Lagna')} <Text style={{ fontWeight: '800' }}>{native(b.lagna, b.lagnaHi)}</Text>
+            {'  ·  '}{tx('Moon')} <Text style={{ fontWeight: '800' }}>{native(b.rashi, b.rashiHi)}</Text>
+            {'  ·  '}<Text style={{ fontWeight: '800' }}>{native(b.nakshatra, b.nakshatraHi)}</Text> {b.pada}
+          </Text>
           <Text style={[s.chartSub, { color: colors.textTertiary }]}>
             {tx(chartTab === 'd1' ? 'Birth chart: overall life and body' : chartTab === 'd9' ? 'Navamsa: marriage, dharma and inner strength' : chartTab === 'd10' ? 'Dasamsa: career and profession' : 'Moon chart: mind and emotions')}
           </Text>
@@ -545,7 +554,7 @@ export default function JyotishScreen() {
                   <Text style={[s.grahaAbbr, { color: p.name === 'Sun' || p.name === 'Moon' ? tones.saffron.fg : colors.text }]}>{p.nameHi}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.grahaName, { color: colors.text }]}>{p.name} <Text style={{ color: colors.textTertiary, fontWeight: '600' }}>· {p.sign} {fmtDeg(p.degree)}</Text></Text>
+                  <Text style={[s.grahaName, { color: colors.text }]}>{loc.planet(p.name)} <Text style={{ color: colors.textTertiary, fontWeight: '600' }}>· {loc.sign(p.signIndex)} {fmtDeg(p.degree)}</Text></Text>
                   <Text style={[s.grahaSub, { color: colors.textSecondary }]}>{tx('House')} {p.house} · {tx(HOUSE_MEANING[p.house])} · {p.nakshatra} {p.pada}</Text>
                   {(dig || f.retro || f.combust || f.vargottama) && (
                     <View style={s.tagRow}>
@@ -568,7 +577,7 @@ export default function JyotishScreen() {
               <View style={[s.dashaNow, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
                 <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{tx('Running now')}</Text>
                 <Text style={{ color: colors.text, fontSize: 16.5, fontWeight: '800', marginTop: 2 }}>
-                  {maha.lord} {tx('Mahadasha')}{antar ? ` · ${antar.lord} ${tx('Antardasha')}` : ''}
+                  {loc.planet(maha.lord)} {tx('Mahadasha')}{antar ? ` · ${loc.planet(antar.lord)} ${tx('Antardasha')}` : ''}
                 </Text>
                 <View style={[s.bar, { backgroundColor: colors.primary + '22' }]}><View style={[s.barFill, { backgroundColor: colors.primary, width: `${pct(maha.start, maha.end) * 100}%` }]} /></View>
                 <Text style={{ color: colors.textTertiary, fontSize: 11.5, marginTop: 4 }}>{fmtShort(maha.start)} – {fmtShort(maha.end)}</Text>
@@ -583,7 +592,7 @@ export default function JyotishScreen() {
                   return (
                     <View key={a.lord + a.start} style={s.timeRow}>
                       <View style={[s.timeDot, { backgroundColor: on ? colors.primary : past ? colors.cardBorder : colors.surface, borderColor: on ? colors.primary : colors.textTertiary }]} />
-                      <Text style={[s.timeLord, { color: on ? colors.primary : past ? colors.textTertiary : colors.text, fontWeight: on ? '800' : '600' }]}>{maha!.lord} / {a.lord}</Text>
+                      <Text style={[s.timeLord, { color: on ? colors.primary : past ? colors.textTertiary : colors.text, fontWeight: on ? '800' : '600' }]}>{loc.planet(maha!.lord)} / {loc.planet(a.lord)}</Text>
                       <Text style={[s.timeSpan, { color: colors.textTertiary }]}>{fmtShort(a.start)} – {fmtShort(a.end)}</Text>
                     </View>
                   );
@@ -598,12 +607,12 @@ export default function JyotishScreen() {
                 <View key={m.lord + m.start}>
                   <TouchableOpacity onPress={() => setOpenMaha(open ? null : m.start)} style={s.timeRow}>
                     <Icon name={open ? 'caret-down' : 'caret-right'} size={13} color={colors.textTertiary} weight="regular" />
-                    <Text style={[s.timeLord, { color: on ? colors.primary : colors.text, fontWeight: on ? '800' : '600' }]}>{m.lord}</Text>
+                    <Text style={[s.timeLord, { color: on ? colors.primary : colors.text, fontWeight: on ? '800' : '600' }]}>{loc.planet(m.lord)}</Text>
                     <Text style={[s.timeSpan, { color: colors.textTertiary }]}>{m.start.slice(0, 4)} – {m.end.slice(0, 4)}</Text>
                   </TouchableOpacity>
                   {open && antardashas(m).map((a) => (
                     <View key={a.start} style={[s.timeRow, { paddingLeft: 24 }]}>
-                      <Text style={[s.timeLord, { color: colors.textSecondary, fontSize: 13 }]}>{m.lord} / {a.lord}</Text>
+                      <Text style={[s.timeLord, { color: colors.textSecondary, fontSize: 13 }]}>{loc.planet(m.lord)} / {loc.planet(a.lord)}</Text>
                       <Text style={[s.timeSpan, { color: colors.textTertiary }]}>{fmtShort(a.start)} – {fmtShort(a.end)}</Text>
                     </View>
                   ))}
@@ -641,31 +650,34 @@ export default function JyotishScreen() {
 
         {/* Yogas */}
         <Section2 title={tx('Yogas')} colors={colors} display={display}>
-          {presentYogas.length === 0 && <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>{tx('No major classical yogas from this curated set. Every chart still has its own strengths — see the dashas and planet dignities above.')}</Text>}
-          {(showAllYogas ? analysis.yogas : presentYogas).map((y) => (
-            <View key={y.name} style={[s.finding, { opacity: y.present ? 1 : 0.55 }]}>
+          {presentYogas.length === 0 && <Text style={{ color: colors.textSecondary, fontSize: 13.5, lineHeight: 19 }}>{tx('None of the major classical yogas are formed. Every chart still has its own strengths: see the dashas and planet dignities above.')}</Text>}
+          {presentYogas.map((y, i) => (
+            <View key={y.name} style={[s.finding, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, paddingTop: 10 }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Icon name={y.present ? 'check-circle' : 'x-circle'} size={15} color={y.present ? tones.tulsi.fg : colors.textTertiary} weight="fill" />
-                <Text style={{ color: colors.text, fontSize: 14.5, fontWeight: '800', flexShrink: 1 }}>{deva ? y.nameHi : y.name}</Text>
+                <Icon name="check-circle" size={15} color={tones.tulsi.fg} weight="fill" />
+                <Text style={{ color: colors.text, fontSize: 14.5, fontWeight: '800', flexShrink: 1 }}>{native(y.name, y.nameHi)}</Text>
               </View>
-              <Text style={{ color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 3 }}>{y.detail}{y.present && y.note ? `. ${y.note}` : ''}</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 3 }}>{y.detail}{y.note ? `. ${y.note}` : ''}</Text>
             </View>
           ))}
-          <TouchableOpacity onPress={() => setShowAllYogas((v) => !v)} style={{ paddingTop: 6 }}>
-            <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>{tx(showAllYogas ? 'Show only yogas present' : 'Show every yoga checked')}</Text>
-          </TouchableOpacity>
         </Section2>
 
         {/* Doshas */}
         <Section2 title={tx('Doshas')} colors={colors} display={display}>
-          {analysis.doshas.map((d, i) => (
+          {presentDoshas.length === 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Icon name="check-circle" size={16} color={tones.tulsi.fg} weight="fill" />
+              <Text style={{ color: colors.textSecondary, fontSize: 13.5, flex: 1 }}>{tx('No major dosha in your chart.')}</Text>
+            </View>
+          )}
+          {presentDoshas.map((d, i) => (
             <View key={d.name} style={[s.finding, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, paddingTop: 10 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <Text style={{ color: colors.text, fontSize: 14.5, fontWeight: '800', flexShrink: 1 }}>{deva ? d.nameHi : d.name}</Text>
-                <Tag text={tx(d.present ? 'Present' : 'Not present')} tone={d.present ? tones.kumkum : tones.tulsi} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon name="warning" size={15} color={tones.kumkum.fg} weight="fill" />
+                <Text style={{ color: colors.text, fontSize: 14.5, fontWeight: '800', flexShrink: 1 }}>{native(d.name, d.nameHi)}</Text>
               </View>
               <Text style={{ color: colors.textSecondary, fontSize: 12.5, lineHeight: 18, marginTop: 3 }}>{d.detail}</Text>
-              {d.present && !!d.note && <Text style={{ color: tones.plum.fg, fontSize: 12.5, lineHeight: 18, marginTop: 3 }}>{d.note}</Text>}
+              {!!d.note && <Text style={{ color: tones.plum.fg, fontSize: 12.5, lineHeight: 18, marginTop: 3 }}>{d.note}</Text>}
             </View>
           ))}
         </Section2>
@@ -751,6 +763,7 @@ const s = StyleSheet.create({
   chartTabs: { flexDirection: 'row', gap: 6, marginBottom: 6, flexWrap: 'wrap', justifyContent: 'center' },
   chartTab: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 100, borderWidth: 1 },
   chartSub: { fontSize: 12, marginBottom: 12, textAlign: 'center' },
+  glance: { fontSize: 13.5, textAlign: 'center', marginBottom: 4, lineHeight: 20 },
   legend: { fontSize: 11.5, textAlign: 'center', marginTop: 10 },
   actions: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   action: { flex: 1, borderRadius: 18, borderWidth: 1, padding: 12, alignItems: 'center', gap: 8 },

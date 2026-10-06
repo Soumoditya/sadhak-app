@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, TextInput, Linking, Share, Platform,
-  ActivityIndicator, FlatList, Modal, KeyboardAvoidingView, ScrollView, useWindowDimensions,
+  View, Text, TouchableOpacity, StyleSheet, TextInput, Linking, Share, Platform, ActivityIndicator, FlatList, Modal, ScrollView, useWindowDimensions,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -439,7 +439,7 @@ export default function TemplesScreen() {
 
       {/* Add place sheet */}
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={st.sheetWrap}>
+        <KeyboardAvoidingView behavior="padding" style={st.sheetWrap}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setAddOpen(false)} />
           <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>
             <View style={[st.handle, { backgroundColor: colors.cardBorder }]} />

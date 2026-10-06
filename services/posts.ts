@@ -91,7 +91,7 @@ export async function createPost(input: {
 }
 
 /** Live explore feed (newest first). */
-export function subscribeFeed(cb: (posts: Post[]) => void, max = 60): () => void {
+export function subscribeFeed(cb: (posts: Post[]) => void, max = 150): () => void {
   const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(max));
   return onSnapshot(
     q,
@@ -178,4 +178,58 @@ export async function searchPosts(term: string): Promise<Post[]> {
   return snap.docs
     .map(toPost)
     .filter((p) => p.text.toLowerCase().includes(t) || p.hashtags.some((h) => h.includes(t)));
+}
+
+/** Latest few comments for the inline preview under a post. */
+export async function getLatestComments(postId: string, n = 2): Promise<PostComment[]> {
+  const snap = await getDocs(query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'desc'), limit(n)));
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })).reverse();
+}
+
+// ─── Ranking (Reddit-style) ──────────────────────────────────────────────────
+export type FeedSort = 'hot' | 'new' | 'top';
+export type TopPeriod = 'day' | 'week' | 'all';
+
+export const postMillis = (p: Post) => p.createdAt?.toMillis?.() ?? (typeof p.createdAt === 'number' ? p.createdAt : Date.now());
+
+/** Engagement decayed by age: newer posts with activity float up. */
+export function hotScore(p: Post, now = Date.now()): number {
+  const hours = Math.max(0, (now - postMillis(p)) / 3600_000);
+  const points = 1 + (p.likeCount || 0) + 2 * (p.commentCount || 0);
+  return points / Math.pow(hours + 2, 1.5);
+}
+
+export function rankPosts(posts: Post[], sort: FeedSort, period: TopPeriod = 'week'): Post[] {
+  const now = Date.now();
+  const arr = [...posts];
+  if (sort === 'new') return arr.sort((a, b) => postMillis(b) - postMillis(a));
+  if (sort === 'hot') return arr.sort((a, b) => hotScore(b, now) - hotScore(a, now));
+  const span = period === 'day' ? 86400_000 : period === 'week' ? 7 * 86400_000 : Infinity;
+  return arr
+    .filter((p) => now - postMillis(p) <= span)
+    .sort((a, b) => (b.likeCount + b.commentCount) - (a.likeCount + a.commentCount) || postMillis(b) - postMillis(a));
+}
+
+export function timeAgo(createdAt: any): string {
+  const ms = createdAt?.toMillis?.() ?? (typeof createdAt === 'number' ? createdAt : 0);
+  if (!ms) return 'now';
+  const s = Math.max(1, Math.floor((Date.now() - ms) / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  return `${Math.floor(d / 7)}w`;
+}
+
+/** Keep the name and photo on a person's own posts in step with their profile. */
+export async function syncAuthorOnPosts(uid: string, a: { displayName: string; username: string; profilePicUrl: string | null }) {
+  const snap = await getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), limit(200)));
+  await Promise.all(snap.docs.map((d) => {
+    const v: any = d.data();
+    if (v.authorName === a.displayName && v.authorUsername === a.username && v.authorPfp === a.profilePicUrl) return null;
+    return updateDoc(d.ref, { authorName: a.displayName || 'Sadhak', authorUsername: a.username || '', authorPfp: a.profilePicUrl || null }).catch(() => {});
+  }));
 }

@@ -1,8 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal,
-  TextInput,
+  TextInput, PanResponder, Animated,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { holidaysOn, isPublicHoliday, type Holiday } from '../../constants/holidays';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -47,6 +49,7 @@ interface DayInfo {
   isAmavasya: boolean;
   isEkadashi: boolean;
   festivals: Festival[];
+  holidays: Holiday[];
 }
 
 function fmt12(h: number, m: number): string {
@@ -59,7 +62,8 @@ export default function CalendarScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
-  const { t, locale, noTrack, display, tx } = useLanguage();
+  const { t, tf, locale, noTrack, display, tx, native, pick, language } = useLanguage();
+  const { tones } = useTheme();
   // Weekday/month names in the chosen language (1 Jan 2023 was a Sunday).
   const dayNames = useMemo(() => Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i).toLocaleDateString(locale, { weekday: 'short' })), [locale]);
   const monthNames = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(2023, i, 1).toLocaleDateString(locale, { month: 'long' })), [locale]);
@@ -73,8 +77,9 @@ export default function CalendarScreen() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [reminders, setReminders] = useState<Record<string, { id: string; time: string }>>({});
   const [reminderSheet, setReminderSheet] = useState(false);
-  const [remHour, setRemHour] = useState(6);
+  const [remHour, setRemHour] = useState(7);
   const [remMinute, setRemMinute] = useState(0);
+  const [groomOpen, setGroomOpen] = useState(false);
   const [showClock, setShowClock] = useState(false);
   const [monthPicker, setMonthPicker] = useState(false);
 
@@ -138,9 +143,10 @@ export default function CalendarScreen() {
           isAmavasya: tn.includes('amavasya'),
           isEkadashi: tn.includes('ekadashi'),
           festivals: dayFestivals,
+          holidays: holidaysOn(date),
         };
       } catch {
-        map[d] = { status: 'allowed', isPurnima: false, isAmavasya: false, isEkadashi: false, festivals: [] };
+        map[d] = { status: 'allowed', isPurnima: false, isAmavasya: false, isEkadashi: false, festivals: [], holidays: holidaysOn(date) };
       }
     }
     return map;
@@ -167,8 +173,28 @@ export default function CalendarScreen() {
   const isSelected = (day: number) =>
     day === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear();
 
-  const goToPrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
-  const goToNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  // Month change with a short slide so a swipe feels like turning a page.
+  const slide = useRef(new Animated.Value(0)).current;
+  const shiftMonth = (dir: 1 | -1) => {
+    Animated.timing(slide, { toValue: -dir * 40, duration: 110, useNativeDriver: true }).start(() => {
+      setCurrentDate((c) => new Date(c.getFullYear(), c.getMonth() + dir, 1));
+      slide.setValue(dir * 40);
+      Animated.spring(slide, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 4 }).start();
+    });
+  };
+  const goToPrevMonth = () => shiftMonth(-1);
+  const goToNextMonth = () => shiftMonth(1);
+  const swipe = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
+    onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+    onPanResponderMove: (_, g) => slide.setValue(g.dx * 0.35),
+    onPanResponderRelease: (_, g) => {
+      if (g.dx < -50 || g.vx < -0.5) shiftMonth(1);
+      else if (g.dx > 50 || g.vx > 0.5) shiftMonth(-1);
+      else Animated.spring(slide, { toValue: 0, useNativeDriver: true }).start();
+    },
+    onPanResponderTerminate: () => Animated.spring(slide, { toValue: 0, useNativeDriver: true }).start(),
+  }), []);
   const goToToday = () => { setCurrentDate(new Date()); setSelectedDate(new Date()); };
 
   const addNote = () => {
@@ -195,21 +221,7 @@ export default function CalendarScreen() {
   const selectedDateKey = getDateKey(selectedDate);
   const existingReminder = reminders[selectedDateKey];
 
-  const openReminderSheet = () => {
-    if (existingReminder) {
-      dialog.alert(
-        'Reminder set',
-        `A reminder is set for ${existingReminder.time}. What would you like to do?`,
-        [
-          { text: 'Keep it', style: 'cancel' },
-          { text: 'Remove reminder', style: 'destructive', onPress: cancelReminder },
-          { text: 'Change time', onPress: () => setReminderSheet(true) },
-        ],
-      );
-      return;
-    }
-    setReminderSheet(true);
-  };
+  const openReminderSheet = () => setReminderSheet(true);
 
   const cancelReminder = async () => {
     try {
@@ -220,7 +232,7 @@ export default function CalendarScreen() {
     saveReminders(updated);
   };
 
-  const scheduleReminder = async () => {
+  const scheduleAt = async (target: Date) => {
     try {
       let perm = await Notifications.getPermissionsAsync();
       if (!perm.granted) perm = await Notifications.requestPermissionsAsync();
@@ -228,37 +240,72 @@ export default function CalendarScreen() {
         dialog.alert('Notifications off', 'Please allow notifications so reminders can reach you.', undefined, { tone: 'warning' });
         return;
       }
-      const target = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), remHour, remMinute, 0);
       if (target.getTime() <= Date.now()) {
         dialog.alert('Time has passed', 'Pick a future time for this reminder.', undefined, { tone: 'warning' });
         return;
       }
-      // Replace any previous reminder for this date.
       if (existingReminder?.id) {
         try { await Notifications.cancelScheduledNotificationAsync(existingReminder.id); } catch {}
       }
       const dateLabel = selectedDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
       const note = notes[selectedDateKey];
+      const what = [...(selectedInfo?.festivals || []).map((f) => native(f.name, f.nameHi)), ...(selectedInfo?.holidays || []).map(holidayName)].join(', ');
       const id = await Notifications.scheduleNotificationAsync({
         content: {
-          title: '🙏 Sadhak Reminder',
-          body: note ? `${dateLabel}: ${note}` : `Your reminder for ${dateLabel}`,
+          title: what ? `🙏 ${what}` : '🙏 Sadhak',
+          body: [dateLabel, note].filter(Boolean).join(' · '),
           sound: true,
           data: { route: '/(tabs)/calendar' },
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: target, channelId: 'sadhak-spiritual' },
       });
-      saveReminders({ ...reminders, [selectedDateKey]: { id, time: fmt12(remHour, remMinute) } });
+      const sameDay = target.toDateString() === selectedDate.toDateString();
+      const label = `${sameDay ? '' : target.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) + ', '}${fmt12(target.getHours(), target.getMinutes())}`;
+      saveReminders({ ...reminders, [selectedDateKey]: { id, time: label } });
       setReminderSheet(false);
-      dialog.alert('Reminder set', `${dateLabel} at ${fmt12(remHour, remMinute)}.`, undefined, { tone: 'success' });
+      dialog.alert('Reminder set', label, undefined, { tone: 'success' });
     } catch {
       dialog.alert('Error', 'Could not set the reminder. Please try again.');
     }
   };
 
+  // Sensible reminder moments for the selected day (only future ones).
+  const reminderPresets = useMemo(() => {
+    const d = selectedDate;
+    const at = (dayOffset: number, h: number, m: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + dayOffset, h, m, 0);
+    const [sh, sm] = (selectedPanchang?.sunrise || '06:00').split(':').map(Number);
+    return [
+      { key: 'eve', label: tx('Evening before'), icon: 'weather-sunset-down', date: at(-1, 19, 0) },
+      { key: 'rise', label: tx('At sunrise'), icon: 'weather-sunset-up', date: at(0, sh, sm) },
+      { key: 'morn', label: tx('Morning'), icon: 'white-balance-sunny', date: at(0, 8, 0) },
+      { key: 'eve0', label: tx('Evening'), icon: 'weather-night', date: at(0, 18, 0) },
+    ].filter((p) => p.date.getTime() > Date.now());
+  }, [selectedDate.toDateString(), selectedPanchang?.sunrise, tx]);
+
+  const holidayName = (h: Holiday) => (language === 'hi' || language === 'mr' ? h.hi : language === 'bn' || language === 'as' ? h.bn : h.name);
+
   const groomingColor = getGroomingStatusColor(selectedGrooming.overallStatus);
   const hasNote = !!notes[selectedDateKey];
   const selFestivals = selectedInfo?.festivals || [];
+
+  // Everything notable about the selected day, most important first.
+  type DayEvent = { title: string; line?: string; tag?: string; icon: string; tone: { bg: string; fg: string } };
+  const dayEvents: DayEvent[] = [];
+  selFestivals.forEach((f) => dayEvents.push({
+    title: native(f.name, f.nameHi),
+    line: tx(f.description),
+    tag: f.fasting ? tx('Fast') : f.type === 'major' ? tx('Festival') : undefined,
+    icon: 'star-four-points', tone: tones.kumkum,
+  }));
+  (selectedInfo?.holidays || []).forEach((h) => dayEvents.push({
+    title: holidayName(h),
+    tag: h.kind === 'day' ? tx('Important day') : tx('Public holiday'),
+    icon: h.kind === 'day' ? 'flag-outline' : 'flag', tone: tones.neel,
+  }));
+  const covered = (n: string) => selFestivals.some((f) => f.name.toLowerCase().includes(n));
+  if (selectedInfo?.isEkadashi && !covered('ekadashi')) dayEvents.push({ title: native('Ekadashi', 'एकादशी'), line: tx('Fasting day dedicated to Lord Vishnu.'), tag: tx('Fast'), icon: 'moon-waxing-crescent', tone: tones.plum });
+  if (selectedInfo?.isPurnima && !covered('purnima')) dayEvents.push({ title: native('Purnima', 'पूर्णिमा'), line: tx('Full moon: Satyanarayan puja, charity and holy dips.'), icon: 'moon-full', tone: tones.haldi });
+  if (selectedInfo?.isAmavasya && !covered('amavasya')) dayEvents.push({ title: native('Amavasya', 'अमावस्या'), line: tx('New moon: tarpan for ancestors and quiet prayer.'), icon: 'moon-new', tone: tones.neel });
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
@@ -268,7 +315,7 @@ export default function CalendarScreen() {
         <View style={{ paddingTop: headerPaddingTop }}>
           <AppBar
             title={t('f.calendar')}
-            subtitle={selectedPanchang ? `${selectedPanchang.hinduMonth.nameHi} · ${selectedPanchang.tithi.pakshaHi}` : ''}
+            subtitle={selectedPanchang ? `${native(selectedPanchang.hinduMonth.name, selectedPanchang.hinduMonth.nameHi)} · ${native(selectedPanchang.tithi.paksha === 'shukla' ? 'Shukla paksha' : 'Krishna paksha', selectedPanchang.tithi.pakshaHi)}` : ''}
             right={
               <TouchableOpacity
                 onPress={goToToday}
@@ -309,7 +356,7 @@ export default function CalendarScreen() {
         </View>
 
         {/* ═══ Calendar grid — clean by default, markers only when meaningful ═══ */}
-        <View style={[st.calendarCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+        <View style={[st.calendarCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} {...swipe.panHandlers}>
           <View style={st.dayHeaders}>
             {dayNames.map((d, i) => (
               <View key={i} style={{ width: CELL, alignItems: 'center', paddingVertical: 8 }}>
@@ -318,7 +365,7 @@ export default function CalendarScreen() {
             ))}
           </View>
 
-          <View style={st.grid}>
+          <Animated.View style={[st.grid, { transform: [{ translateX: slide }], opacity: slide.interpolate({ inputRange: [-60, 0, 60], outputRange: [0.4, 1, 0.4] }) }]}>
             {calendarDays.map((item, idx) => {
               if (!item.isCurrentMonth) {
                 return (
@@ -334,10 +381,8 @@ export default function CalendarScreen() {
               const isSunday = new Date(year, month, day).getDay() === 0;
               const hasFestival = (info?.festivals.length || 0) > 0;
               const dayHasNote = !!notes[getDateKey(new Date(year, month, day))];
-              const restricted = info?.status === 'forbidden';
-              // Only hard "avoid" days get a mark — amber caution bars on most
-              // days made the grid read as noise. Caution stays in the day sheet.
-              const caution = false;
+              const holiday = !!info?.holidays.some(isPublicHoliday);
+              const fest = tones.kumkum;
 
               return (
                 <TouchableOpacity
@@ -345,45 +390,48 @@ export default function CalendarScreen() {
                   style={[st.cell, { width: CELL }]}
                   onPress={() => setSelectedDate(new Date(year, month, day))}
                   activeOpacity={0.6}
+                  accessibilityLabel={`${day}${hasFestival ? ', ' + info!.festivals.map((f) => f.name).join(', ') : ''}`}
                 >
                   <View
                     style={[
                       st.cellInner,
-                      hasFestival && !selected && { backgroundColor: colors.purnima + '1E' },
-                      today && !selected && { borderColor: colors.primary, borderWidth: 1.5 },
+                      hasFestival && !selected && { backgroundColor: fest.fg + '2B', borderWidth: 1.5, borderColor: fest.fg + '99' },
+                      today && !selected && { borderColor: colors.primary, borderWidth: 2 },
                       selected && { backgroundColor: colors.primary },
                     ]}
                   >
                     <Text
                       style={[
                         st.cellDay,
-                        { color: isSunday ? colors.festival : colors.text },
-                        hasFestival && !selected && { color: isDark ? colors.purnima : '#8A6A10', fontWeight: '800' },
+                        { color: isSunday || holiday ? colors.festival : colors.text },
+                        hasFestival && !selected && { color: fest.fg, fontWeight: '800' },
                         today && !selected && { color: colors.primary, fontWeight: '800' },
                         selected && { color: '#FFF', fontWeight: '800' },
                       ]}
                     >
                       {day}
                     </Text>
-                    {/* Grooming underlines removed — they made the grid look noisy.
-                        Grooming guidance now lives only in the day sheet below. */}
-                    {/* Special tithi micro-marks */}
-                    {info?.isPurnima && <View style={[st.tithiDot, { backgroundColor: colors.purnima, borderColor: selected ? '#FFF' : 'transparent' }]} />}
-                    {info?.isAmavasya && <View style={[st.tithiDot, { backgroundColor: colors.amavasya, borderColor: colors.textTertiary }]} />}
-                    {info?.isEkadashi && <View style={[st.tithiDot, { backgroundColor: colors.ekadashi, borderColor: selected ? '#FFF' : 'transparent' }]} />}
+                    {(info?.isPurnima || info?.isAmavasya || info?.isEkadashi) && (
+                      <View style={[st.tithiDot, {
+                        backgroundColor: info.isPurnima ? colors.purnima : info.isEkadashi ? colors.ekadashi : colors.amavasya,
+                        borderColor: selected ? '#FFF' : info.isAmavasya ? colors.textTertiary : 'transparent',
+                      }]} />
+                    )}
+                    {holiday && <View style={[st.holidayBar, { backgroundColor: selected ? '#FFF' : colors.info }]} />}
                     {dayHasNote && <View style={[st.noteMark, { backgroundColor: selected ? '#FFD700' : colors.info || '#1565C0' }]} />}
                   </View>
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </Animated.View>
 
           <View style={[st.legend, { borderTopColor: colors.divider }]}>
             {[
               { swatch: <View style={[st.legendDot, { backgroundColor: colors.purnima }]} />, label: t('cal.purnima') },
               { swatch: <View style={[st.legendDot, { backgroundColor: colors.amavasya, borderWidth: 1, borderColor: colors.textTertiary }]} />, label: t('cal.amavasya') },
               { swatch: <View style={[st.legendDot, { backgroundColor: colors.ekadashi }]} />, label: t('cal.ekadashi') },
-              { swatch: <View style={[st.legendSquare, { backgroundColor: colors.purnima + '3D' }]} />, label: t('cal.festival') },
+              { swatch: <View style={[st.legendSquare, { backgroundColor: tones.kumkum.fg + '2B', borderWidth: 1.5, borderColor: tones.kumkum.fg + '99' }]} />, label: t('cal.festival') },
+              { swatch: <View style={[st.legendBar, { backgroundColor: colors.info }]} />, label: 'Holiday' },
             ].map((item, idx) => (
               <View key={idx} style={st.legendItem}>
                 {item.swatch}
@@ -393,114 +441,93 @@ export default function CalendarScreen() {
           </View>
         </View>
 
-        {/* ═══ Day sheet ═══ */}
+        {/* ═══ Day card: what this day is, then timings and your notes ═══ */}
         <View style={[st.detailCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={st.detailHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={[st.detailWeekday, { color: colors.primary }]}>
-                {selectedDate.toLocaleDateString(locale, { weekday: 'long' }).toUpperCase()}
-              </Text>
-              <Text style={[st.detailDate, { color: colors.text }]}>
-                {selectedDate.getDate()} {selectedDate.toLocaleDateString(locale, { month: 'long' })}
-                <Text style={{ color: colors.textTertiary, fontSize: 16 }}>  {selectedDate.getFullYear()}</Text>
-              </Text>
+            <View style={[st.dateBlock, { backgroundColor: selFestivals.length ? tones.kumkum.bg : colors.surfaceSecondary }]}>
+              <Text style={[st.dateBlockDay, { color: selFestivals.length ? tones.kumkum.fg : colors.text }]}>{selectedDate.getDate()}</Text>
+              <Text style={[st.dateBlockMon, { color: selFestivals.length ? tones.kumkum.fg : colors.textSecondary }, noTrack]}>{selectedDate.toLocaleDateString(locale, { month: 'short' })}</Text>
             </View>
-            {/* Grooming badge — scissors + OK/Caution/Avoid, identical to Home so
-                it clearly reads as grooming guidance (not a verdict on the day). */}
-            <View style={[st.statusBadge, { backgroundColor: groomingColor + '14', borderColor: groomingColor + '3D' }]}>
-              <MaterialCommunityIcons name="content-cut" size={14} color={groomingColor} />
-              <Text style={[st.statusBadgeText, { color: groomingColor }]}>
-                {t(selectedGrooming.overallStatus === 'allowed' ? 'grooming.ok' : selectedGrooming.overallStatus === 'avoid' ? 'grooming.caution' : 'grooming.avoid')}
+            <View style={{ flex: 1 }}>
+              <Text style={[st.detailWeekday, { color: colors.primary }, noTrack]}>
+                {selectedDate.toLocaleDateString(locale, { weekday: 'long' })}
+              </Text>
+              <Text style={[st.detailTithi, { color: colors.text }]} numberOfLines={1}>
+                {native(selectedPanchang.tithi.name, selectedPanchang.tithi.nameHi)} · {native(selectedPanchang.nakshatra.name, selectedPanchang.nakshatra.nameHi)}
+              </Text>
+              <Text style={[st.detailSub, { color: colors.textTertiary }]} numberOfLines={1}>
+                {native(selectedPanchang.hinduMonth.name, selectedPanchang.hinduMonth.nameHi)} {native(selectedPanchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna', selectedPanchang.tithi.pakshaHi)} · {native(selectedPanchang.yoga.name, selectedPanchang.yoga.nameHi)} {tx('yoga')}
               </Text>
             </View>
           </View>
 
-          {/* Festival banner */}
-          {selFestivals.length > 0 && (
-            <LinearGradient
-              colors={isDark ? ['#3A2E08', '#241E08'] : ['#FBF3D8', '#F7E9BB']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={[st.festivalBanner, { borderColor: colors.purnima + '55' }]}
-            >
-              <View style={[st.festivalIcon, { backgroundColor: colors.purnima + '2E' }]}>
-                <MaterialCommunityIcons name="star-four-points" size={18} color={isDark ? colors.purnima : '#8A6A10'} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[st.festivalName, { color: isDark ? colors.purnima : '#6B520C' }]}>
-                  {selFestivals.map(f => f.name).join(' · ')}
-                </Text>
-                <Text style={[st.festivalNameHi, { color: isDark ? 'rgba(232,195,74,0.75)' : '#8A6A10' }]}>
-                  {selFestivals.map(f => f.nameHi).join(' · ')}
-                </Text>
-              </View>
-            </LinearGradient>
+          {/* What's on: festivals, holidays, special tithis */}
+          {dayEvents.length > 0 ? (
+            <View style={st.events}>
+              {dayEvents.map((e, i) => (
+                <View key={i} style={[st.event, { backgroundColor: e.tone.bg }]}>
+                  <View style={[st.eventIcon, { backgroundColor: colors.surface }]}>
+                    <MaterialCommunityIcons name={e.icon as any} size={18} color={e.tone.fg} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={[st.eventName, { color: colors.text }]}>{e.title}</Text>
+                      {!!e.tag && (
+                        <View style={[st.eventTag, { borderColor: e.tone.fg + '55' }]}>
+                          <Text style={[st.eventTagText, { color: e.tone.fg }, noTrack]}>{e.tag}</Text>
+                        </View>
+                      )}
+                    </View>
+                    {!!e.line && <Text style={[st.eventLine, { color: colors.textSecondary }]}>{e.line}</Text>}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={[st.quietDay, { color: colors.textTertiary }]}>{tx('No festival or holiday on this day.')}</Text>
           )}
 
-          {/* Panchang chips */}
-          <View style={st.chipsRow}>
-            <View style={[st.chip, { backgroundColor: colors.ekadashi + '14' }]}>
-              <MaterialCommunityIcons name="moon-waning-crescent" size={13} color={colors.ekadashi} />
-              <Text style={[st.chipText, { color: colors.text }]}>{selectedPanchang.tithi.nameHi}</Text>
-            </View>
-            <View style={[st.chip, { backgroundColor: '#FF6B0014' }]}>
-              <MaterialCommunityIcons name="star-four-points-outline" size={13} color="#FF6B00" />
-              <Text style={[st.chipText, { color: colors.text }]}>{selectedPanchang.nakshatra.nameHi}</Text>
-            </View>
-            <View style={[st.chip, { backgroundColor: '#2D6A4F14' }]}>
-              <MaterialCommunityIcons name="yoga" size={13} color="#2D6A4F" />
-              <Text style={[st.chipText, { color: colors.text }]}>{selectedPanchang.yoga.nameHi}</Text>
-            </View>
-          </View>
-
           {/* Timings */}
-          <View style={[st.timingsRow, { backgroundColor: isDark ? colors.surfaceElevated : '#F8F4F0', borderColor: colors.divider }]}>
+          <View style={[st.timingsRow, { backgroundColor: colors.surfaceSecondary, borderColor: colors.divider }]}>
             <View style={st.timing}>
               <MaterialCommunityIcons name="weather-sunset-up" size={15} color="#FF8C00" />
-              <Text style={[st.timingLabel, { color: colors.textTertiary }]}>{t('ui.sunrise')}</Text>
+              <Text style={[st.timingLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.sunrise')}</Text>
               <Text style={[st.timingValue, { color: colors.text }]}>{selectedPanchang.sunrise}</Text>
             </View>
             <View style={[st.timingDivider, { backgroundColor: colors.divider }]} />
             <View style={st.timing}>
               <MaterialCommunityIcons name="weather-sunset-down" size={15} color="#7C3AED" />
-              <Text style={[st.timingLabel, { color: colors.textTertiary }]}>{t('ui.sunset')}</Text>
+              <Text style={[st.timingLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.sunset')}</Text>
               <Text style={[st.timingValue, { color: colors.text }]}>{selectedPanchang.sunset}</Text>
             </View>
             <View style={[st.timingDivider, { backgroundColor: colors.divider }]} />
             <View style={st.timing}>
               <MaterialCommunityIcons name="alert-circle-outline" size={15} color={colors.festival} />
-              <Text style={[st.timingLabel, { color: colors.textTertiary }]}>{t('ui.rahuKaal')}</Text>
+              <Text style={[st.timingLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.rahuKaal')}</Text>
               <Text style={[st.timingValue, { color: colors.festival }]}>{selectedPanchang.rahuKaal.start}–{selectedPanchang.rahuKaal.end}</Text>
             </View>
           </View>
 
-          {/* Grooming per-activity chips (consistent with Home) */}
-          <View style={st.groomingChips}>
-            {selectedGrooming.rules.slice(0, 3).map((rule, idx) => {
-              const label = t(rule.type === 'haircut' ? 'grooming.haircut' : rule.type === 'shaving' ? 'grooming.shaving' : 'grooming.nails');
-              const word = t(rule.status === 'allowed' ? 'grooming.ok' : rule.status === 'avoid' ? 'grooming.caution' : 'grooming.avoid');
-              const c = getGroomingStatusColor(rule.status);
-              return (
-                <View key={idx} style={[st.gChip, { backgroundColor: c + '12', borderColor: c + '30' }]}>
-                  <MaterialCommunityIcons
-                    name={rule.type === 'haircut' ? 'content-cut' : rule.type === 'shaving' ? 'razor-double-edge' : 'hand-back-right-outline'}
-                    size={12} color={c}
-                  />
-                  <Text style={[st.gChipLabel, { color: colors.text }]}>{label}</Text>
-                  <Text style={[st.gChipWord, { color: c }]}>{word}</Text>
-                </View>
-              );
-            })}
-          </View>
-          {!!selectedGrooming.rules[0]?.reason && (
-            <Text style={[st.groomingReason, { color: colors.textTertiary }]} numberOfLines={2}>
-              {selectedGrooming.rules[0].reason}
+          {/* One grooming line; tap for the reason */}
+          <TouchableOpacity onPress={() => setGroomOpen((v) => !v)} activeOpacity={0.75} style={[st.groomRow, { backgroundColor: groomingColor + '12', borderColor: groomingColor + '33' }]}>
+            <MaterialCommunityIcons name="content-cut" size={15} color={groomingColor} />
+            <Text style={[st.groomText, { color: colors.text }]}>{t('home.grooming')}</Text>
+            <Text style={[st.groomWord, { color: groomingColor }]}>
+              {t(selectedGrooming.overallStatus === 'allowed' ? 'grooming.ok' : selectedGrooming.overallStatus === 'avoid' ? 'grooming.caution' : 'grooming.avoid')}
+            </Text>
+            <View style={{ flex: 1 }} />
+            <Ionicons name={groomOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+          {groomOpen && !!selectedGrooming.rules[0] && (
+            <Text style={[st.groomingReason, { color: colors.textSecondary }]}>
+              {language === 'hi' || language === 'mr' ? selectedGrooming.rules[0].reasonHi : tx(selectedGrooming.rules[0].reason)}
             </Text>
           )}
 
           {/* Note */}
           {hasNote && (
-            <View style={[st.noteDisplay, { backgroundColor: (colors.info || '#1565C0') + '0D', borderColor: (colors.info || '#1565C0') + '26' }]}>
-              <MaterialCommunityIcons name="note-text-outline" size={16} color={colors.info || '#1565C0'} />
+            <View style={[st.noteDisplay, { backgroundColor: colors.info + '0D', borderColor: colors.info + '26' }]}>
+              <MaterialCommunityIcons name="note-text-outline" size={16} color={colors.info} />
               <Text style={[st.noteDisplayText, { color: colors.text }]}>{notes[selectedDateKey]}</Text>
               <TouchableOpacity onPress={deleteNote} hitSlop={10}>
                 <MaterialCommunityIcons name="close-circle-outline" size={16} color={colors.textTertiary} />
@@ -518,12 +545,12 @@ export default function CalendarScreen() {
               <Text style={[st.actionBtnText, { color: colors.primary }]}>{t(hasNote ? 'cal.editNote' : 'cal.addNoteBtn')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[st.actionBtn, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}
+              style={[st.actionBtn, { backgroundColor: existingReminder ? colors.primary : colors.primary + '12', borderColor: colors.primary + '30' }]}
               onPress={openReminderSheet}
             >
-              <MaterialCommunityIcons name={existingReminder ? 'bell-check' : 'bell-plus-outline'} size={17} color={colors.primary} />
-              <Text style={[st.actionBtnText, { color: colors.primary }]}>
-                {existingReminder ? `Reminds ${existingReminder.time}` : t('cal.reminder')}
+              <MaterialCommunityIcons name={existingReminder ? 'bell-check' : 'bell-plus-outline'} size={17} color={existingReminder ? '#FFF' : colors.primary} />
+              <Text style={[st.actionBtnText, { color: existingReminder ? '#FFF' : colors.primary }]} numberOfLines={1}>
+                {existingReminder ? existingReminder.time : t('cal.reminder')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -532,8 +559,9 @@ export default function CalendarScreen() {
       <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: colors.background }} />
 
       {/* ═══ Note modal ═══ */}
-      <Modal visible={noteModal} transparent animationType="slide" onRequestClose={() => setNoteModal(false)}>
-        <View style={st.modalOverlay}>
+      <Modal visible={noteModal} transparent animationType="slide" onRequestClose={() => setNoteModal(false)} statusBarTranslucent navigationBarTranslucent>
+        <KeyboardAvoidingView behavior="padding" style={st.modalOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setNoteModal(false)} />
           <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + bottomInset }]}>
             <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
             <View style={st.sheetHeader}>
@@ -562,11 +590,11 @@ export default function CalendarScreen() {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ═══ Reminder time sheet ═══ */}
-      <Modal visible={reminderSheet} transparent animationType="slide" onRequestClose={() => setReminderSheet(false)}>
+      <Modal visible={reminderSheet} transparent animationType="slide" onRequestClose={() => setReminderSheet(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={st.modalOverlay}>
           <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + bottomInset }]}>
             <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
@@ -580,18 +608,42 @@ export default function CalendarScreen() {
               {selectedDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
 
-            {/* Big time display — tap to open native clock dial */}
+            {reminderPresets.map((p) => (
+              <TouchableOpacity
+                key={p.key}
+                onPress={() => scheduleAt(p.date)}
+                activeOpacity={0.8}
+                style={[st.presetRow, { borderColor: colors.cardBorder, backgroundColor: colors.background }]}
+              >
+                <View style={[st.presetIcon, { backgroundColor: colors.primary + '14' }]}>
+                  <MaterialCommunityIcons name={p.icon as any} size={19} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.presetTitle, { color: colors.text }]}>{p.label}</Text>
+                  <Text style={[st.presetSub, { color: colors.textTertiary }]}>
+                    {p.date.toDateString() === selectedDate.toDateString() ? '' : p.date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }) + ' · '}{fmt12(p.date.getHours(), p.date.getMinutes())}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
             <TouchableOpacity
-              style={[st.remTimeDisplay, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
               onPress={() => setShowClock(true)}
-              activeOpacity={0.85}
+              activeOpacity={0.8}
+              style={[st.presetRow, { borderColor: colors.cardBorder, backgroundColor: colors.background }]}
             >
-              <Text style={[st.remTimeBig, { color: colors.primary }]}>{fmt12(remHour, remMinute)}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                <MaterialCommunityIcons name="clock-edit-outline" size={13} color={colors.textSecondary} />
-                <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>{tx('Tap to change')}</Text>
+              <View style={[st.presetIcon, { backgroundColor: colors.primary + '14' }]}>
+                <MaterialCommunityIcons name="clock-edit-outline" size={19} color={colors.primary} />
               </View>
+              <Text style={[st.presetTitle, { color: colors.text, flex: 1 }]}>{tx('Pick a time')}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
+            {existingReminder && (
+              <TouchableOpacity onPress={() => { cancelReminder(); setReminderSheet(false); }} style={st.removeRem} hitSlop={6}>
+                <MaterialCommunityIcons name="bell-off-outline" size={17} color={colors.error} />
+                <Text style={{ color: colors.error, fontWeight: '700', fontSize: 14 }}>{tx('Remove reminder')}</Text>
+              </TouchableOpacity>
+            )}
             {showClock && (
               <DateTimePicker
                 value={new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), remHour, remMinute)}
@@ -602,17 +654,11 @@ export default function CalendarScreen() {
                   if (event.type === 'set' && date) {
                     setRemHour(date.getHours());
                     setRemMinute(date.getMinutes());
+                    scheduleAt(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), date.getHours(), date.getMinutes(), 0));
                   }
                 }}
               />
             )}
-
-            <TouchableOpacity onPress={scheduleReminder} activeOpacity={0.85}>
-              <LinearGradient colors={['#C2410C', '#E8743B']} style={st.primaryBtn}>
-                <MaterialCommunityIcons name="bell-check-outline" size={19} color="#FFF" />
-                <Text style={st.primaryBtnText}>{tx('Set for')} {fmt12(remHour, remMinute)}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -696,12 +742,34 @@ const st = StyleSheet.create({
   legendBar: { width: 12, height: 3, borderRadius: 2 },
   legendDot: { width: 7, height: 7, borderRadius: 4 },
   legendSquare: { width: 9, height: 9, borderRadius: 3 },
-  legendText: { fontSize: 10, fontWeight: '600' },
+  legendText: { fontSize: 11, fontWeight: '600' },
 
   // Day sheet
   detailCard: { marginTop: 14, borderRadius: 20, padding: 18, borderWidth: 1 },
-  detailHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  detailWeekday: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
+  detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
+  dateBlock: { width: 58, height: 62, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  dateBlockDay: { fontSize: 24, fontWeight: '800', lineHeight: 28 },
+  dateBlockMon: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  detailTithi: { fontSize: 17, fontWeight: '800', marginTop: 2 },
+  detailSub: { fontSize: 12.5, marginTop: 2 },
+  detailWeekday: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  events: { gap: 8, marginBottom: 12 },
+  event: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 12, borderRadius: 16 },
+  eventIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  eventName: { fontSize: 15.5, fontWeight: '800' },
+  eventTag: { borderWidth: 1, borderRadius: 100, paddingHorizontal: 7, paddingVertical: 1 },
+  eventTagText: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.3 },
+  eventLine: { fontSize: 13, lineHeight: 18.5, marginTop: 3 },
+  quietDay: { fontSize: 13, marginBottom: 12 },
+  groomRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 13, borderWidth: 1 },
+  groomText: { fontSize: 13.5, fontWeight: '700' },
+  groomWord: { fontSize: 13.5, fontWeight: '800' },
+  holidayBar: { position: 'absolute', bottom: 4, width: 16, height: 3, borderRadius: 2 },
+  presetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1, marginBottom: 8 },
+  presetIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  presetTitle: { fontSize: 15, fontWeight: '700' },
+  presetSub: { fontSize: 12.5, marginTop: 1 },
+  removeRem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, marginTop: 4 },
   detailDate: { fontSize: 24, fontWeight: '800', marginTop: 2 },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 100, borderWidth: 1 },
   statusBadgeText: { fontSize: 12, fontWeight: '800' },
@@ -725,7 +793,7 @@ const st = StyleSheet.create({
   gChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 9, borderWidth: 1 },
   gChipLabel: { fontSize: 11.5, fontWeight: '600' },
   gChipWord: { fontSize: 10.5, fontWeight: '800' },
-  groomingReason: { fontSize: 11.5, lineHeight: 16, marginTop: 8 },
+  groomingReason: { fontSize: 13, lineHeight: 19, marginTop: 8, paddingHorizontal: 4 },
 
   noteDisplay: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, marginTop: 12 },
   noteDisplayText: { flex: 1, fontSize: 13, lineHeight: 18 },

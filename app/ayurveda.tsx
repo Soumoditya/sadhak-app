@@ -99,8 +99,8 @@ export default function AyurvedaScreen() {
             <Text style={[st.heroName, { color: colors.text }]}>
               {p.name}{sec ? <Text style={{ color: tone(sec.color).fg }}>-{sec.name}</Text> : null}
             </Text>
-            <Text style={[st.heroEl, { color: colors.textSecondary }]}>{p.elements}{sec ? ` · ${sec.elements}` : ''}</Text>
-            <Text style={[st.heroNature, { color: colors.textSecondary }]}>{p.nature}</Text>
+            <Text style={[st.heroEl, { color: colors.textSecondary }]}>{tx(p.elements)}{sec ? ` · ${tx(sec.elements)}` : ''}</Text>
+            <Text style={[st.heroNature, { color: colors.textSecondary }]}>{tx(p.nature)}</Text>
 
             {/* Dosha balance */}
             <View style={st.bars}>
@@ -133,8 +133,8 @@ export default function AyurvedaScreen() {
             })}
           </View>
 
-          <Sec title={tx('When balanced')} icon="white-balance-sunny" color={colors.tulsiGreen || '#2D6A4F'} colors={colors}><Text style={[st.body, { color: colors.textSecondary }]}>{g.balanced}</Text></Sec>
-          <Sec title={tx('Signs of imbalance')} icon="alert-circle-outline" color={colors.festival || '#DC2626'} colors={colors}><Text style={[st.body, { color: colors.textSecondary }]}>{g.imbalanced}</Text></Sec>
+          <Sec title={tx('When balanced')} icon="white-balance-sunny" color={colors.tulsiGreen || '#2D6A4F'} colors={colors}><Text style={[st.body, { color: colors.textSecondary }]}>{tx(g.balanced)}</Text></Sec>
+          <Sec title={tx('Signs of imbalance')} icon="alert-circle-outline" color={colors.festival || '#DC2626'} colors={colors}><Text style={[st.body, { color: colors.textSecondary }]}>{tx(g.imbalanced)}</Text></Sec>
           <Sec title={tx('Favour these')} icon="check-circle-outline" color={colors.tulsiGreen || '#2D6A4F'} colors={colors}><List items={g.favor} color={colors.tulsiGreen || '#2D6A4F'} colors={colors} /></Sec>
           <Sec title={tx('Reduce these')} icon="minus-circle-outline" color={colors.festival || '#DC2626'} colors={colors}><List items={g.reduce} color={colors.festival || '#DC2626'} colors={colors} /></Sec>
           <Sec title={tx('Daily routine (dinacharya)')} icon="weather-sunset" color={colors.primary} colors={colors}><List items={g.routine} color={colors.primary} colors={colors} /></Sec>
@@ -159,8 +159,8 @@ export default function AyurvedaScreen() {
       <Header title={tx('Discover Your Prakriti')} subtitle={tx('Your Ayurvedic mind-body constitution')} />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
         <View style={st.progressHead}>
-          <Text style={[st.progressText, { color: colors.textSecondary }]}>{tx('Question')} {step + 1}of {total}</Text>
-          <Text style={[st.progressText, { color: colors.textTertiary }]}>{answeredCount}/{total} answered</Text>
+          <Text style={[st.progressText, { color: colors.textSecondary }]}>{tx('Question')} {step + 1}/{total}</Text>
+          <Text style={[st.progressText, { color: colors.textTertiary }]}>{answeredCount}/{total} {tx('answered')}</Text>
         </View>
         <View style={[st.progressTrack, { backgroundColor: colors.cardBorder }]}>
           <View style={[st.progressFill, { width: `${((step + (answers[step] ? 1 : 0)) / total) * 100}%`, backgroundColor: colors.primary }]} />
@@ -171,14 +171,14 @@ export default function AyurvedaScreen() {
         )}
 
         <View style={[st.qCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          <Text style={[st.qText, { color: colors.text }]}>{item.q}</Text>
+          <Text style={[st.qText, { color: colors.text }]}>{tx(item.q)}</Text>
           {item.options.map((o, oi) => {
             const active = answers[step] === o.dosha;
             return (
               <TouchableOpacity key={oi} onPress={() => pick(step, o.dosha)} activeOpacity={0.8}
                 style={[st.opt, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.primary + '12' : 'transparent' }]}>
                 <MaterialCommunityIcons name={active ? 'radiobox-marked' : 'radiobox-blank'} size={19} color={active ? colors.primary : colors.textTertiary} />
-                <Text style={[st.optText, { color: active ? colors.text : colors.textSecondary }]}>{o.label}</Text>
+                <Text style={[st.optText, { color: active ? colors.text : colors.textSecondary }]}>{tx(o.label)}</Text>
               </TouchableOpacity>
             );
           })}
@@ -218,10 +218,11 @@ function Sec({ title, icon, color, colors, children }: any) {
   );
 }
 function List({ items, color, colors }: { items: string[]; color: string; colors: any }) {
+  const { tx } = useLanguage();
   return <>{items.map((it, i) => (
     <View key={i} style={{ flexDirection: 'row', gap: 8, marginTop: 5 }}>
       <Text style={{ color, fontSize: 13 }}>•</Text>
-      <Text style={{ color: colors.textSecondary, fontSize: 13.5, lineHeight: 20, flex: 1 }}>{it}</Text>
+      <Text style={{ color: colors.textSecondary, fontSize: 13.5, lineHeight: 20, flex: 1 }}>{tx(it)}</Text>
     </View>
   ))}</>;
 }

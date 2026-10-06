@@ -12,6 +12,20 @@ export const SIGNS_HI = ['मेष', 'वृषभ', 'मिथुन', 'कर
 export const SIGN_LORD = ['Mars', 'Venus', 'Mercury', 'Moon', 'Sun', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Saturn', 'Jupiter'];
 const NAKSHATRAS = ['Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni', 'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha', 'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'];
 
+// Localiser for generated text. Templates use {name} placeholders; the
+// screen passes its own (tx + script-aware names), English is the default.
+export type Loc = {
+  t: (s: string, v?: Record<string, string | number>) => string;
+  planet: (n: string) => string;
+  sign: (i: number) => string;
+  nak: (i: number) => string;
+  ord: (n: number) => string;
+  locale?: string;
+};
+const fill = (s: string, v?: Record<string, string | number>) => (v ? s.replace(/\{(\w+)\}/g, (_, k) => (v[k] != null ? String(v[k]) : `{${k}}`)) : s);
+const ordEn = (n: number) => { const v = n % 100; return n + (['th', 'st', 'nd', 'rd'][(v - 20) % 10] || ['th', 'st', 'nd', 'rd'][v] || 'th'); };
+export const EN_LOC: Loc = { t: fill, planet: (n) => n, sign: (i) => SIGNS[i], nak: (i) => NAKSHATRAS[i], ord: ordEn };
+
 const EXALT: Record<string, number> = { Sun: 0, Moon: 1, Mars: 9, Mercury: 5, Jupiter: 3, Venus: 11, Saturn: 6 };
 const OWN: Record<string, number[]> = { Sun: [4], Moon: [3], Mars: [0, 7], Mercury: [2, 5], Jupiter: [8, 11], Venus: [1, 6], Saturn: [9, 10] };
 const BENEFICS = ['Mercury', 'Jupiter', 'Venus'];
@@ -133,7 +147,8 @@ export const fmtDeg = (d: number) => {
 
 export type Finding = { name: string; nameHi: string; present: boolean; detail: string; note?: string };
 
-export function analyse(k: Kundli): { yogas: Finding[]; doshas: Finding[] } {
+export function analyse(k: Kundli, L$: Loc = EN_LOC): { yogas: Finding[]; doshas: Finding[] } {
+  const T = L$.t, pl = L$.planet, list = (a: string[]) => a.map(pl).join(', ');
   const P: Record<string, GrahaPlacement> = Object.fromEntries(k.planets.map((p) => [p.name, p]));
   const L = k.lagna.signIndex;
   const M = P.Moon.signIndex;
@@ -148,17 +163,17 @@ export function analyse(k: Kundli): { yogas: Finding[]; doshas: Finding[] } {
   const dig = (n: string) => dignityOf(n, P[n].signIndex);
   const yogas: Finding[] = [];
   const doshas: Finding[] = [];
-  const add = (list: Finding[], name: string, nameHi: string, present: boolean, detail: string, note?: string) =>
-    list.push({ name, nameHi, present, detail, note });
+  const add = (to: Finding[], name: string, nameHi: string, present: boolean, detail: string, note?: string) =>
+    to.push({ name, nameHi, present, detail, note: note ? T(note) : note });
 
   // Gajakesari
-  add(yogas, 'Gajakesari Yoga', 'गजकेसरी योग', kendra(hM('Jupiter')), `Jupiter in house ${hM('Jupiter')} from the Moon`,
+  add(yogas, 'Gajakesari Yoga', 'गजकेसरी योग', kendra(hM('Jupiter')), T('Jupiter in house {h} from the Moon', { h: hM('Jupiter') }),
     'Wisdom, respect and steady support in life.');
   // Budhaditya
-  add(yogas, 'Budhaditya Yoga', 'बुधादित्य योग', same('Sun', 'Mercury'), `Sun and Mercury together in ${P.Sun.sign}`,
+  add(yogas, 'Budhaditya Yoga', 'बुधादित्य योग', same('Sun', 'Mercury'), T('Sun and Mercury together in {sign}', { sign: L$.sign(P.Sun.signIndex) }),
     'Sharp intellect, good communication and learning.');
   // Chandra-Mangal
-  add(yogas, 'Chandra-Mangal Yoga', 'चंद्र-मंगल योग', same('Moon', 'Mars'), `Moon and Mars together in ${P.Moon.sign}`,
+  add(yogas, 'Chandra-Mangal Yoga', 'चंद्र-मंगल योग', same('Moon', 'Mars'), T('Moon and Mars together in {sign}', { sign: L$.sign(P.Moon.signIndex) }),
     'Drive and enterprise, especially with money.');
   // Pancha Mahapurusha
   const mp: [string, string, string, string][] = [
@@ -170,58 +185,58 @@ export function analyse(k: Kundli): { yogas: Finding[]; doshas: Finding[] } {
   ];
   for (const [pl, name, hi, note] of mp) {
     const d = dig(pl);
-    add(yogas, name, hi, kendra(hL(pl)) && (d === 'Exalted' || d === 'Own sign'), `${pl} ${d ? d.toLowerCase() : `in ${P[pl].sign}`} in house ${hL(pl)}`, note);
+    add(yogas, name, hi, kendra(hL(pl)) && (d === 'Exalted' || d === 'Own sign'), d ? T(`{planet} ${d.toLowerCase()} in house {h}`, { planet: L$.planet(pl), h: hL(pl) }) : T('{planet} in {sign} in house {h}', { planet: L$.planet(pl), sign: L$.sign(P[pl].signIndex), h: hL(pl) }), note);
   }
   // Sunapha / Anapha / Durdhara / Kemadruma
   const others = ['Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
   const in2 = others.filter((n) => hM(n) === 2);
   const in12 = others.filter((n) => hM(n) === 12);
-  add(yogas, 'Sunapha Yoga', 'सुनफा योग', in2.length > 0 && in12.length === 0, in2.length ? `${in2.join(', ')} in the 2nd from the Moon` : 'No planet in the 2nd from the Moon', 'Self-earned wealth and a good reputation.');
-  add(yogas, 'Anapha Yoga', 'अनफा योग', in12.length > 0 && in2.length === 0, in12.length ? `${in12.join(', ')} in the 12th from the Moon` : 'No planet in the 12th from the Moon', 'Good health, character and contentment.');
-  add(yogas, 'Durdhara Yoga', 'दुरधरा योग', in2.length > 0 && in12.length > 0, `Planets on both sides of the Moon`, 'Generosity, comforts and wide support.');
+  add(yogas, 'Sunapha Yoga', 'सुनफा योग', in2.length > 0 && in12.length === 0, in2.length ? T('{list} in the 2nd from the Moon', { list: list(in2) }) : T('No planet in the 2nd from the Moon'), 'Self-earned wealth and a good reputation.');
+  add(yogas, 'Anapha Yoga', 'अनफा योग', in12.length > 0 && in2.length === 0, in12.length ? T('{list} in the 12th from the Moon', { list: list(in12) }) : T('No planet in the 12th from the Moon'), 'Good health, character and contentment.');
+  add(yogas, 'Durdhara Yoga', 'दुरधरा योग', in2.length > 0 && in12.length > 0, T('Planets on both sides of the Moon'), 'Generosity, comforts and wide support.');
   const kendraFromMoon = others.some((n) => kendra(hM(n))) || others.some((n) => kendra(hL(n)));
   add(doshas, 'Kemadruma Dosha', 'केमद्रुम दोष', in2.length === 0 && in12.length === 0 && !kendraFromMoon,
-    in2.length === 0 && in12.length === 0 ? (kendraFromMoon ? 'Moon has no neighbours, but it is cancelled by planets in kendra' : 'No planets on either side of the Moon') : 'Moon is supported by neighbouring planets',
+    T(in2.length === 0 && in12.length === 0 ? (kendraFromMoon ? 'Moon has no neighbours, but it is cancelled by planets in kendra' : 'No planets on either side of the Moon') : 'Moon is supported by neighbouring planets'),
     'Remedy: Monday fasts, Shiva puja and wearing silver.');
   // Adhi yoga
   const adhi = BENEFICS.filter((n) => [6, 7, 8].includes(hM(n)));
-  add(yogas, 'Adhi Yoga', 'अधि योग', adhi.length >= 2, adhi.length ? `${adhi.join(', ')} in the 6th–8th from the Moon` : 'Benefics not in the 6th–8th from the Moon', 'Leadership, comfort and victory over rivals.');
+  add(yogas, 'Adhi Yoga', 'अधि योग', adhi.length >= 2, adhi.length ? T('{list} in the 6th–8th from the Moon', { list: list(adhi) }) : T('Benefics not in the 6th–8th from the Moon'), 'Leadership, comfort and victory over rivals.');
   // Amala
   const amala = BENEFICS.filter((n) => hL(n) === 10 || hM(n) === 10);
-  add(yogas, 'Amala Yoga', 'अमला योग', amala.length > 0, amala.length ? `${amala.join(', ')} in the 10th house` : 'No benefic in the 10th house', 'A clean reputation and virtuous work.');
+  add(yogas, 'Amala Yoga', 'अमला योग', amala.length > 0, amala.length ? T('{list} in the 10th house', { list: list(amala) }) : T('No benefic in the 10th house'), 'A clean reputation and virtuous work.');
   // Raja yoga: kendra lord with trikona lord, or a yogakaraka
   const kendraLords = [4, 7, 10].map(lordOf);
   const trikonaLords = [5, 9].map(lordOf);
   const yk = seven.find((n) => kendraLords.includes(n) && trikonaLords.includes(n));
-  const rajaPairs = kendraLords.flatMap((a) => trikonaLords.filter((b) => a !== b && same(a, b)).map((b) => `${a} + ${b}`));
+  const rajaPairs = kendraLords.flatMap((a) => trikonaLords.filter((b) => a !== b && same(a, b)).map((b) => `${pl(a)} + ${pl(b)}`));
   add(yogas, 'Raja Yoga', 'राज योग', !!yk || rajaPairs.length > 0,
-    yk ? `${yk} rules both a kendra and a trikona (yogakaraka)` : rajaPairs.length ? `Kendra and trikona lords together: ${[...new Set(rajaPairs)].join(', ')}` : 'Kendra and trikona lords are not joined',
+    yk ? T('{planet} rules both a kendra and a trikona (yogakaraka)', { planet: pl(yk) }) : rajaPairs.length ? T('Kendra and trikona lords together: {list}', { list: [...new Set(rajaPairs)].join(', ') }) : T('Kendra and trikona lords are not joined'),
     'Rise in status and authority, strongest in their dashas.');
   // Dhana yoga
-  const dhanaPairs = [2, 11].map(lordOf).flatMap((a) => [5, 9].map(lordOf).filter((b) => a !== b && same(a, b)).map((b) => `${a} + ${b}`));
-  add(yogas, 'Dhana Yoga', 'धन योग', dhanaPairs.length > 0, dhanaPairs.length ? `Wealth lords together: ${[...new Set(dhanaPairs)].join(', ')}` : 'Wealth and fortune lords are not joined', 'Prosperity and accumulation of wealth.');
+  const dhanaPairs = [2, 11].map(lordOf).flatMap((a) => [5, 9].map(lordOf).filter((b) => a !== b && same(a, b)).map((b) => `${pl(a)} + ${pl(b)}`));
+  add(yogas, 'Dhana Yoga', 'धन योग', dhanaPairs.length > 0, dhanaPairs.length ? T('Wealth lords together: {list}', { list: [...new Set(dhanaPairs)].join(', ') }) : T('Wealth and fortune lords are not joined'), 'Prosperity and accumulation of wealth.');
   // Vipreet Raja yoga
-  const vip = [6, 8, 12].filter((h) => [6, 8, 12].includes(hL(lordOf(h))) && hL(lordOf(h)) !== h).map((h) => `lord of ${h} (${lordOf(h)}) in house ${hL(lordOf(h))}`);
-  add(yogas, 'Vipreet Raja Yoga', 'विपरीत राज योग', vip.length > 0, vip.length ? vip.join('; ') : 'Dusthana lords are not in dusthanas', 'Success that rises out of difficulty.');
+  const vip = [6, 8, 12].filter((h) => [6, 8, 12].includes(hL(lordOf(h))) && hL(lordOf(h)) !== h).map((h) => T('lord of {n} ({planet}) in house {h}', { n: h, planet: pl(lordOf(h)), h: hL(lordOf(h)) }));
+  add(yogas, 'Vipreet Raja Yoga', 'विपरीत राज योग', vip.length > 0, vip.length ? vip.join('; ') : T('Dusthana lords are not in dusthanas'), 'Success that rises out of difficulty.');
   // Neecha Bhanga
   const nb = seven.filter((n) => dig(n) === 'Debilitated').filter((n) => {
     const dispositor = SIGN_LORD[P[n].signIndex];
     return kendra(hL(dispositor)) || kendra(hM(dispositor));
   });
-  add(yogas, 'Neecha Bhanga Raja Yoga', 'नीचभंग राज योग', nb.length > 0, nb.length ? `Debilitation of ${nb.join(', ')} is cancelled` : 'No cancelled debilitation', 'A weak point that turns into strength over time.');
+  add(yogas, 'Neecha Bhanga Raja Yoga', 'नीचभंग राज योग', nb.length > 0, nb.length ? T('Debilitation of {list} is cancelled', { list: list(nb) }) : T('No cancelled debilitation'), 'A weak point that turns into strength over time.');
   // Lakshmi
   const l9 = lordOf(9);
   const d9l = dig(l9);
-  add(yogas, 'Lakshmi Yoga', 'लक्ष्मी योग', (d9l === 'Own sign' || d9l === 'Exalted') && (kendra(hL(l9)) || trikona(hL(l9))), `9th lord ${l9} in house ${hL(l9)}${d9l ? `, ${d9l.toLowerCase()}` : ''}`, 'Fortune, grace and abundance.');
+  add(yogas, 'Lakshmi Yoga', 'लक्ष्मी योग', (d9l === 'Own sign' || d9l === 'Exalted') && (kendra(hL(l9)) || trikona(hL(l9))), T('9th lord {planet} in house {h}', { planet: pl(l9), h: hL(l9) }) + (d9l ? `, ${T(d9l.toLowerCase())}` : ''), 'Fortune, grace and abundance.');
   // Saraswati
   const sar = ['Jupiter', 'Venus', 'Mercury'].every((n) => [1, 2, 4, 5, 7, 9, 10].includes(hL(n)));
-  add(yogas, 'Saraswati Yoga', 'सरस्वती योग', sar, sar ? 'Jupiter, Venus and Mercury all well placed' : 'Not all three benefics are in kendra, trikona or 2nd', 'Learning, arts, speech and scholarship.');
+  add(yogas, 'Saraswati Yoga', 'सरस्वती योग', sar, T(sar ? 'Jupiter, Venus and Mercury all well placed' : 'Not all three benefics are in kendra, trikona or 2nd'), 'Learning, arts, speech and scholarship.');
   // Parivartana
   const par: string[] = [];
   seven.forEach((a, i) => seven.slice(i + 1).forEach((b) => {
-    if (SIGN_LORD[P[a].signIndex] === b && SIGN_LORD[P[b].signIndex] === a && a !== b) par.push(`${a} ↔ ${b}`);
+    if (SIGN_LORD[P[a].signIndex] === b && SIGN_LORD[P[b].signIndex] === a && a !== b) par.push(`${pl(a)} ↔ ${pl(b)}`);
   }));
-  add(yogas, 'Parivartana Yoga', 'परिवर्तन योग', par.length > 0, par.length ? `Sign exchange: ${par.join(', ')}` : 'No sign exchange', 'The two planets support each other strongly.');
+  add(yogas, 'Parivartana Yoga', 'परिवर्तन योग', par.length > 0, par.length ? T('Sign exchange: {list}', { list: par.join(', ') }) : T('No sign exchange'), 'The two planets support each other strongly.');
 
   // Doshas
   const marsH = hL('Mars');
@@ -230,21 +245,21 @@ export function analyse(k: Kundli): { yogas: Finding[]; doshas: Finding[] } {
   const mangal = mangalHouses.includes(marsH) || mangalHouses.includes(marsMoonH);
   const mangalMild = dig('Mars') === 'Own sign' || dig('Mars') === 'Exalted';
   add(doshas, 'Mangal (Kuja) Dosha', 'मंगल दोष', mangal,
-    mangal ? `Mars in house ${marsH} from Lagna, ${marsMoonH} from the Moon${mangalMild ? ' (mild: Mars is strong in its sign)' : ''}` : `Mars in house ${marsH} from Lagna`,
+    mangal ? T('Mars in house {h} from Lagna, {m} from the Moon', { h: marsH, m: marsMoonH }) + (mangalMild ? ` ${T('(mild: Mars is strong in its sign)')}` : '') : T('Mars in house {h} from Lagna', { h: marsH }),
     'Remedy: Hanuman Chalisa on Tuesdays; matched with a similar chart in marriage.');
-  add(doshas, 'Kaal Sarp Dosha', 'काल सर्प दोष', !!k.doshas?.kaalSarp.present, k.doshas?.kaalSarp.present ? 'All planets lie between Rahu and Ketu' : 'Planets fall on both sides of the Rahu–Ketu axis',
+  add(doshas, 'Kaal Sarp Dosha', 'काल सर्प दोष', !!k.doshas?.kaalSarp.present, T(k.doshas?.kaalSarp.present ? 'All planets lie between Rahu and Ketu' : 'Planets fall on both sides of the Rahu–Ketu axis'),
     'Remedy: Shiva abhishek, Nag Panchami puja, Maha Mrityunjaya japa.');
   const pitra = same('Sun', 'Rahu') || same('Sun', 'Ketu') || hL('Rahu') === 9;
-  add(doshas, 'Pitra Dosha', 'पितृ दोष', pitra, pitra ? (hL('Rahu') === 9 ? 'Rahu in the 9th house' : 'Sun joined by Rahu or Ketu') : 'Sun and the 9th house are free of the nodes',
+  add(doshas, 'Pitra Dosha', 'पितृ दोष', pitra, T(pitra ? (hL('Rahu') === 9 ? 'Rahu in the 9th house' : 'Sun joined by Rahu or Ketu') : 'Sun and the 9th house are free of the nodes'),
     'Remedy: tarpan and shraddha for ancestors, feed cows and crows, especially on Amavasya.');
-  add(doshas, 'Guru Chandal Dosha', 'गुरु चांडाल दोष', same('Jupiter', 'Rahu') || same('Jupiter', 'Ketu'), same('Jupiter', 'Rahu') || same('Jupiter', 'Ketu') ? `Jupiter with ${same('Jupiter', 'Rahu') ? 'Rahu' : 'Ketu'}` : 'Jupiter is free of the nodes',
+  add(doshas, 'Guru Chandal Dosha', 'गुरु चांडाल दोष', same('Jupiter', 'Rahu') || same('Jupiter', 'Ketu'), same('Jupiter', 'Rahu') || same('Jupiter', 'Ketu') ? T('Jupiter with {planet}', { planet: pl(same('Jupiter', 'Rahu') ? 'Rahu' : 'Ketu') }) : T('Jupiter is free of the nodes'),
     'Remedy: respect teachers, Guru mantra on Thursdays, donate yellow items.');
   const grahan = ['Sun', 'Moon'].filter((n) => same(n, 'Rahu') || same(n, 'Ketu'));
-  add(doshas, 'Grahan Dosha', 'ग्रहण दोष', grahan.length > 0, grahan.length ? `${grahan.join(' and ')} with a node` : 'Sun and Moon are free of the nodes',
+  add(doshas, 'Grahan Dosha', 'ग्रहण दोष', grahan.length > 0, grahan.length ? T('{list} with a node', { list: list(grahan) }) : T('Sun and Moon are free of the nodes'),
     'Remedy: Surya arghya at sunrise or Chandra puja on Mondays; chant during eclipses.');
-  add(doshas, 'Shrapit Dosha', 'श्रापित दोष', same('Saturn', 'Rahu'), same('Saturn', 'Rahu') ? `Saturn with Rahu in ${P.Saturn.sign}` : 'Saturn and Rahu are apart',
+  add(doshas, 'Shrapit Dosha', 'श्रापित दोष', same('Saturn', 'Rahu'), same('Saturn', 'Rahu') ? T('Saturn with Rahu in {sign}', { sign: L$.sign(P.Saturn.signIndex) }) : T('Saturn and Rahu are apart'),
     'Remedy: Shani and Rahu shanti, service to the elderly and needy.');
-  add(doshas, 'Angarak Dosha', 'अंगारक दोष', same('Mars', 'Rahu'), same('Mars', 'Rahu') ? `Mars with Rahu in ${P.Mars.sign}` : 'Mars and Rahu are apart',
+  add(doshas, 'Angarak Dosha', 'अंगारक दोष', same('Mars', 'Rahu'), same('Mars', 'Rahu') ? T('Mars with Rahu in {sign}', { sign: L$.sign(P.Mars.signIndex) }) : T('Mars and Rahu are apart'),
     'Remedy: patience in anger, Hanuman worship, donate red lentils on Tuesdays.');
 
   // Merge any yogas the engine found that we don't already list.
@@ -393,25 +408,33 @@ function dayReading(k: Kundli, date: Date) {
   return { tara, house, mh, nak, score, moonSign: Math.floor(moonNow / 30) };
 }
 
-export function localPrediction(k: Kundli, period: PredictionPeriod, now = new Date()): Prediction {
+export function localPrediction(k: Kundli, period: PredictionPeriod, now = new Date(), L$: Loc = EN_LOC): Prediction {
+  const T = L$.t, pl = L$.planet;
   const date = ymd(now);
   const wd = WEEKDAY[now.getDay()];
   const dasha = runningDasha(k, date);
-  const dashaLine = dasha.maha ? `${dasha.maha} mahadasha${dasha.antar ? ` with ${dasha.antar} antardasha` : ''}` : '';
+  const dashaLine = dasha.maha
+    ? (dasha.antar ? T('{maha} mahadasha with {antar} antardasha', { maha: pl(dasha.maha), antar: pl(dasha.antar) }) : T('{maha} mahadasha', { maha: pl(dasha.maha) }))
+    : '';
   const remedyLord = dasha.antar || dasha.maha;
-  const base: Prediction = { period, date, lucky: { color: wd.color, number: wd.number, direction: wd.direction } };
+  const base: Prediction = { period, date, lucky: { color: T(wd.color), number: wd.number, direction: T(wd.direction) } };
 
   if (period === 'daily') {
     const r = dayReading(k, now);
-    const tone = r.score >= 1 ? 'A favourable day.' : r.score <= -1 ? 'A day to go gently.' : 'A mixed, steady day.';
+    const tone = T(r.score >= 1 ? 'A favourable day.' : r.score <= -1 ? 'A day to go gently.' : 'A mixed, steady day.');
     return {
       ...base,
-      overview: `${tone} The Moon moves through ${SIGNS[r.moonSign]} (${NAKSHATRAS[r.nak]}), your ${ordinal(r.house)} house from the natal Moon, highlighting ${r.mh.area}. It is your ${r.tara.name} tara: ${r.tara.note}.${dashaLine ? ` You are running ${dashaLine}.` : ''}`,
-      goodFor: r.mh.good !== false ? [cap(r.mh.area), ...(r.tara.good ? ['Starting planned work', 'Meetings and requests'] : ['Routine tasks'])] : ['Prayer, rest and planning', 'Finishing pending work'],
-      avoid: r.score <= 0 ? ['Big decisions or new ventures', 'Arguments and hasty spending'] : ['Overcommitting your time'],
-      doToday: [wd.mantra],
-      remedies: remedyLord ? [DASHA_REMEDY[remedyLord]] : [],
-      transit: `Moon in ${SIGNS[r.moonSign]} · ${r.tara.name} tara`,
+      overview: [
+        tone,
+        T('The Moon moves through {sign} ({nak}), your {house} house from the natal Moon, highlighting {area}.', { sign: L$.sign(r.moonSign), nak: L$.nak(r.nak), house: L$.ord(r.house), area: T(r.mh.area) }),
+        T('It is your {tara} tara: {note}.', { tara: T(r.tara.name), note: T(r.tara.note) }),
+        dashaLine ? T('You are running {dasha}.', { dasha: dashaLine }) : '',
+      ].filter(Boolean).join(' '),
+      goodFor: r.mh.good !== false ? [cap(T(r.mh.area)), ...(r.tara.good ? [T('Starting planned work'), T('Meetings and requests')] : [T('Routine tasks')])] : [T('Prayer, rest and planning'), T('Finishing pending work')],
+      avoid: r.score <= 0 ? [T('Big decisions or new ventures'), T('Arguments and hasty spending')] : [T('Overcommitting your time')],
+      doToday: [T(wd.mantra)],
+      remedies: remedyLord ? [T(DASHA_REMEDY[remedyLord])] : [],
+      transit: T('Moon in {sign} · {tara} tara', { sign: L$.sign(r.moonSign), tara: T(r.tara.name) }),
     };
   }
 
@@ -421,7 +444,7 @@ export function localPrediction(k: Kundli, period: PredictionPeriod, now = new D
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, 9);
       return { d, r: dayReading(k, d) };
     });
-    const fmt = (d: Date) => d.toLocaleDateString('en-IN', { weekday: period === 'weekly' ? 'short' : undefined, day: 'numeric', month: 'short' });
+    const fmt = (d: Date) => d.toLocaleDateString(L$.locale || 'en-IN', { weekday: period === 'weekly' ? 'short' : undefined, day: 'numeric', month: 'short' });
     const best = list.filter((x) => x.r.score >= 1).slice(0, period === 'weekly' ? 3 : 6).map((x) => fmt(x.d));
     const careful = list.filter((x) => x.r.score <= -1).slice(0, period === 'weekly' ? 3 : 6).map((x) => fmt(x.d));
     const tr = transitsAt(now, anchorOf(k));
@@ -431,12 +454,20 @@ export function localPrediction(k: Kundli, period: PredictionPeriod, now = new D
     const sunGood = [3, 6, 10, 11].includes(sunH);
     return {
       ...base,
-      overview: `${period === 'weekly' ? 'This week' : 'This month'} the Sun transits your ${ordinal(sunH)} house from the Moon (${sunGood ? 'supportive for work and status' : 'ask for patience with authority and health'}), Mars your ${ordinal(marsH)}, Mercury your ${ordinal(merH)} and Venus your ${ordinal(venH)}.${dashaLine ? ` Dasha: ${dashaLine}.` : ''}`,
-      goodFor: best.length ? [`Best days: ${best.join(', ')}`] : [],
-      avoid: careful.length ? [`Go slow on: ${careful.join(', ')}`] : [],
-      doToday: [sunGood ? 'Push important work and applications' : 'Plan carefully; finish before starting new things'],
-      remedies: remedyLord ? [DASHA_REMEDY[remedyLord]] : [],
-      transit: tr.filter((p) => ['Sun', 'Mars', 'Mercury', 'Venus'].includes(p.name)).map((p) => `${p.name} ${SIGNS[p.signIndex]}${p.retro && p.name !== 'Sun' ? ' (R)' : ''}`).join(' · '),
+      overview: [
+        T(period === 'weekly'
+          ? 'This week the Sun transits your {sun} house from the Moon ({tone}), Mars your {mars}, Mercury your {mer} and Venus your {ven}.'
+          : 'This month the Sun transits your {sun} house from the Moon ({tone}), Mars your {mars}, Mercury your {mer} and Venus your {ven}.', {
+          sun: L$.ord(sunH), mars: L$.ord(marsH), mer: L$.ord(merH), ven: L$.ord(venH),
+          tone: T(sunGood ? 'supportive for work and status' : 'ask for patience with authority and health'),
+        }),
+        dashaLine ? T('Dasha: {dasha}.', { dasha: dashaLine }) : '',
+      ].filter(Boolean).join(' '),
+      goodFor: best.length ? [T('Best days: {list}', { list: best.join(', ') })] : [],
+      avoid: careful.length ? [T('Go slow on: {list}', { list: careful.join(', ') })] : [],
+      doToday: [T(sunGood ? 'Push important work and applications' : 'Plan carefully; finish before starting new things')],
+      remedies: remedyLord ? [T(DASHA_REMEDY[remedyLord])] : [],
+      transit: tr.filter((p) => ['Sun', 'Mars', 'Mercury', 'Venus'].includes(p.name)).map((p) => `${pl(p.name)} ${L$.sign(p.signIndex)}${p.retro && p.name !== 'Sun' ? ' (R)' : ''}`).join(' · '),
     };
   }
 
@@ -448,16 +479,31 @@ export function localPrediction(k: Kundli, period: PredictionPeriod, now = new D
   const juGood = [2, 5, 7, 9, 11].includes(ju);
   const saGood = [3, 6, 11].includes(sa);
   const sade = [12, 1, 2].includes(sa);
+  const signOf = (n: string) => L$.sign(tr.find((p) => p.name === n)!.signIndex);
   return {
     ...base,
-    overview: `Jupiter transits your ${ordinal(ju)} house from the Moon (${juGood ? 'growth and blessings' : 'learning through effort'}), Saturn your ${ordinal(sa)} (${sade ? 'Sade Sati: discipline and patience bring lasting results' : saGood ? 'steady gains through hard work' : 'responsibilities and slow progress'}), and Rahu your ${ordinal(ra)}.${dashaLine ? ` The year runs under ${dashaLine}.` : ''}`,
-    goodFor: [juGood ? 'Expansion, study, family events and investments' : 'Skill-building and long-term planning', saGood ? 'Career consolidation' : 'Health routines and savings'],
-    avoid: [sade || !saGood ? 'Shortcuts, debt and impulsive moves' : 'Complacency'],
-    doToday: ['Pick one daily practice (japa, reading or seva) and keep it all year'],
-    remedies: [sade || !saGood ? DASHA_REMEDY.Saturn : DASHA_REMEDY.Jupiter, ...(remedyLord ? [DASHA_REMEDY[remedyLord]] : [])].filter((v, i, a) => a.indexOf(v) === i),
-    transit: `Jupiter ${SIGNS[tr.find((p) => p.name === 'Jupiter')!.signIndex]} · Saturn ${SIGNS[tr.find((p) => p.name === 'Saturn')!.signIndex]} · Rahu ${SIGNS[tr.find((p) => p.name === 'Rahu')!.signIndex]}`,
+    overview: [
+      T('Jupiter transits your {ju} house from the Moon ({juTone}), Saturn your {sa} ({saTone}), and Rahu your {ra}.', {
+        ju: L$.ord(ju), sa: L$.ord(sa), ra: L$.ord(ra),
+        juTone: T(juGood ? 'growth and blessings' : 'learning through effort'),
+        saTone: T(sade ? 'Sade Sati: discipline and patience bring lasting results' : saGood ? 'steady gains through hard work' : 'responsibilities and slow progress'),
+      }),
+      dashaLine ? T('The year runs under {dasha}.', { dasha: dashaLine }) : '',
+    ].filter(Boolean).join(' '),
+    goodFor: [T(juGood ? 'Expansion, study, family events and investments' : 'Skill-building and long-term planning'), T(saGood ? 'Career consolidation' : 'Health routines and savings')],
+    avoid: [T(sade || !saGood ? 'Shortcuts, debt and impulsive moves' : 'Complacency')],
+    doToday: [T('Pick one daily practice (japa, reading or seva) and keep it all year')],
+    remedies: [sade || !saGood ? DASHA_REMEDY.Saturn : DASHA_REMEDY.Jupiter, ...(remedyLord ? [DASHA_REMEDY[remedyLord]] : [])].filter((v, i, a) => a.indexOf(v) === i).map((x) => T(x)),
+    transit: `${pl('Jupiter')} ${signOf('Jupiter')} · ${pl('Saturn')} ${signOf('Saturn')} · ${pl('Rahu')} ${signOf('Rahu')}`,
   };
 }
 
 const ordinal = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Today's one-glance reading for the Home card (no network). */
+export function dayGlance(k: Kundli, now = new Date()): { score: number; tara: string; taraGood: boolean | null; house: number; area: string; moonSign: number; maha?: string; antar?: string } {
+  const r = dayReading(k, now);
+  const d = runningDasha(k, ymd(now));
+  return { score: r.score, tara: r.tara.name, taraGood: r.tara.good, house: r.house, area: r.mh.area, moonSign: r.moonSign, maha: d.maha, antar: d.antar };
+}

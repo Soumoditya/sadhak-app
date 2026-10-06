@@ -15,7 +15,7 @@ import { toneSolid } from '../constants/theme';
 
 export default function BhogScreen() {
   const { colors, isDark, tone } = useTheme();
-  const { t: tr, tx } = useLanguage();
+  const { t: tr, tx, native, language } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [query, setQuery] = useState('');
   const [recipe, setRecipe] = useState<BhogRecipe | null>(null);
@@ -67,13 +67,13 @@ export default function BhogScreen() {
             ) : (
               <MaterialCommunityIcons name={recipe.icon as any} size={34} color="#FFD700" />
             )}
-            <Text style={st.dTitle}>{recipe.name}</Text>
-            <Text style={st.dTitleHi}>{recipe.nameHi}</Text>
+            <Text style={st.dTitle}>{native(recipe.name, recipe.nameHi)}</Text>
+            {language === 'en' && <Text style={st.dTitleHi}>{recipe.nameHi}</Text>}
             <View style={st.dMeta}>
               <View style={st.dChip}><MaterialCommunityIcons name="clock-outline" size={12} color="#FFF" /><Text style={st.dChipText}>{recipe.time}</Text></View>
               <View style={st.dChip}><MaterialCommunityIcons name="leaf" size={12} color="#FFF" /><Text style={st.dChipText}>{tx('No onion · No garlic')}</Text></View>
             </View>
-            <Text style={st.dOccasion}>{recipe.occasion}</Text>
+            <Text style={st.dOccasion}>{tx(recipe.occasion)}</Text>
           </LinearGradient>
 
           {/* Ingredients */}
@@ -84,7 +84,7 @@ export default function BhogScreen() {
             </View>
             {recipe.ingredients.map((ing, i) => (
               <View key={i} style={[st.ingRow, i > 0 && { borderTopColor: colors.divider, borderTopWidth: 1 }]}>
-                <Text style={[st.ingName, { color: colors.textSecondary }]}>{ing.item}</Text>
+                <Text style={[st.ingName, { color: colors.textSecondary }]}>{tx(ing.item)}</Text>
                 <Text style={[st.ingQty, { color: colors.text }]}>{ing.qty}</Text>
               </View>
             ))}
@@ -101,7 +101,7 @@ export default function BhogScreen() {
                 <View style={[st.stepNo, { backgroundColor: '#2D6A4F18' }]}>
                   <Text style={{ color: '#2D6A4F', fontWeight: '800', fontSize: 11 }}>{i + 1}</Text>
                 </View>
-                <Text style={[st.stepText, { color: colors.textSecondary }]}>{s}</Text>
+                <Text style={[st.stepText, { color: colors.textSecondary }]}>{tx(s)}</Text>
               </View>
             ))}
           </View>
@@ -109,7 +109,7 @@ export default function BhogScreen() {
           {!!recipe.tips && (
             <View style={[st.tipCard, { backgroundColor: tone(recipe.color).bg, borderColor: tone(recipe.color).fg + '35' }]}>
               <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={tone(recipe.color).fg} />
-              <Text style={[st.tipText, { color: colors.textSecondary }]}>{recipe.tips}</Text>
+              <Text style={[st.tipText, { color: colors.textSecondary }]}>{tx(recipe.tips)}</Text>
             </View>
           )}
 
@@ -181,8 +181,8 @@ export default function BhogScreen() {
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[st.cardTitle, { color: colors.text }]}>{r.name} <Text style={{ color: tone(r.color).fg, fontSize: 13 }}>{r.nameHi}</Text></Text>
-              <Text style={[st.cardMeta, { color: colors.textTertiary }]} numberOfLines={1}>{r.occasion}</Text>
+              <Text style={[st.cardTitle, { color: colors.text }]}>{native(r.name, r.nameHi)} {language === 'en' && <Text style={{ color: tone(r.color).fg, fontSize: 13 }}>{r.nameHi}</Text>}</Text>
+              <Text style={[st.cardMeta, { color: colors.textTertiary }]} numberOfLines={1}>{tx(r.occasion)}</Text>
             </View>
             <View style={[st.timeChip, { backgroundColor: colors.background }]}>
               <MaterialCommunityIcons name="clock-outline" size={11} color={colors.textTertiary} />

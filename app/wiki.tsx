@@ -9,7 +9,7 @@ import { WIKI, WIKI_CATEGORIES, type WikiArticle, type WikiCat } from '../consta
 
 export default function WikiScreen() {
   const { colors, tone } = useTheme();
-  const { t: tr, tx } = useLanguage();
+  const { t: tr, tx, native, language } = useLanguage();
   const { screenBottom } = useDsInsets();
   const [cat, setCat] = useState<WikiCat | 'all'>('all');
   const [q, setQ] = useState('');
@@ -38,17 +38,17 @@ export default function WikiScreen() {
     const related = WIKI.filter((a) => a.category === article.category && a.id !== article.id).slice(0, 4);
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Header title={article.title} subtitle={c.label} onBack={() => setArticle(null)} />
+        <Header title={native(article.title, article.titleHi)} subtitle={c.label} onBack={() => setArticle(null)} />
         <ScrollView ref={readerRef} contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
-          {!!article.titleHi && <Text style={[st.artHi, { color: tone(c.color).fg }]}>{article.titleHi}</Text>}
-          <Text style={[st.artBody, { color: colors.text }]}>{article.body}</Text>
+          {language === 'en' && !!article.titleHi && <Text style={[st.artHi, { color: tone(c.color).fg }]}>{article.titleHi}</Text>}
+          <Text style={[st.artBody, { color: colors.text }]}>{tx(article.body)}</Text>
           {related.length > 0 && (
             <View style={{ marginTop: 26 }}>
               <Text style={[st.relLabel, { color: colors.textTertiary }]}>{tx('MORE IN')} {c.label.toUpperCase()}</Text>
               {related.map((r) => (
                 <TouchableOpacity key={r.id} onPress={() => setArticle(r)} activeOpacity={0.8}
                   style={[st.relRow, { borderColor: colors.cardBorder }]}>
-                  <Text style={[st.relTitle, { color: colors.text }]} numberOfLines={1}>{r.title}</Text>
+                  <Text style={[st.relTitle, { color: colors.text }]} numberOfLines={1}>{native(r.title, r.titleHi)}</Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
                 </TouchableOpacity>
               ))}
@@ -94,8 +94,8 @@ export default function WikiScreen() {
               style={[st.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <View style={[st.cardIcon, { backgroundColor: tone(c.color).bg }]}><MaterialCommunityIcons name={c.icon as any} size={20} color={tone(c.color).fg} /></View>
               <View style={{ flex: 1 }}>
-                <Text style={[st.cardTitle, { color: colors.text }]}>{a.title}{a.titleHi ? <Text style={{ color: colors.textTertiary }}>  {a.titleHi}</Text> : null}</Text>
-                <Text style={[st.cardSum, { color: colors.textSecondary }]} numberOfLines={2}>{a.summary}</Text>
+                <Text style={[st.cardTitle, { color: colors.text }]}>{native(a.title, a.titleHi)}{language === 'en' && a.titleHi ? <Text style={{ color: colors.textTertiary }}>  {a.titleHi}</Text> : null}</Text>
+                <Text style={[st.cardSum, { color: colors.textSecondary }]} numberOfLines={2}>{tx(a.summary)}</Text>
               </View>
               <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
             </TouchableOpacity>
