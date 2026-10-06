@@ -31,14 +31,15 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL || true
           sudo swapoff -a || true
-          sudo fallocate -l 10G /swapfile2 && sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2 && sudo swapon /swapfile2
+          sudo fallocate -l 6G /swapfile2 && sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2 && sudo swapon /swapfile2
           free -h; df -h /
       - name: Gradle settings for CI
         run: |
           mkdir -p ~/.gradle
           cat > ~/.gradle/gradle.properties <<'PROPS'
           org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
-          org.gradle.workers.max=3
+          org.gradle.workers.max=2
+          reactNativeArchitectures=arm64-v8a
           org.gradle.parallel=false
           org.gradle.daemon=false
           kotlin.daemon.jvmargs=-Xmx2g
@@ -65,6 +66,13 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
           restore-keys: gradle-${{ runner.os }}-
       - run: npm ci
+      # Print memory and disk every minute so a dying runner leaves a trace.
+      - name: Resource log
+        run: |
+          cat > /tmp/res.sh <<'SH'
+          while true; do echo "$(date +%T) $(free -m | sed -n 2p) | $(df -m / | sed -n 2p)"; sleep 60; done
+          SH
+          nohup bash /tmp/res.sh > /tmp/res.log 2>&1 &
       - name: Build APK on this runner
         timeout-minutes: 60
         env:
@@ -75,7 +83,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: build.log
+          path: |
+            build.log
+            /tmp/res.log
           if-no-files-found: ignore
       - name: Version
         id: v
