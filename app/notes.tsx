@@ -412,7 +412,7 @@ export default function NotesScreen() {
           return (
             <TouchableOpacity key={folder} style={[st.folderChip, { backgroundColor: isActive ? colors.primary : colors.surface, borderColor: isActive ? colors.primary : colors.border }]} onPress={() => setActiveFolder(folder)}>
               <MaterialCommunityIcons name={icon as any} size={14} color={isActive ? '#FFF' : colors.textSecondary} />
-              <Text style={[st.folderText, { color: isActive ? '#FFF' : colors.text }]}>{folder}</Text>
+              <Text style={[st.folderText, { color: isActive ? '#FFF' : colors.text }]}>{tx(folder)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -438,10 +438,10 @@ export default function NotesScreen() {
           <View style={st.empty}>
             <MaterialCommunityIcons name={activeFolder === 'Trash' ? 'delete-empty-outline' : activeFolder === 'Archive' ? 'archive-off-outline' : 'note-off-outline'} size={56} color={colors.textTertiary} />
             <Text style={[st.emptyTitle, { color: colors.text }]}>
-              {activeFolder === 'Trash' ? 'Trash is empty' : activeFolder === 'Archive' ? 'No archived notes' : 'No notes yet'}
+              {tx(activeFolder === 'Trash' ? 'Trash is empty' : activeFolder === 'Archive' ? 'No archived notes' : 'No notes yet')}
             </Text>
             <Text style={[st.emptyText, { color: colors.textSecondary }]}>
-              {activeFolder === 'Trash' ? 'Deleted notes appear here' : activeFolder === 'Archive' ? 'Archived notes appear here' : 'Tap + to create your first note'}
+              {tx(activeFolder === 'Trash' ? 'Deleted notes appear here' : activeFolder === 'Archive' ? 'Archived notes appear here' : 'Tap + to create your first note')}
             </Text>
           </View>
         )}

@@ -329,7 +329,7 @@ export default function TemplesScreen() {
             return (
               <TouchableOpacity key={k} onPress={() => { setTab(k); setSelectedId(null); }} style={[st.segBtn, active && { backgroundColor: c }]}>
                 <MaterialCommunityIcons name={k === 'temples' ? 'temple-hindu' : 'food-variant'} size={16} color={active ? '#FFF' : colors.textSecondary} />
-                <Text style={{ color: active ? '#FFF' : colors.textSecondary, fontWeight: '800', fontSize: 13.5 }}>{k === 'temples' ? 'Temples' : 'Bhandara'}</Text>
+                <Text style={{ color: active ? '#FFF' : colors.textSecondary, fontWeight: '800', fontSize: 13.5 }}>{tx(k === 'temples' ? 'Temples' : 'Bhandara')}</Text>
               </TouchableOpacity>
             );
           })}
@@ -337,7 +337,7 @@ export default function TemplesScreen() {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={[st.search, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <Ionicons name="search" size={16} color={colors.textTertiary} />
-            <TextInput style={[st.searchIn, { color: colors.text }]} placeholder={tab === 'bhandara' ? 'Search bhandaras' : 'Search temples'} placeholderTextColor={colors.textTertiary} value={query} onChangeText={setQuery} />
+            <TextInput style={[st.searchIn, { color: colors.text }]} placeholder={tx(tab === 'bhandara' ? 'Search bhandaras' : 'Search temples')} placeholderTextColor={colors.textTertiary} value={query} onChangeText={setQuery} />
             {!!query && <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}><Ionicons name="close-circle" size={16} color={colors.textTertiary} /></TouchableOpacity>}
           </View>
           <TouchableOpacity onPress={openAdd} style={[st.addBtn, { backgroundColor: accent }]}>

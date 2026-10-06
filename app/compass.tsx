@@ -167,12 +167,12 @@ export default function CompassScreen() {
               <View style={st.chips}>
                 <View style={[st.chip, { borderColor: colors.cardBorder }]}>
                   <MaterialCommunityIcons name={trueNorth ? 'earth' : 'magnet'} size={13} color={colors.textSecondary} />
-                  <Text style={[st.chipText, { color: colors.textSecondary }]}>{trueNorth ? 'True north' : 'Magnetic north'}</Text>
+                  <Text style={[st.chipText, { color: colors.textSecondary }]}>{tx(trueNorth ? 'True north' : 'Magnetic north')}</Text>
                 </View>
                 {source && (
                   <View style={[st.chip, { borderColor: lowAccuracy ? '#F59E0B' : colors.cardBorder, backgroundColor: lowAccuracy ? '#F59E0B14' : 'transparent' }]}>
                     <MaterialCommunityIcons name={lowAccuracy ? 'alert-outline' : 'check-circle-outline'} size={13} color={lowAccuracy ? '#D97706' : colors.tulsiGreen || '#2D6A4F'} />
-                    <Text style={[st.chipText, { color: lowAccuracy ? '#D97706' : colors.textSecondary }]}>{lowAccuracy ? 'Needs calibration' : source === 'fused' ? 'Tilt-corrected' : 'Hold phone flat'}</Text>
+                    <Text style={[st.chipText, { color: lowAccuracy ? '#D97706' : colors.textSecondary }]}>{tx(lowAccuracy ? 'Needs calibration' : source === 'fused' ? 'Tilt-corrected' : 'Hold phone flat')}</Text>
                   </View>
                 )}
               </View>
@@ -220,7 +220,7 @@ export default function CompassScreen() {
             <TouchableOpacity onPress={toggleHold} activeOpacity={0.85}
               style={[st.holdBtn, held != null ? { backgroundColor: colors.primary } : { borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
               <MaterialCommunityIcons name={held != null ? 'lock' : 'lock-open-variant-outline'} size={17} color={held != null ? '#FFF' : colors.text} />
-              <Text style={{ color: held != null ? '#FFF' : colors.text, fontWeight: '800', fontSize: 14 }}>{held != null ? `Held at ${Math.round(held)}° · tap to release` : 'Hold this reading'}</Text>
+              <Text style={{ color: held != null ? '#FFF' : colors.text, fontWeight: '800', fontSize: 14 }}>{held != null ? `${Math.round(held)}° · ${tx('tap to release')}` : tx('Hold this reading')}</Text>
             </TouchableOpacity>
 
             {/* Guidance */}

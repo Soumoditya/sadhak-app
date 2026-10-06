@@ -208,7 +208,7 @@ export default function CommunityScreen() {
                 )}
               </View>
               <Text style={[s.roomLast, { color: colors.textSecondary }]} numberOfLines={1}>
-                {item.lastMessage || item.description}
+                {item.lastMessage || tx(item.description || '')}
               </Text>
             </View>
           </TouchableOpacity>

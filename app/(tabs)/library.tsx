@@ -334,7 +334,7 @@ export default function LibraryScreen() {
           return (
             <TouchableOpacity key={mode} style={[st.sortChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]} onPress={() => setSortMode(mode)}>
               <MaterialCommunityIcons name={icon as any} size={14} color={active ? '#FFF' : colors.textSecondary} />
-              <Text style={[st.sortText, { color: active ? '#FFF' : colors.textSecondary }]}>{label}</Text>
+              <Text style={[st.sortText, { color: active ? '#FFF' : colors.textSecondary }]}>{tx(label)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -372,10 +372,10 @@ export default function LibraryScreen() {
             <View style={st.emptyState}>
               <MaterialCommunityIcons name="book-open-blank-variant" size={60} color={colors.textTertiary} />
               <Text style={[st.emptyTitle, { color: colors.text }]}>
-                {searchQuery ? 'No Results' : 'Library is Empty'}
+                {tx(searchQuery ? 'No Results' : 'Library is Empty')}
               </Text>
               <Text style={[st.emptyText, { color: colors.textSecondary }]}>
-                {searchQuery ? `No books matching "${searchQuery}"` : 'Upload a PDF to get started'}
+                {searchQuery ? `${tx('No books match')} "${searchQuery}"` : tx('Upload a PDF to get started')}
               </Text>
             </View>
           }
