@@ -67,6 +67,18 @@ jobs:
       - run: npm ci
         if: steps.token.outputs.ok == 'true'
 
+      # The phones only accept updates from the project in app.json, so the
+      # token must belong to its owner (or a member with publish rights).
+      - name: Check the token's account can publish this project
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          echo "Token account: $(eas whoami 2>&1 | head -1)"
+          echo "Project owner in app.json: $(node -p "require('./app.json').expo.owner")"
+          eas project:info --non-interactive || {
+            echo "::error::This token's account can't access the project in app.json (owner above). Use a token from that account, or switch the app to the new account (needs one new APK)."
+            exit 1
+          }
+
       - name: Publish to the production channel
         if: steps.token.outputs.ok == 'true'
         env:
