@@ -1,0 +1,44 @@
+# Builds an installable Android APK in the cloud with EAS Build (account that
+# owns EXPO_TOKEN), signed with the project's own release key kept by Expo.
+# The download link is printed at the end of the run and shown on
+# expo.dev → Projects → sadhak-app → Builds.
+#
+# Needed only when native things change (new native library, permissions,
+# icon, splash, app version). Everything else ships with "Publish OTA update".
+name: Build APK (EAS)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ccr-5f48682a-w1d2yg]
+    paths:
+      - .github/workflows/eas-build.yml
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Build on EAS (waits for the cloud build)
+        run: eas build --platform android --profile preview --non-interactive --wait --json > build.json
+      - name: Download link
+        if: always()
+        run: |
+          test -s build.json || { echo "No build output"; exit 1; }
+          node -e "
+            const b = require('./build.json')[0];
+            console.log('STATUS=' + b.status);
+            console.log('APK=' + ((b.artifacts && (b.artifacts.applicationArchiveUrl || b.artifacts.buildUrl)) || 'none'));
+            const owner = (b.project && b.project.ownerAccount && b.project.ownerAccount.name) || 'inactiveriteshs-team';
+            console.log('PAGE=https://expo.dev/accounts/' + owner + '/projects/sadhak-app/builds/' + b.id);
+          "

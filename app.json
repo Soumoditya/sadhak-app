@@ -2,13 +2,13 @@
   "expo": {
     "name": "Sadhak",
     "slug": "sadhak-app",
-    "version": "1.12.0",
+    "version": "1.13.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sadhak",
     "userInterfaceStyle": "automatic",
     "android": {
-      "versionCode": 14,
+      "versionCode": 15,
       "adaptiveIcon": {
         "backgroundColor": "#13110F",
         "foregroundImage": "./assets/images/adaptive-foreground.png"
@@ -90,23 +90,38 @@
         }
       ],
       "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "useLegacyPackaging": true,
+            "buildArchs": [
+              "arm64-v8a",
+              "armeabi-v7a"
+            ],
+            "extraProguardRules": "# Shrink only, never rename (avoids reflection/JNI name breakage).\n-dontobfuscate\n-keep class expo.modules.sadhakwallpaper.** { *; }\n-keep class expo.modules.** extends expo.modules.kotlin.modules.Module { *; }\n-keep class * implements expo.modules.kotlin.records.Record { *; }\n-keepclassmembers class * { @expo.modules.kotlin.records.Field *; }\n"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "eas": {
-        "projectId": "c90b71e5-97fa-4da8-9ba2-f8898096d09e"
+        "projectId": "6b6e6af5-f934-4b62-bdb6-6203ed2bdafe"
       },
       "router": {}
     },
-    "owner": "shadowfluxx404",
+    "owner": "inactiveriteshs-team",
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/c90b71e5-97fa-4da8-9ba2-f8898096d09e",
+      "url": "https://u.expo.dev/6b6e6af5-f934-4b62-bdb6-6203ed2bdafe",
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,

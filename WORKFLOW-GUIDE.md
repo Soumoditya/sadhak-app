@@ -54,7 +54,7 @@ The app is built **in the cloud** by EAS (no need for Android Studio). Two kinds
 From v1.11.0 the app has **expo-updates**. Changes to screens, text, design and app logic go straight to phones, no APK needed.
 
 **Easiest: one click on GitHub (set up once)**
-1. expo.dev → Account settings → Access tokens → create a token.
+1. expo.dev (account **inactiveriteshs-team**, which owns the Sadhak project) → Access tokens → create a token.
 2. GitHub repo → Settings → Secrets and variables → Actions → New repository secret: name `EXPO_TOKEN`, paste the token.
 3. It runs by itself on every push to `main` (and to the current redesign branch). Once the workflow is on `main`, you can also run it by hand: Actions tab → **Publish OTA update** → Run workflow.
 
@@ -63,9 +63,10 @@ From v1.11.0 the app has **expo-updates**. Changes to screens, text, design and 
 Phones download the update in the background and show **Update ready → Restart** (from the first OTA onwards; before that, it applies on the next app start).
 
 Rules:
-- An OTA update only reaches builds with the **same app version** (`version` in `app.json`, now 1.12.0). Don't bump the version for an OTA update.
+- An OTA update only reaches builds with the **same app version** (`version` in `app.json`, now 1.13.0). Don't bump the version for an OTA update.
 - Adding a library with native code, changing permissions, the app icon or splash still needs a **new build** (Section C). Bump the version then.
-- Settings and About show the running update (e.g. "v1.12.0 · update 4 Oct, 3f9a2c1d"), so you can confirm it arrived.
+- Settings and About show the running update (e.g. "v1.13.0 · update 6 Oct, 3f9a2c1d"), so you can confirm it arrived.
+- New APKs are built in the cloud by the **Build APK (EAS)** workflow (signed with the project's own key kept by Expo); the download link appears in the run log and on expo.dev → Builds.
 
 ---
 

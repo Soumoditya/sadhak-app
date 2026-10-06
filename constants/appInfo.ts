@@ -26,10 +26,8 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    // Shipped over the air: the app version stays 1.12.0 so installed phones
-    // (runtime 1.12.0) accept it.
-    version: '1.12.0 · update 1',
-    date: '2026-10-04',
+    version: '1.13.0',
+    date: '2026-10-06',
     title: 'A new look, everywhere',
     changes: [
       'Theme and language switches on Home, every tab and every screen header',
@@ -38,7 +36,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Coming up: the next festivals, Ekadashi, Purnima and Amavasya on Home',
       'New type: a warm serif for titles and a classic Devanagari face for shlokas',
       'One calm colour family for icons instead of mixed bright colours',
-      'Updates now install with one tap (Restart) instead of waiting for the next launch',
+      'Bottom bar no longer overlaps the phone\'s navigation buttons; nothing shows through at the top or bottom',
+      'Updates now arrive over the air and install with one tap (Restart)',
     ],
   },
   {
