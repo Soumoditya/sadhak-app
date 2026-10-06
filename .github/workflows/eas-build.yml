@@ -8,12 +8,10 @@
 # Last native build: 1.14.0 (Google sign-in, keyboard controller, new icon).
 name: Build APK (EAS)
 
+# Manual fallback only. The default APK build is "Build APK (GitHub)"
+# (apk-github.yml), which skips the Expo queue.
 on:
   workflow_dispatch:
-  push:
-    branches: [ccr-5f48682a-w1d2yg]
-    paths:
-      - .github/workflows/eas-build.yml
 
 jobs:
   build:
