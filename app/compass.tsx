@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, ScrollView, useWindowDimensions, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { Magnetometer } from 'expo-sensors';
+import { Magnetometer, DeviceMotion } from 'expo-sensors';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Line, Path, Text as SvgText, G } from 'react-native-svg';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -28,11 +28,11 @@ const VASTU: {
 const norm = (d: number) => ((d % 360) + 360) % 360;
 const directionFor = (deg: number) => VASTU[Math.round(norm(deg) / 45) % 8];
 
-type Source = 'fused' | 'magnetometer' | 'none';
+type Source = 'fused' | 'motion' | 'magnetometer' | 'none';
 
 export default function CompassScreen() {
   const { colors, isDark } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const { screenBottom } = useDsInsets();
   const { width } = useWindowDimensions();
   const SIZE = Math.min(width - 48, 320);
@@ -66,37 +66,60 @@ export default function CompassScreen() {
   };
 
   useEffect(() => {
-    let sub: { remove: () => void } | null = null;
+    const subs: { remove: () => void }[] = [];
     let cancelled = false;
+    let lastFused = 0;
     (async () => {
-      // Preferred: Android's fused rotation-vector heading. It is tilt-compensated
-      // (works with the phone held upright) and gives true north when location
-      // is available, which is what Vastu directions are measured against.
+      // 1) Android's fused heading (tilt-compensated, true north with location).
+      //    Some phones grant permission but never deliver it (location off, no
+      //    rotation sensor), so the sensors below keep running as a backup and
+      //    take over whenever the fused heading goes quiet.
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted' && !cancelled) {
-          sub = await Location.watchHeadingAsync((h) => {
+          const sub = await Location.watchHeadingAsync((h) => {
             const useTrue = h.trueHeading != null && h.trueHeading >= 0;
+            const v = useTrue ? h.trueHeading : h.magHeading;
+            if (v == null || v < 0) return;
+            lastFused = Date.now();
             setTrueNorth(useTrue);
             setAccuracy(typeof h.accuracy === 'number' ? h.accuracy : null);
-            feed(useTrue ? h.trueHeading : h.magHeading);
+            setSource('fused');
+            feed(v);
           });
-          if (cancelled) sub.remove(); else setSource('fused');
-          return;
+          if (cancelled) sub.remove(); else subs.push(sub);
         }
       } catch {}
-      // Fallback: raw magnetometer (needs the phone flat).
+      const fusedQuiet = () => Date.now() - lastFused > 1200;
+      // 2) Rotation-vector sensor (no location needed).
       try {
-        if (await Magnetometer.isAvailableAsync()) {
-          Magnetometer.setUpdateInterval(60);
-          sub = Magnetometer.addListener(({ x, y }) => feed(norm((Math.atan2(-x, y) * 180) / Math.PI)));
-          if (!cancelled) setSource('magnetometer');
+        if (!cancelled && (await DeviceMotion.isAvailableAsync())) {
+          DeviceMotion.setUpdateInterval(60);
+          subs.push(DeviceMotion.addListener((m) => {
+            const a = m.rotation?.alpha;
+            if (typeof a !== 'number' || !fusedQuiet()) return;
+            setSource((s) => (s === 'motion' ? s : 'motion'));
+            setTrueNorth(false);
+            feed(norm((-a * 180) / Math.PI));
+          }));
           return;
         }
       } catch {}
-      if (!cancelled) setSource('none');
+      // 3) Raw magnetometer (needs the phone flat).
+      try {
+        if (!cancelled && (await Magnetometer.isAvailableAsync())) {
+          Magnetometer.setUpdateInterval(60);
+          subs.push(Magnetometer.addListener(({ x, y }) => {
+            if (!fusedQuiet()) return;
+            setSource((s) => (s === 'magnetometer' ? s : 'magnetometer'));
+            feed(norm((Math.atan2(-x, y) * 180) / Math.PI));
+          }));
+          return;
+        }
+      } catch {}
+      if (!cancelled && !lastFused) setSource('none');
     })();
-    return () => { cancelled = true; sub?.remove(); };
+    return () => { cancelled = true; subs.forEach((x) => x.remove()); };
   }, []);
 
   const shown = held ?? heading;
@@ -125,13 +148,15 @@ export default function CompassScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title={tr('t.compass')} subtitle="वास्तु दिशा · find directions for your home" />
+      <Header title={tr('t.compass')} subtitle={tx('वास्तु दिशा · find directions for your home')} />
       <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: screenBottom, paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
         {source === 'none' ? (
           <View style={{ alignItems: 'center', marginTop: 60, paddingHorizontal: 20 }}>
             <MaterialCommunityIcons name="compass-off-outline" size={52} color={colors.textTertiary} />
-            <Text style={[st.emptyTitle, { color: colors.text }]}>Compass sensor not available</Text>
-            <Text style={[st.emptySub, { color: colors.textSecondary }]}>This phone doesn't report a heading. Allow location access, or try on a phone with a compass sensor.</Text>
+            <Text style={[st.emptyTitle, { color: colors.text }]}>{tx('Compass sensor not available')}</Text>
+            <Text style={[st.emptySub, { color: colors.textSecondary }]}>{tx(
+              'This phone doesn\'t report a heading. Allow location access, or try on a phone with a compass sensor.'
+            )}</Text>
           </View>
         ) : (
           <>
@@ -206,24 +231,28 @@ export default function CompassScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[st.cardTitle, { color: colors.text }]}>{dir.label} ({dir.labelHi})</Text>
-                  <Text style={[st.cardSub, { color: colors.textSecondary }]}>Dikpala {dir.dikpala} · {dir.element}</Text>
+                  <Text style={[st.cardSub, { color: colors.textSecondary }]}>{tx('Dikpala')} {dir.dikpala}· {dir.element}</Text>
                 </View>
               </View>
               <View style={st.row}>
                 <MaterialCommunityIcons name="check-circle-outline" size={16} color={colors.tulsiGreen || '#2D6A4F'} />
-                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>Best for: </Text>{dir.good}</Text>
+                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>{tx('Best for:')} </Text>{dir.good}</Text>
               </View>
               <View style={st.row}>
                 <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" />
-                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>Avoid: </Text>{dir.avoid}</Text>
+                <Text style={[st.rowText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '800', color: colors.text }}>{tx('Avoid:')} </Text>{dir.avoid}</Text>
               </View>
             </View>
 
             <View style={[st.tips, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Text style={[st.tipsTitle, { color: colors.text }]}>How to read a room</Text>
-              <Text style={[st.tipText, { color: colors.textSecondary }]}>1. Stand at the centre of the room or home and point the top of the phone at the door or wall you want to check.</Text>
-              <Text style={[st.tipText, { color: colors.textSecondary }]}>2. Tap "Hold this reading" so you can read it comfortably.</Text>
-              <Text style={[st.tipText, { color: colors.textSecondary }]}>3. Keep away from fridges, speakers and steel almirahs. If it says "Needs calibration", move the phone in a figure-8 a few times.</Text>
+              <Text style={[st.tipsTitle, { color: colors.text }]}>{tx('How to read a room')}</Text>
+              <Text style={[st.tipText, { color: colors.textSecondary }]}>{tx(
+                '1. Stand at the centre of the room or home and point the top of the phone at the door or wall you want to check.'
+              )}</Text>
+              <Text style={[st.tipText, { color: colors.textSecondary }]}>{tx('2. Tap "Hold this reading" so you can read it comfortably.')}</Text>
+              <Text style={[st.tipText, { color: colors.textSecondary }]}>{tx(
+                '3. Keep away from fridges, speakers and steel almirahs. If it says "Needs calibration", move the phone in a figure-8 a few times.'
+              )}</Text>
             </View>
           </>
         )}

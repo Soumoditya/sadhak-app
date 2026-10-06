@@ -15,7 +15,7 @@ import { toneSolid } from '../constants/theme';
 
 export default function BhogScreen() {
   const { colors, isDark, tone } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [query, setQuery] = useState('');
   const [recipe, setRecipe] = useState<BhogRecipe | null>(null);
@@ -71,7 +71,7 @@ export default function BhogScreen() {
             <Text style={st.dTitleHi}>{recipe.nameHi}</Text>
             <View style={st.dMeta}>
               <View style={st.dChip}><MaterialCommunityIcons name="clock-outline" size={12} color="#FFF" /><Text style={st.dChipText}>{recipe.time}</Text></View>
-              <View style={st.dChip}><MaterialCommunityIcons name="leaf" size={12} color="#FFF" /><Text style={st.dChipText}>No onion · No garlic</Text></View>
+              <View style={st.dChip}><MaterialCommunityIcons name="leaf" size={12} color="#FFF" /><Text style={st.dChipText}>{tx('No onion · No garlic')}</Text></View>
             </View>
             <Text style={st.dOccasion}>{recipe.occasion}</Text>
           </LinearGradient>
@@ -80,7 +80,7 @@ export default function BhogScreen() {
           <View style={[st.section, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={st.sectionHead}>
               <MaterialCommunityIcons name="basket-outline" size={17} color={colors.primary} />
-              <Text style={[st.sectionTitle, { color: colors.text }]}>Ingredients</Text>
+              <Text style={[st.sectionTitle, { color: colors.text }]}>{tx('Ingredients')}</Text>
             </View>
             {recipe.ingredients.map((ing, i) => (
               <View key={i} style={[st.ingRow, i > 0 && { borderTopColor: colors.divider, borderTopWidth: 1 }]}>
@@ -94,7 +94,7 @@ export default function BhogScreen() {
           <View style={[st.section, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={st.sectionHead}>
               <MaterialCommunityIcons name="chef-hat" size={17} color="#2D6A4F" />
-              <Text style={[st.sectionTitle, { color: colors.text }]}>Method</Text>
+              <Text style={[st.sectionTitle, { color: colors.text }]}>{tx('Method')}</Text>
             </View>
             {recipe.steps.map((s, i) => (
               <View key={i} style={st.stepRow}>
@@ -118,7 +118,7 @@ export default function BhogScreen() {
             onPress={() => router.push({ pathname: '/play', params: { query: recipe.playQuery, title: recipe.name } })}
           >
             <MaterialCommunityIcons name="play-circle-outline" size={19} color="#FFF" />
-            <Text style={st.watchBtnText}>Watch it being made</Text>
+            <Text style={st.watchBtnText}>{tx('Watch it being made')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -130,9 +130,9 @@ export default function BhogScreen() {
     <View style={[st.container, { backgroundColor: colors.background }]}>
       <Header
         title={tr('f.bhog')}
-        subtitle="सात्विक भोग · no onion, no garlic"
+        subtitle={tx('सात्विक भोग · no onion, no garlic')}
         right={
-          <TouchableOpacity onPress={surpriseMe} accessibilityLabel="Surprise me" style={[st.randomBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6}>
+          <TouchableOpacity onPress={surpriseMe} accessibilityLabel={tx('Surprise me')} style={[st.randomBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6}>
             <MaterialCommunityIcons name="dice-5-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
         }
@@ -141,7 +141,7 @@ export default function BhogScreen() {
         <Ionicons name="search" size={17} color={colors.textTertiary} />
         <TextInput
           style={[st.searchInput, { color: colors.text }]}
-          placeholder="Search dish, occasion, ingredient…"
+          placeholder={tx('Search dish, occasion, ingredient…')}
           placeholderTextColor={colors.textTertiary}
           value={query}
           onChangeText={setQuery}
@@ -155,9 +155,7 @@ export default function BhogScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.list, { paddingBottom: screenBottomPadding }]}>
         {filtered.length === 0 && (
-          <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 40, fontSize: 13 }}>
-            Nothing matches "{query}" — try an ingredient like "makhana".
-          </Text>
+          <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 40, fontSize: 13 }}>{tx('Nothing matches "')}{query}{tx('" — try an ingredient like "makhana".')}</Text>
         )}
         {filtered.map((r) => {
           const img = getFoodImage(r.id);

@@ -189,6 +189,9 @@ export const UI: Record<string, [string, string, string]> = {
   'lib.sub': ['scriptures & books', 'शास्त्र और पुस्तकें', 'শাস্ত্র ও বই'],
   'lib.search': ['Search books, authors', 'पुस्तक, लेखक खोजें', 'বই, লেখক খুঁজুন'],
   'chat.search': ['Search rooms, groups', 'रूम, समूह खोजें', 'রুম, গ্রুপ খুঁজুন'],
+  'home.tithiUntil': ['tithi until {t}', 'तिथि {t} तक', 'তিথি {t} পর্যন্ত'],
+  'mu.rahu': ['Rahu Kaal', 'राहु काल', 'রাহু কাল'],
+  'home.shareShloka': ['Share as image', 'चित्र के रूप में साझा करें', 'ছবি হিসেবে শেয়ার করুন'],
 };
 
 // Main labels in the other supported languages (tabs come from the base table).

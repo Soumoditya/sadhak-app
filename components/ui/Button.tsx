@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { DS } from '../../constants/ds';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface Props {
   title: string;
@@ -22,6 +23,7 @@ export default function Button({
   icon, disabled, loading, fullWidth = true, style,
 }: Props) {
   const { colors } = useTheme();
+  const { tx } = useLanguage();
   const height = size === 'lg' ? DS.layout.buttonHeightLg : DS.layout.buttonHeightMd;
 
   const content = (fg: string) => (
@@ -31,7 +33,7 @@ export default function Button({
       ) : (
         <>
           {icon && <MaterialCommunityIcons name={icon as any} size={size === 'lg' ? 20 : 18} color={fg} />}
-          <Text style={[styles.text, { color: fg, fontSize: DS.type.button.size }]}>{title}</Text>
+          <Text style={[styles.text, { color: fg, fontSize: DS.type.button.size }]}>{tx(title)}</Text>
         </>
       )}
     </View>

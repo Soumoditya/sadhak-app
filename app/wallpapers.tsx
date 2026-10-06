@@ -24,7 +24,7 @@ const COL_W = (width - 20 * 2 - GAP) / 2;
 
 export default function WallpapersScreen() {
   const { colors } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const dialog = useDialog();
   const { screenBottom } = useDsInsets();
   const [cat, setCat] = useState<'all' | Wallpaper['category']>('all');
@@ -116,7 +116,7 @@ export default function WallpapersScreen() {
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <Header title={tr('f.wallpapers')} subtitle="Gods, temples & sacred nature" />
+      <Header title={tr('f.wallpapers')} subtitle={tx('Gods, temples & sacred nature')} />
 
       {/* Category chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.catScroll} contentContainerStyle={st.catRow}>
@@ -129,7 +129,7 @@ export default function WallpapersScreen() {
               style={[st.catChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.cardBorder }]}
             >
               <MaterialCommunityIcons name={c.icon as any} size={14} color={active ? '#FFF' : colors.textSecondary} />
-              <Text style={[st.catText, { color: active ? '#FFF' : colors.textSecondary }]}>{c.label}</Text>
+              <Text style={[st.catText, { color: active ? '#FFF' : colors.textSecondary }]}>{tx(c.label)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -187,7 +187,7 @@ export default function WallpapersScreen() {
                   disabled={busy !== null}
                 >
                   {busy === 'save' ? <ActivityIndicator size="small" color="#FFF" /> : <MaterialCommunityIcons name="download" size={18} color="#FFF" />}
-                  <Text style={st.pBtnText}>Save</Text>
+                  <Text style={st.pBtnText}>{tx('Save')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[st.pBtn, { backgroundColor: colors.primary }]}
@@ -195,7 +195,7 @@ export default function WallpapersScreen() {
                   disabled={busy !== null}
                 >
                   {busy === 'set' ? <ActivityIndicator size="small" color="#FFF" /> : <MaterialCommunityIcons name="wallpaper" size={18} color="#FFF" />}
-                  <Text style={st.pBtnText}>Set as wallpaper</Text>
+                  <Text style={st.pBtnText}>{tx('Set as wallpaper')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

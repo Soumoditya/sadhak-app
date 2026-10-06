@@ -20,7 +20,7 @@ import { toneSolid } from '../constants/theme';
 
 export default function DevotionalScreen() {
   const { colors, isDark, tone } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [category, setCategory] = useState<DevotionalCategory>('aarti');
   const [selected, setSelected] = useState<DevotionalItem | null>(null);
@@ -84,7 +84,7 @@ export default function DevotionalScreen() {
 
             <TouchableOpacity style={[st.listenBtn, { backgroundColor: toneSolid(selected.color) }]} onPress={() => openPlayer(selected)} activeOpacity={0.85}>
               <MaterialCommunityIcons name="play-circle" size={19} color="#FFF" />
-              <Text style={st.listenBtnText}>Listen / Watch</Text>
+              <Text style={st.listenBtnText}>{tx('Listen / Watch')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -109,7 +109,7 @@ export default function DevotionalScreen() {
   // ─── List view ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <Header title={tr('t.devotional')} subtitle="Aarti · Chalisa · Mantra · Stotra" />
+      <Header title={tr('t.devotional')} subtitle={tx('Aarti · Chalisa · Mantra · Stotra')} />
       <View style={st.tabs}>
         {DEVOTIONAL_CATEGORIES.map((cat) => {
           const active = category === cat.key;
@@ -121,7 +121,7 @@ export default function DevotionalScreen() {
               onPress={() => setCategory(cat.key)}
             >
               {cat.icon === 'candle' ? <Diya size={16} color={fg} /> : <MaterialCommunityIcons name={cat.icon as any} size={15} color={fg} />}
-              <Text style={[st.tabText, { color: fg }]}>{cat.label}</Text>
+              <Text style={[st.tabText, { color: fg }]}>{tx(cat.label)}</Text>
             </TouchableOpacity>
           );
         })}

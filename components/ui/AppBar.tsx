@@ -12,11 +12,13 @@ import { LanguageChip, ThemeToggle } from './QuickSettings';
  * theme switches (plus any extra actions) on the right. Sits inside the
  * screen's scroll content, under the safe-area padding.
  */
-export default function AppBar({ title, subtitle, right, overline, back }: {
+export default function AppBar({ title, subtitle, right, after, overline, back }: {
   title: string;
   subtitle?: string;
   overline?: string;
   right?: React.ReactNode;
+  /** Actions after the language + theme switches (e.g. Settings on Profile). */
+  after?: React.ReactNode;
   /** Show a back button (for tab-hosted screens reached from elsewhere). */
   back?: boolean;
 }) {
@@ -44,6 +46,7 @@ export default function AppBar({ title, subtitle, right, overline, back }: {
         {right}
         <LanguageChip />
         <ThemeToggle />
+        {after}
       </View>
     </View>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
   Modal, Alert, Dimensions, Platform, Animated, KeyboardAvoidingView,
@@ -91,8 +92,9 @@ export default function NotesScreen() {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardInset();
   const dialog = useDialog();
-  const { t } = useLanguage();
+  const { t, tx } = useLanguage();
   const [notes, setNotes] = useState<Note[]>([]);
   const [showEditor, setShowEditor] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
@@ -381,7 +383,7 @@ export default function NotesScreen() {
       {/* ── Header ── */}
       <Header
         title={t('feat.notes')}
-        subtitle="Personal notes, folders & reminders"
+        subtitle={tx('Personal notes, folders & reminders')}
         right={
           <TouchableOpacity onPress={() => setIsGridView(!isGridView)} style={[st.viewToggle, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
             <MaterialCommunityIcons name={isGridView ? 'view-agenda-outline' : 'view-grid-outline'} size={20} color={colors.text} />
@@ -394,7 +396,7 @@ export default function NotesScreen() {
         <Ionicons name="search" size={18} color={colors.textTertiary} />
         <TextInput
           style={[st.searchInput, { color: colors.text }]}
-          placeholder="Search notes..."
+          placeholder={tx('Search notes...')}
           placeholderTextColor={colors.textTertiary}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -586,11 +588,11 @@ export default function NotesScreen() {
           )}
 
           {/* Editor body */}
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1, paddingBottom: kb }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView style={st.editorBody} keyboardShouldPersistTaps="handled">
               <TextInput
                 style={[st.editorTitle, { color: colors.text }]}
-                placeholder="Title"
+                placeholder={tx('Title')}
                 placeholderTextColor={colors.textTertiary}
                 value={title}
                 onChangeText={setTitle}
@@ -612,7 +614,7 @@ export default function NotesScreen() {
                   ))}
                   <View style={st.addCheckRow}>
                     <MaterialCommunityIcons name="plus" size={22} color={colors.textTertiary} />
-                    <TextInput style={[st.addCheckInput, { color: colors.text }]} placeholder="Add item..." placeholderTextColor={colors.textTertiary} value={newCheckItem} onChangeText={setNewCheckItem} onSubmitEditing={addCheckItem} returnKeyType="done" />
+                    <TextInput style={[st.addCheckInput, { color: colors.text }]} placeholder={tx('Add item...')} placeholderTextColor={colors.textTertiary} value={newCheckItem} onChangeText={setNewCheckItem} onSubmitEditing={addCheckItem} returnKeyType="done" />
                   </View>
                 </View>
               ) : (
@@ -625,7 +627,7 @@ export default function NotesScreen() {
                     textDecorationLine: isUnderline && isStrikethrough ? 'underline line-through' : isUnderline ? 'underline' : isStrikethrough ? 'line-through' : 'none',
                     backgroundColor: highlightColor,
                   }]}
-                  placeholder="Write your note..."
+                  placeholder={tx('Write your note...')}
                   placeholderTextColor={colors.textTertiary}
                   value={content}
                   onChangeText={handleContentChange}
@@ -655,7 +657,7 @@ export default function NotesScreen() {
           <View style={[st.remSheet, { backgroundColor: colors.surface }]}>
             <View style={[st.remHandle, { backgroundColor: colors.divider }]} />
             <View style={st.remHeader}>
-              <Text style={[st.remTitle, { color: colors.text }]}>Remind me</Text>
+              <Text style={[st.remTitle, { color: colors.text }]}>{tx('Remind me')}</Text>
               <TouchableOpacity onPress={() => setShowReminderSheet(false)} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textTertiary} />
               </TouchableOpacity>
@@ -670,7 +672,7 @@ export default function NotesScreen() {
               onPress={() => setPickStage('date')}
             >
               <MaterialCommunityIcons name="calendar-clock" size={18} color={colors.primary} />
-              <Text style={[st.remDialText, { color: colors.primary }]}>Pick exact date & time</Text>
+              <Text style={[st.remDialText, { color: colors.primary }]}>{tx('Pick exact date & time')}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.primary} />
             </TouchableOpacity>
             {pickStage === 'date' && (
@@ -753,7 +755,7 @@ export default function NotesScreen() {
             <TouchableOpacity onPress={scheduleNoteReminder} activeOpacity={0.85}>
               <LinearGradient colors={['#C2410C', '#E8743B']} style={st.remSubmit}>
                 <MaterialCommunityIcons name="bell-check-outline" size={19} color="#FFF" />
-                <Text style={st.remSubmitText}>Set reminder</Text>
+                <Text style={st.remSubmitText}>{tx('Set reminder')}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -770,7 +772,7 @@ export default function NotesScreen() {
             ].map((item, idx) => (
               <TouchableOpacity key={idx} style={st.moreItem} onPress={item.action}>
                 <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color || colors.text} />
-                <Text style={[st.moreItemText, { color: item.color || colors.text }]}>{item.label}</Text>
+                <Text style={[st.moreItemText, { color: item.color || colors.text }]}>{tx(item.label)}</Text>
               </TouchableOpacity>
             ))}
           </View>

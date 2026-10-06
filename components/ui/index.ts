@@ -8,4 +8,4 @@ export { default as Diya } from './Diya';
 export { default as Icon, fromMaterial } from './Icon';
 export { default as AppBar } from './AppBar';
 export { ToolTile, ToolRow, ToolGlyph } from './ToolTile';
-export { LanguageChip, ThemeToggle, QuickSettingsButton, useQuickSettings } from './QuickSettings';
+export { LanguageChip, ThemeToggle, useQuickSettings } from './QuickSettings';

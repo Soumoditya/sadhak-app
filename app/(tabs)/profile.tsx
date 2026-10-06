@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, Image, Modal,
-  Share, ActivityIndicator, Dimensions,
-} from 'react-native';
+  Share, ActivityIndicator, Dimensions, RefreshControl } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -13,7 +12,7 @@ import { shareSadhak } from '../../services/shareApp';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useLanguage, SUPPORTED_LANGUAGES } from '../../contexts/LanguageContext';
-import { db, collection, getDocs, query, where, setDoc, doc } from '../../config/firebase';
+import { db, collection, getDocs, query, where, setDoc, doc, deleteDoc } from '../../config/firebase';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { getUserPosts, type Post } from '../../services/posts';
 import { WEBSITE_URL } from '../../constants/appInfo';
@@ -25,10 +24,10 @@ const GRID_GAP = 3;
 const GRID_COL = (SCREEN_W - 20 * 2 - GRID_GAP * 2) / 3;
 
 export default function ProfileScreen() {
-  const { profile, isGuest, isAdmin, updateProfile, user } = useAuth();
+  const { profile, isGuest, isAdmin, updateProfile, user, refreshProfile } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
-  const { t, display } = useLanguage();
+  const { t, display, tx } = useLanguage();
   const insets = useSafeAreaInsets();
 
   const [uploadingPfp, setUploadingPfp] = useState(false);
@@ -80,6 +79,18 @@ export default function ProfileScreen() {
     }, [user?.uid]),
   );
 
+  // Pull to refresh: profile and posts from the server.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refreshProfile(),
+        user?.uid ? getUserPosts(user.uid).then(setMyPosts) : Promise.resolve(),
+      ]);
+    } catch {} finally { setRefreshing(false); }
+  }, [user?.uid, refreshProfile]);
+
   useEffect(() => {
     if (profile) {
       setEditName(profile.displayName || '');
@@ -118,13 +129,15 @@ export default function ProfileScreen() {
     setCheckingUsername(true);
     try {
       const snap = await getDocs(query(collection(db, 'usernames'), where('username', '==', name)));
-      if (!snap.empty && snap.docs[0].data().uid !== user?.uid) {
+      if (snap.docs.some((d) => !d.data().deletedAt && d.data().uid !== user?.uid)) {
         dialog.alert('Taken', 'That username is already taken.');
         setCheckingUsername(false);
         return;
       }
-      if (profile?.username) {
-        await setDoc(doc(db, 'usernames', profile.username), { deletedAt: Date.now() }, { merge: true });
+      if (profile?.username && profile.username !== name) {
+        // Release the old name; if rules don't allow delete, mark it released.
+        await deleteDoc(doc(db, 'usernames', profile.username)).catch(() =>
+          setDoc(doc(db, 'usernames', profile.username), { deletedAt: Date.now() }, { merge: true }));
       }
       await setDoc(doc(db, 'usernames', name), { uid: user?.uid, username: name, createdAt: Date.now() });
       await updateProfile({ username: name });
@@ -155,13 +168,13 @@ export default function ProfileScreen() {
   const initials = (profile?.displayName || 'S').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
-    <Screen scroll tabbed edges={{ top: true, bottom: false }}>
+    <Screen scroll tabbed edges={{ top: true, bottom: false }} scrollProps={{ refreshControl: <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surface} /> }}>
 
       {/* ═══ Top bar: back, title, settings, language + theme ═══ */}
       <AppBar
         back
         title={t('p.title')}
-        right={
+        after={
           <TouchableOpacity
             onPress={() => router.push('/settings' as any)}
             style={[styles.gearBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
@@ -198,11 +211,11 @@ export default function ProfileScreen() {
         <View style={styles.statsRow}>
           <View style={styles.stat}>
             <Text style={[styles.statNum, { color: colors.text }]}>{myPosts.length}</Text>
-            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Posts</Text>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{tx('Posts')}</Text>
           </View>
           <View style={styles.stat}>
             <Text style={[styles.statNum, { color: colors.text }]}>{memberSinceYear}</Text>
-            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Since</Text>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{tx('Since')}</Text>
           </View>
           {!!profile?.location?.city && (
             <View style={styles.stat}>
@@ -227,12 +240,12 @@ export default function ProfileScreen() {
             {isAdmin && (
               <View style={[styles.badge, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B55' }]}>
                 <MaterialCommunityIcons name="shield-crown" size={11} color="#F59E0B" />
-                <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '800' }}>Admin</Text>
+                <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '800' }}>{tx('Admin')}</Text>
               </View>
             )}
             {isGuest && (
               <View style={[styles.badge, { backgroundColor: colors.textTertiary + '18', borderColor: colors.textTertiary + '55' }]}>
-                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '800' }}>Guest</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '800' }}>{tx('Guest')}</Text>
               </View>
             )}
           </View>
@@ -273,7 +286,7 @@ export default function ProfileScreen() {
           <Text style={[styles.emptyPostsText, { color: colors.textSecondary }]}>{t('p.noPosts')}</Text>
           <TouchableOpacity onPress={() => router.push('/create-post')} style={[styles.emptyPostsBtn, { backgroundColor: colors.primary }]}>
             <MaterialCommunityIcons name="plus" size={16} color="#FFF" />
-            <Text style={styles.emptyPostsBtnText}>Create your first post</Text>
+            <Text style={styles.emptyPostsBtnText}>{tx('Create your first post')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -302,23 +315,23 @@ export default function ProfileScreen() {
         <View style={styles.sheetOverlay}>
           <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: 28 + insets.bottom }]}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
-            <Text style={[styles.sheetTitle, { color: colors.text }]}>Edit profile</Text>
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>{tx('Edit profile')}</Text>
 
-            <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>DISPLAY NAME</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>{tx('DISPLAY NAME')}</Text>
             <TextInput
               style={[styles.field, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.background }]}
-              value={editName} onChangeText={setEditName} placeholder="Your name" placeholderTextColor={colors.textTertiary}
+              value={editName} onChangeText={setEditName} placeholder={tx('Your name')} placeholderTextColor={colors.textTertiary}
             />
             <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>BIO</Text>
             <TextInput
               style={[styles.field, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.background, height: 96, textAlignVertical: 'top' }]}
-              value={editBio} onChangeText={setEditBio} placeholder="Tell us about your spiritual journey…"
+              value={editBio} onChangeText={setEditBio} placeholder={tx('Tell us about your spiritual journey…')}
               placeholderTextColor={colors.textTertiary} multiline maxLength={150}
             />
             <Text style={[styles.charCount, { color: colors.textTertiary }]}>{editBio.length}/150</Text>
 
             <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>GENDER</Text>
-            <Text style={[styles.fieldHint, { color: colors.textTertiary }]}>Used to personalise grooming guidance per shastra</Text>
+            <Text style={[styles.fieldHint, { color: colors.textTertiary }]}>{tx('Used to personalise grooming guidance per shastra')}</Text>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 6 }}>
               {([['male', 'Male', 'gender-male'], ['female', 'Female', 'gender-female']] as const).map(([val, label, icon]) => {
                 const active = editGender === val;
@@ -337,8 +350,8 @@ export default function ProfileScreen() {
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
-              <Button title="Cancel" variant="secondary" onPress={() => setEditOpen(false)} />
-              <Button title="Save" loading={savingEdit} onPress={saveEdit} />
+              <Button title={tx('Cancel')} variant="secondary" onPress={() => setEditOpen(false)} style={{ flex: 1 }} />
+              <Button title={tx('Save')} loading={savingEdit} onPress={saveEdit} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -349,10 +362,8 @@ export default function ProfileScreen() {
         <View style={styles.sheetOverlay}>
           <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: 28 + insets.bottom }]}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
-            <Text style={[styles.sheetTitle, { color: colors.text }]}>Set username</Text>
-            <Text style={[styles.sheetSub, { color: colors.textSecondary }]}>
-              Others can find and mention you by your @username.
-            </Text>
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>{tx('Set username')}</Text>
+            <Text style={[styles.sheetSub, { color: colors.textSecondary }]}>{tx('Others can find and mention you by your @username.')}</Text>
             <View style={[styles.usernameField, { borderColor: colors.cardBorder, backgroundColor: colors.background }]}>
               <Text style={{ color: colors.textTertiary, fontSize: 17, fontWeight: '600' }}>@</Text>
               <TextInput
@@ -363,8 +374,8 @@ export default function ProfileScreen() {
               />
             </View>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              <Button title="Cancel" variant="secondary" onPress={() => setUsernameOpen(false)} />
-              <Button title="Save" loading={checkingUsername} onPress={saveUsername} />
+              <Button title={tx('Cancel')} variant="secondary" onPress={() => setUsernameOpen(false)} style={{ flex: 1 }} />
+              <Button title={tx('Save')} loading={checkingUsername} onPress={saveUsername} style={{ flex: 1 }} />
             </View>
           </View>
         </View>

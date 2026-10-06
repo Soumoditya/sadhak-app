@@ -11,19 +11,20 @@ import { DS } from '../../constants/ds';
 // Reachable from Home, every tab header and every screen header, so nobody
 // has to dig into Settings for them.
 
-const Ctx = createContext<{ open: () => void }>({ open: () => {} });
+type SheetKind = 'language' | 'theme';
+const Ctx = createContext<{ open: (kind?: SheetKind) => void }>({ open: () => {} });
 export const useQuickSettings = () => useContext(Ctx);
 
 export function QuickSettingsProvider({ children }: { children: React.ReactNode }) {
-  const [visible, setVisible] = useState(false);
-  const open = useCallback(() => {
+  const [kind, setKind] = useState<SheetKind | null>(null);
+  const open = useCallback((k: SheetKind = 'language') => {
     Haptics.selectionAsync().catch(() => {});
-    setVisible(true);
+    setKind(k);
   }, []);
   return (
     <Ctx.Provider value={{ open }}>
       {children}
-      {visible && <QuickSheet onClose={() => setVisible(false)} />}
+      {kind && <QuickSheet kind={kind} onClose={() => setKind(null)} />}
     </Ctx.Provider>
   );
 }
@@ -33,7 +34,7 @@ const SCRIPT_MARK: Record<string, string> = {
   en: 'En', hi: 'हि', bn: 'বা', mr: 'म', gu: 'ગુ', ta: 'த', te: 'తె', kn: 'ಕ', ml: 'മ', pa: 'ਪੰ', as: 'অ', od: 'ଓ',
 };
 
-function QuickSheet({ onClose }: { onClose: () => void }) {
+function QuickSheet({ kind, onClose }: { kind: SheetKind; onClose: () => void }) {
   const { colors, mode, setMode, isDark } = useTheme();
   const { language, setLanguage, t, noTrack, display } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -74,13 +75,14 @@ function QuickSheet({ onClose }: { onClose: () => void }) {
       >
         <View style={[qs.grabber, { backgroundColor: colors.border }]} />
         <View style={qs.titleRow}>
-          <Text style={[qs.title, { color: colors.text }, display]}>{t('qs.title')}</Text>
+          <Text style={[qs.title, { color: colors.text }, display]}>{t(kind === 'theme' ? 's.appearance' : 's.language')}</Text>
           <TouchableOpacity onPress={close} hitSlop={10} style={[qs.close, { backgroundColor: colors.surfaceSecondary }]}>
             <Icon name="x" size={16} color={colors.textSecondary} weight="regular" />
           </TouchableOpacity>
         </View>
 
-        <Text style={[qs.label, { color: colors.textTertiary }, noTrack]}>{t('s.appearance')}</Text>
+        {kind === 'theme' && (
+          <>
         <View style={[qs.segment, { backgroundColor: colors.surfaceSecondary }]}>
           {modes.map((m) => {
             const on = mode === m.key;
@@ -99,7 +101,9 @@ function QuickSheet({ onClose }: { onClose: () => void }) {
           })}
         </View>
 
-        <Text style={[qs.label, { color: colors.textTertiary, marginTop: 22 }, noTrack]}>{t('s.language')}</Text>
+          </>
+        )}
+        {kind === 'language' && (
         <ScrollView style={{ flexGrow: 0 }} showsVerticalScrollIndicator={false}>
           <View style={qs.langGrid}>
             {SUPPORTED_LANGUAGES.map((l) => {
@@ -128,6 +132,7 @@ function QuickSheet({ onClose }: { onClose: () => void }) {
           </View>
           <Text style={[qs.note, { color: colors.textTertiary }]}>{t('s.languageNote')}</Text>
         </ScrollView>
+        )}
       </Animated.View>
     </Modal>
   );
@@ -142,12 +147,12 @@ export function LanguageChip({ size = 40 }: { size?: number }) {
   const { open } = useQuickSettings();
   return (
     <TouchableOpacity
-      onPress={open}
+      onPress={() => open('language')}
       hitSlop={6}
       accessibilityLabel={t('s.language')}
       style={[qs.chip, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
     >
-      <Text style={[qs.chipText, { color: colors.text }]}>{SCRIPT_MARK[language] || 'En'}</Text>
+      <Text style={[qs.chipText, { color: colors.text, fontSize: size < 40 ? 13 : 14 }]}>{SCRIPT_MARK[language] || 'En'}</Text>
     </TouchableOpacity>
   );
 }
@@ -167,7 +172,7 @@ export function ThemeToggle({ size = 40 }: { size?: number }) {
   return (
     <TouchableOpacity
       onPress={flip}
-      onLongPress={open}
+      onLongPress={() => open('theme')}
       hitSlop={6}
       accessibilityLabel={t(isDark ? 'theme.light' : 'theme.dark')}
       style={[qs.chip, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
@@ -175,23 +180,6 @@ export function ThemeToggle({ size = 40 }: { size?: number }) {
       <Animated.View style={{ transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['-90deg', '0deg'] }) }] }}>
         <Icon name={isDark ? 'sun' : 'moon'} size={19} color={isDark ? '#F2C14E' : colors.text} weight="duotone" />
       </Animated.View>
-    </TouchableOpacity>
-  );
-}
-
-/** Compact single button for crowded headers: opens theme + language sheet. */
-export function QuickSettingsButton({ size = 40 }: { size?: number }) {
-  const { colors } = useTheme();
-  const { t } = useLanguage();
-  const { open } = useQuickSettings();
-  return (
-    <TouchableOpacity
-      onPress={open}
-      hitSlop={6}
-      accessibilityLabel={t('qs.title')}
-      style={[qs.chip, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-    >
-      <Icon name="text-aa" size={19} color={colors.text} />
     </TouchableOpacity>
   );
 }

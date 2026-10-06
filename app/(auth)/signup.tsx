@@ -11,7 +11,11 @@ import { useDialog } from '../../contexts/DialogContext';
 import { Button } from '../../components/ui';
 import { DS, useDsInsets } from '../../constants/ds';
 
+import { useLanguage } from '../../contexts/LanguageContext';
+
 export default function SignupScreen() {
+  const { tx } = useLanguage();
+
   const { signUpWithEmail } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
@@ -30,7 +34,11 @@ export default function SignupScreen() {
       return;
     }
     if (password !== confirm) { dialog.alert('Passwords don\'t match', 'Please retype the password.'); return; }
-    if (password.length < 6) { dialog.alert('Password too short', 'Use at least 6 characters.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) { dialog.alert('Check your email', 'That doesn\'t look like a valid email address.'); return; }
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      dialog.alert('Stronger password', 'Use at least 8 characters with letters and numbers.');
+      return;
+    }
     setLoading(true);
     try {
       await signUpWithEmail(email.trim(), password, name.trim());
@@ -39,6 +47,8 @@ export default function SignupScreen() {
       const msg = error.code === 'auth/email-already-in-use' ? 'This email already has an account. Sign in instead.'
         : error.code === 'auth/invalid-email' ? 'Invalid email format.'
         : error.code === 'auth/weak-password' ? 'Password is too weak.'
+        : error.code === 'auth/credential-already-in-use' ? 'This email already has an account. Sign in instead.'
+        : error.code === 'auth/network-request-failed' ? 'No internet connection. Check it and try again.'
         : String(error?.message || 'Sign up failed.').slice(0, 160);
       dialog.alert('Sign up failed', msg);
     } finally { setLoading(false); }
@@ -67,16 +77,16 @@ export default function SignupScreen() {
           </View>
 
           {/* Title */}
-          <Text style={[st.title, { color: colors.text }]}>Create your account</Text>
-          <Text style={[st.sub, { color: colors.textSecondary }]}>Begin your daily practice with Sadhak.</Text>
+          <Text style={[st.title, { color: colors.text }]}>{tx('Create your account')}</Text>
+          <Text style={[st.sub, { color: colors.textSecondary }]}>{tx('Begin your daily practice with Sadhak.')}</Text>
 
           {/* Name */}
-          <Text style={[st.label, { color: colors.textTertiary }]}>FULL NAME</Text>
+          <Text style={[st.label, { color: colors.textTertiary }]}>{tx('FULL NAME')}</Text>
           <View style={[st.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
             <Ionicons name="person-outline" size={18} color={colors.textTertiary} />
             <TextInput
               style={[st.input, { color: colors.text }]}
-              placeholder="Your name"
+              placeholder={tx('Your name')}
               placeholderTextColor={colors.textTertiary}
               value={name} onChangeText={setName}
             />
@@ -101,7 +111,7 @@ export default function SignupScreen() {
             <Ionicons name="lock-closed-outline" size={18} color={colors.textTertiary} />
             <TextInput
               style={[st.input, { color: colors.text }]}
-              placeholder="At least 6 characters"
+              placeholder={tx('At least 8 characters, with a number')}
               placeholderTextColor={colors.textTertiary}
               value={password} onChangeText={setPassword}
               secureTextEntry={!showPw}
@@ -112,12 +122,12 @@ export default function SignupScreen() {
           </View>
 
           {/* Confirm */}
-          <Text style={[st.label, { color: colors.textTertiary }]}>CONFIRM PASSWORD</Text>
+          <Text style={[st.label, { color: colors.textTertiary }]}>{tx('CONFIRM PASSWORD')}</Text>
           <View style={[st.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
             <Ionicons name="shield-checkmark-outline" size={18} color={colors.textTertiary} />
             <TextInput
               style={[st.input, { color: colors.text }]}
-              placeholder="Repeat password"
+              placeholder={tx('Repeat password')}
               placeholderTextColor={colors.textTertiary}
               value={confirm} onChangeText={setConfirm}
               secureTextEntry={!showPw}
@@ -126,17 +136,15 @@ export default function SignupScreen() {
           </View>
 
           <View style={{ marginTop: 24 }}>
-            <Button title="Create Account" loading={loading} disabled={loading} onPress={submit} />
+            <Button title={tx('Create Account')} loading={loading} disabled={loading} onPress={submit} />
           </View>
 
-          <Text style={[st.legal, { color: colors.textTertiary }]}>
-            By creating an account, you agree to Sadhak's terms and privacy policy.
-          </Text>
+          <Text style={[st.legal, { color: colors.textTertiary }]}>{tx('By creating an account, you agree to Sadhak\'s terms and privacy policy.')}</Text>
 
           <View style={st.signin}>
-            <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>Already have an account? </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>{tx('Already have an account?')} </Text>
             <TouchableOpacity onPress={() => router.replace('/(auth)/login')} hitSlop={8}>
-              <Text style={{ color: colors.primary, fontSize: 13.5, fontWeight: '800' }}>Sign in</Text>
+              <Text style={{ color: colors.primary, fontSize: 13.5, fontWeight: '800' }}>{tx('Sign in')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

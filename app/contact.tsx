@@ -16,7 +16,7 @@ type FormType = 'bug' | 'feature' | null;
 export default function ContactScreen() {
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
-  const { t } = useLanguage();
+  const { t, tx } = useLanguage();
   const { user, profile } = useAuth();
   const [activeForm, setActiveForm] = useState<FormType>(null);
   const [title, setTitle] = useState('');
@@ -65,7 +65,7 @@ export default function ContactScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <Header title={t('contact.title')} subtitle="We'd love to hear from you" />
+        <Header title={t('contact.title')} subtitle={tx('We\'d love to hear from you')} />
 
         {/* Contact Options */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -79,7 +79,7 @@ export default function ContactScreen() {
               <View style={[styles.optionIcon, { backgroundColor: opt.color + '15' }]}>
                 <MaterialCommunityIcons name={opt.icon as any} size={22} color={opt.color} />
               </View>
-              <Text style={[styles.optionLabel, { color: colors.text }]}>{opt.label}</Text>
+              <Text style={[styles.optionLabel, { color: colors.text }]}>{tx(opt.label)}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
             </TouchableOpacity>
           ))}
@@ -134,16 +134,16 @@ export default function ContactScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            <Text style={[styles.formNote, { color: colors.textTertiary }]}>
-              App v{APP_VERSION} • {Platform.OS === 'android' ? 'Android' : 'iOS'}
+            <Text style={[styles.formNote, { color: colors.textTertiary }]}>{tx('App v')}{APP_VERSION} • {Platform.OS === 'android' ? 'Android' : 'iOS'}
             </Text>
           </View>
         )}
 
         {/* Info */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            We typically respond within 24-48 hours. For urgent issues, please email us directly at{' '}
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>{tx(
+            'We typically respond within 24-48 hours. For urgent issues, please email us directly at'
+          )}{' '}
             <Text style={{ color: '#C2410C', fontWeight: '600' }}>{SUPPORT_EMAIL}</Text>
           </Text>
         </View>

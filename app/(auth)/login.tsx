@@ -8,13 +8,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
-import { sendPasswordResetEmail, signInAnonymously as fbAnon, signOut as fbSignOut, deleteUser as fbDeleteUser } from 'firebase/auth';
-import { auth, db, doc, getDoc } from '../../config/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 import { Button } from '../../components/ui';
 import { DS, useDsInsets } from '../../constants/ds';
 
+import { useLanguage } from '../../contexts/LanguageContext';
+
 export default function LoginScreen() {
-  const { signInWithEmail, signInAsGuest } = useAuth();
+  const { tx } = useLanguage();
+
+  const { signInWithEmail, signInAsGuest, resolveLoginEmail } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
   const { insets } = useDsInsets();
@@ -25,21 +29,6 @@ export default function LoginScreen() {
   const [signingIn, setSigningIn] = useState(false);
   const [guest, setGuest] = useState(false);
 
-  const resolveUsernameToEmail = async (username: string): Promise<string> => {
-    const anon = await fbAnon(auth);
-    try {
-      const uSnap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
-      if (!uSnap.exists()) throw new Error('No account found with this username.');
-      const uid = (uSnap.data() as any).uid;
-      const pSnap = await getDoc(doc(db, 'users', uid));
-      const em = (pSnap.data() as any)?.email;
-      if (!em) throw new Error('This account has no email. Sign in with your email.');
-      return em;
-    } finally {
-      try { await fbDeleteUser(anon.user); } catch { try { await fbSignOut(auth); } catch {} }
-    }
-  };
-
   const signIn = async () => {
     if (!id.trim() || !password) {
       dialog.alert('Missing details', 'Enter your email or username and password.');
@@ -47,14 +36,15 @@ export default function LoginScreen() {
     }
     setSigningIn(true);
     try {
-      let em = id.trim();
-      if (!em.includes('@')) em = await resolveUsernameToEmail(em.replace(/^@/, ''));
+      const em = await resolveLoginEmail(id);
       await signInWithEmail(em, password);
       router.replace('/(tabs)');
     } catch (error: any) {
       const msg = error.code === 'auth/user-not-found' ? 'No account found with this email/username.'
         : error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' ? 'Incorrect email/username or password.'
         : error.code === 'auth/invalid-email' ? 'Invalid email format.'
+        : error.code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes or reset your password.'
+        : error.code === 'auth/network-request-failed' ? 'No internet connection. Check it and try again.'
         : String(error?.message || 'Login failed.').slice(0, 160);
       dialog.alert('Sign in failed', msg);
     } finally { setSigningIn(false); }
@@ -95,15 +85,15 @@ export default function LoginScreen() {
           {/* Brand mark — compact, understated */}
           <View style={st.brand}>
             <Image source={require('../../assets/images/emblem.png')} style={st.emblem} />
-            <Text style={[st.wordmark, { color: colors.text }]}>Sadhak</Text>
+            <Text style={[st.wordmark, { color: colors.text }]}>{tx('Sadhak')}</Text>
           </View>
 
           {/* Form title */}
-          <Text style={[st.title, { color: colors.text }]}>Welcome back</Text>
-          <Text style={[st.sub, { color: colors.textSecondary }]}>Sign in to continue your practice.</Text>
+          <Text style={[st.title, { color: colors.text }]}>{tx('Welcome back')}</Text>
+          <Text style={[st.sub, { color: colors.textSecondary }]}>{tx('Sign in to continue your practice.')}</Text>
 
           {/* Email / username */}
-          <Text style={[st.label, { color: colors.textTertiary }]}>EMAIL OR USERNAME</Text>
+          <Text style={[st.label, { color: colors.textTertiary }]}>{tx('EMAIL OR USERNAME')}</Text>
           <View style={[st.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
             <Ionicons name="person-outline" size={18} color={colors.textTertiary} />
             <TextInput
@@ -134,10 +124,10 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity onPress={forgot} hitSlop={8} style={{ alignSelf: 'flex-end', marginTop: 12, marginBottom: 22 }}>
-            <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>Forgot password?</Text>
+            <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>{tx('Forgot password?')}</Text>
           </TouchableOpacity>
 
-          <Button title="Sign In" onPress={signIn} loading={signingIn} disabled={signingIn || guest} />
+          <Button title={tx('Sign In')} onPress={signIn} loading={signingIn} disabled={signingIn || guest} />
 
           {/* Divider */}
           <View style={st.dividerRow}>
@@ -146,13 +136,13 @@ export default function LoginScreen() {
             <View style={[st.dividerLine, { backgroundColor: colors.divider }]} />
           </View>
 
-          <Button title="Continue as Guest" variant="secondary" onPress={asGuest} loading={guest} disabled={signingIn || guest} />
+          <Button title={tx('Continue as Guest')} variant="secondary" onPress={asGuest} loading={guest} disabled={signingIn || guest} />
 
           {/* Sign up link */}
           <View style={st.signup}>
-            <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>Don't have an account? </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13.5 }}>{tx('Don\'t have an account?')} </Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/signup')} hitSlop={8}>
-              <Text style={{ color: colors.primary, fontSize: 13.5, fontWeight: '800' }}>Sign up</Text>
+              <Text style={{ color: colors.primary, fontSize: 13.5, fontWeight: '800' }}>{tx('Sign up')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

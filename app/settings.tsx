@@ -23,7 +23,7 @@ export default function SettingsScreen() {
   const { profile, isGuest, isAdmin, logout, updateProfile, deleteAccount } = useAuth();
   const { colors, isDark, mode, setMode } = useTheme();
   const dialog = useDialog();
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage, t, tx } = useLanguage();
   const { screenBottom } = useDsInsets();
   const [languageOpen, setLanguageOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -78,7 +78,20 @@ export default function SettingsScreen() {
       { text: 'Delete forever', style: 'destructive', onPress: () => {
         dialog.alert('Are you absolutely sure?', 'Last chance — this is permanent.', [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Yes, delete', style: 'destructive', onPress: deleteAccount },
+          { text: 'Yes, delete', style: 'destructive', onPress: async () => {
+            try {
+              await deleteAccount();
+            } catch (e: any) {
+              if (e?.code === 'auth/requires-recent-login') {
+                dialog.alert('Sign in again first', 'For your security, sign out, sign back in, then delete your account right away.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Sign out', style: 'destructive', onPress: logout },
+                ]);
+              } else {
+                dialog.alert('Could not delete', String(e?.message || 'Try again.').slice(0, 160));
+              }
+            }
+          } },
         ]);
       }},
     ]);
@@ -192,7 +205,7 @@ export default function SettingsScreen() {
           )}
         </Card>
 
-        <Text style={[styles.versionText, { color: colors.textTertiary }]}>Sadhak v{APP_VERSION}{updateLabel() ? ` · ${updateLabel()}` : ''}</Text>
+        <Text style={[styles.versionText, { color: colors.textTertiary }]}>{tx('Sadhak v')}{APP_VERSION}{updateLabel() ? ` · ${updateLabel()}` : ''}</Text>
 
         {/* Language Modal */}
         <Modal visible={languageOpen} transparent animationType="slide" onRequestClose={() => setLanguageOpen(false)}>

@@ -46,7 +46,7 @@ function whenLabel(ms?: number | null): string {
 export default function TemplesScreen() {
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const dialog = useDialog();
   const { insets } = useDsInsets();
   const { width } = useWindowDimensions();
@@ -252,18 +252,18 @@ export default function TemplesScreen() {
             {p.type === 'bhandara' && !!p.startsAt && (
               <Text style={[st.cardWhen, { color: c }]}>{whenLabel(p.startsAt)}</Text>
             )}
-            {p.pandal && <Text style={[st.cardWhen, { color: '#C49A2C' }]}>Seasonal puja pandal</Text>}
+            {p.pandal && <Text style={[st.cardWhen, { color: '#C49A2C' }]}>{tx('Seasonal puja pandal')}</Text>}
             {!!p.address && !p.pandal && <Text style={[st.cardSub, { color: colors.textSecondary }]} numberOfLines={compact ? 1 : 2}>{p.address}</Text>}
             <View style={st.metaRow}>
               {p.distance != null && <Text style={[st.meta, { color: colors.textTertiary }]}>{formatDistance(p.distance)} away</Text>}
-              {p.community && <Text style={[st.meta, { color: colors.textTertiary }]}>· added by {p.ownerId === user?.uid ? 'you' : p.addedByName}</Text>}
+              {p.community && <Text style={[st.meta, { color: colors.textTertiary }]}>{tx('· added by')} {p.ownerId === user?.uid ? 'you' : p.addedByName}</Text>}
             </View>
           </View>
         </View>
         <View style={st.actions}>
           <TouchableOpacity onPress={() => directions(p)} style={[st.primaryBtn, { backgroundColor: c }]}>
             <MaterialCommunityIcons name="directions" size={16} color="#FFF" />
-            <Text style={st.primaryBtnText}>Directions</Text>
+            <Text style={st.primaryBtnText}>{tx('Directions')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => share(p)} style={[st.iconBtn, { borderColor: colors.cardBorder }]} hitSlop={6}>
             <Ionicons name="share-social-outline" size={17} color={colors.textSecondary} />
@@ -278,31 +278,35 @@ export default function TemplesScreen() {
     );
   };
 
-  const Empty = () => (
-    <View style={st.empty}>
-      <MaterialCommunityIcons name={tab === 'bhandara' ? 'food-variant' : 'temple-hindu'} size={34} color={accent} />
-      <Text style={[st.emptyTitle, { color: colors.text }]}>
-        {status === 'error' && tab === 'temples' ? "Couldn't reach the map service" : tab === 'bhandara' ? 'No bhandaras listed nearby' : `No temples found within ${radius} km`}
-      </Text>
-      <Text style={[st.emptySub, { color: colors.textSecondary }]}>
-        {status === 'error' && tab === 'temples' ? 'Check your internet connection and try again.'
-          : tab === 'bhandara' ? 'Bhandaras are shared by devotees. Know of one? Add it so others can join.'
-          : 'Small local mandirs are often missing from the map. Try a larger area or add one you know.'}
-      </Text>
-      <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-        {status === 'error' && tab === 'temples' ? (
-          <TouchableOpacity onPress={refresh} style={[st.emptyBtn, { backgroundColor: accent }]}><Text style={st.primaryBtnText}>Try again</Text></TouchableOpacity>
-        ) : tab === 'temples' && radius < 50 ? (
-          <TouchableOpacity onPress={() => changeRadius(RADII[RADII.indexOf(radius) + 1])} style={[st.emptyBtn, { backgroundColor: accent }]}>
-            <Text style={st.primaryBtnText}>Search {RADII[RADII.indexOf(radius) + 1]} km</Text>
+  const Empty = () => {
+    const { tx } = useLanguage();
+
+    return (
+      <View style={st.empty}>
+        <MaterialCommunityIcons name={tab === 'bhandara' ? 'food-variant' : 'temple-hindu'} size={34} color={accent} />
+        <Text style={[st.emptyTitle, { color: colors.text }]}>
+          {status === 'error' && tab === 'temples' ? "Couldn't reach the map service" : tab === 'bhandara' ? 'No bhandaras listed nearby' : `No temples found within ${radius} km`}
+        </Text>
+        <Text style={[st.emptySub, { color: colors.textSecondary }]}>
+          {status === 'error' && tab === 'temples' ? 'Check your internet connection and try again.'
+            : tab === 'bhandara' ? 'Bhandaras are shared by devotees. Know of one? Add it so others can join.'
+            : 'Small local mandirs are often missing from the map. Try a larger area or add one you know.'}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+          {status === 'error' && tab === 'temples' ? (
+            <TouchableOpacity onPress={refresh} style={[st.emptyBtn, { backgroundColor: accent }]}><Text style={st.primaryBtnText}>{tx('Try again')}</Text></TouchableOpacity>
+          ) : tab === 'temples' && radius < 50 ? (
+            <TouchableOpacity onPress={() => changeRadius(RADII[RADII.indexOf(radius) + 1])} style={[st.emptyBtn, { backgroundColor: accent }]}>
+              <Text style={st.primaryBtnText}>{tx('Search')} {RADII[RADII.indexOf(radius) + 1]}km</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity onPress={openAdd} style={[st.emptyBtn, { borderWidth: 1, borderColor: accent }]}>
+            <Text style={{ color: accent, fontWeight: '800' }}>{tab === 'bhandara' ? 'Add a bhandara' : 'Add a temple'}</Text>
           </TouchableOpacity>
-        ) : null}
-        <TouchableOpacity onPress={openAdd} style={[st.emptyBtn, { borderWidth: 1, borderColor: accent }]}>
-          <Text style={{ color: accent, fontWeight: '800' }}>{tab === 'bhandara' ? 'Add a bhandara' : 'Add a temple'}</Text>
-        </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -338,7 +342,7 @@ export default function TemplesScreen() {
           </View>
           <TouchableOpacity onPress={openAdd} style={[st.addBtn, { backgroundColor: accent }]}>
             <MaterialCommunityIcons name="map-marker-plus" size={17} color="#FFF" />
-            <Text style={st.primaryBtnText}>Add</Text>
+            <Text style={st.primaryBtnText}>{tx('Add')}</Text>
           </TouchableOpacity>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -354,13 +358,13 @@ export default function TemplesScreen() {
         {tab === 'temples' && pandalCount > 0 && (
           <TouchableOpacity onPress={() => { setShowPandals((v) => !v); setSelectedId(null); }} style={st.toggleRow} hitSlop={6}>
             <MaterialCommunityIcons name={showPandals ? 'checkbox-marked' : 'checkbox-blank-outline'} size={18} color={accent} />
-            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Include puja pandals ({pandalCount})</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{tx('Include puja pandals (')}{pandalCount})</Text>
           </TouchableOpacity>
         )}
         {approx && (
           <View style={[st.warn, { backgroundColor: '#F59E0B14', borderColor: '#F59E0B55' }]}>
             <MaterialCommunityIcons name="map-marker-alert-outline" size={15} color="#B45309" />
-            <Text style={{ flex: 1, fontSize: 12, color: isDark ? '#FBBF24' : '#B45309' }}>Using your saved city. Turn on location for accurate results.</Text>
+            <Text style={{ flex: 1, fontSize: 12, color: isDark ? '#FBBF24' : '#B45309' }}>{tx('Using your saved city. Turn on location for accurate results.')}</Text>
           </View>
         )}
       </View>
@@ -368,7 +372,7 @@ export default function TemplesScreen() {
       {/* Body */}
       <View style={{ flex: 1, marginTop: 12 }}>
         {!loc ? (
-          <View style={st.center}><ActivityIndicator color={accent} /><Text style={[st.emptySub, { color: colors.textSecondary }]}>Finding your location…</Text></View>
+          <View style={st.center}><ActivityIndicator color={accent} /><Text style={[st.emptySub, { color: colors.textSecondary }]}>{tx('Finding your location…')}</Text></View>
         ) : view === 'map' ? (
           <View style={{ flex: 1 }}>
             <TempleMap
@@ -392,13 +396,13 @@ export default function TemplesScreen() {
                   <MaterialCommunityIcons name="map-marker" size={44} color={accent} />
                 </View>
                 <View style={[st.pickBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder, paddingBottom: 14 + insets.bottom }]}>
-                  <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14.5 }}>Move the map to the exact spot</Text>
+                  <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14.5 }}>{tx('Move the map to the exact spot')}</Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
                     <TouchableOpacity onPress={() => { setPicking(false); setAddOpen(true); }} style={[st.emptyBtn, { flex: 1, borderWidth: 1, borderColor: colors.cardBorder }]}>
-                      <Text style={{ color: colors.textSecondary, fontWeight: '800' }}>Cancel</Text>
+                      <Text style={{ color: colors.textSecondary, fontWeight: '800' }}>{tx('Cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={confirmPick} style={[st.emptyBtn, { flex: 1, backgroundColor: accent }]}>
-                      <Text style={st.primaryBtnText}>Use this spot</Text>
+                      <Text style={st.primaryBtnText}>{tx('Use this spot')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -477,7 +481,7 @@ export default function TemplesScreen() {
                 </>
               )}
 
-              <Text style={[st.label, { color: colors.textTertiary }]}>DETAILS (OPTIONAL)</Text>
+              <Text style={[st.label, { color: colors.textTertiary }]}>{tx('DETAILS (OPTIONAL)')}</Text>
               <TextInput value={addDesc} onChangeText={setAddDesc} multiline placeholder={tab === 'bhandara' ? 'What is served, who is organising, landmark…' : 'Deity, landmark, timings…'} placeholderTextColor={colors.textTertiary}
                 style={[st.input, { minHeight: 70, textAlignVertical: 'top', paddingTop: 12, color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.background }]} />
 
@@ -487,7 +491,7 @@ export default function TemplesScreen() {
                 <Text style={{ color: colors.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
                   {addLoc && loc && Math.abs(addLoc.lat - loc.lat) < 1e-5 && Math.abs(addLoc.lon - loc.lon) < 1e-5 ? 'Where I am now' : addLoc ? `${addLoc.lat.toFixed(4)}, ${addLoc.lon.toFixed(4)}` : 'Choose on map'}
                 </Text>
-                <Text style={{ color: accent, fontWeight: '800', fontSize: 13 }}>Change</Text>
+                <Text style={{ color: accent, fontWeight: '800', fontSize: 13 }}>{tx('Change')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={submit} disabled={saving} style={[st.submit, { backgroundColor: accent, opacity: saving ? 0.7 : 1 }]}>

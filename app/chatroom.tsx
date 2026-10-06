@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList,
   KeyboardAvoidingView, Platform, Modal, Image, Dimensions, ActivityIndicator,
@@ -15,6 +16,8 @@ import { remove } from 'firebase/database';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { uploadToCloudinary } from '../services/cloudinary';
+
+import { useLanguage } from '../contexts/LanguageContext';
 
 const GIPHY_API_KEY = 'wAKLYXMGICxFXZ3CZvycYzxk876dQDMM';
 const { width } = Dimensions.get('window');
@@ -43,11 +46,14 @@ interface GiphyResult {
 }
 
 export default function ChatRoomScreen() {
+  const { tx } = useLanguage();
+
   const { roomId, roomName, roomType } = useLocalSearchParams<{ roomId: string; roomName: string; roomType: string }>();
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardInset();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [showGiphy, setShowGiphy] = useState(false);
@@ -450,9 +456,9 @@ export default function ChatRoomScreen() {
     <>
       <Stack.Screen options={{ title: roomName || 'Chat', headerShown: true }} />
       <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : insets.top + 56}
+        style={[styles.container, { backgroundColor: colors.background, paddingBottom: kb }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {/* Messages */}
         <FlatList
@@ -498,7 +504,7 @@ export default function ChatRoomScreen() {
         )}
 
         {/* Input Bar */}
-        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderColor: colors.border, paddingBottom: 8 + insets.bottom }]}>
+        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderColor: colors.border, paddingBottom: 8 + (kb ? 0 : insets.bottom) }]}>
           <TouchableOpacity style={styles.attachBtn} onPress={sendImage} disabled={uploadingImage}>
             {uploadingImage ? (
               <ActivityIndicator size="small" color={colors.primary} />
@@ -513,7 +519,7 @@ export default function ChatRoomScreen() {
           </TouchableOpacity>
           <TextInput
             style={[styles.input, { color: colors.text, backgroundColor: isDark ? colors.surfaceElevated : '#F5F5F5' }]}
-            placeholder="Type a message..."
+            placeholder={tx('Type a message...')}
             placeholderTextColor={colors.textTertiary}
             value={inputText}
             onChangeText={handleTyping}
@@ -538,7 +544,7 @@ export default function ChatRoomScreen() {
         <Modal visible={showGiphy} animationType="slide" presentationStyle="pageSheet">
           <View style={[styles.giphyContainer, { backgroundColor: colors.background }]}>
             <View style={[styles.giphyHeader, { borderColor: colors.border }]}>
-              <Text style={[styles.giphyTitle, { color: colors.text }]}>Send a GIF</Text>
+              <Text style={[styles.giphyTitle, { color: colors.text }]}>{tx('Send a GIF')}</Text>
               <TouchableOpacity onPress={() => setShowGiphy(false)}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
@@ -547,7 +553,7 @@ export default function ChatRoomScreen() {
               <Ionicons name="search" size={18} color={colors.textTertiary} />
               <TextInput
                 style={[styles.giphySearchInput, { color: colors.text }]}
-                placeholder="Search GIFs..."
+                placeholder={tx('Search GIFs...')}
                 placeholderTextColor={colors.textTertiary}
                 value={giphySearch}
                 onChangeText={searchGiphy}
@@ -569,7 +575,7 @@ export default function ChatRoomScreen() {
                 contentContainerStyle={styles.giphyGrid}
               />
             )}
-            <Text style={[styles.giphyPowered, { color: colors.textTertiary }]}>Powered by GIPHY</Text>
+            <Text style={[styles.giphyPowered, { color: colors.textTertiary }]}>{tx('Powered by GIPHY')}</Text>
           </View>
         </Modal>
 

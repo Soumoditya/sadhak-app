@@ -16,7 +16,7 @@ import { toneSolid } from '../constants/theme';
 
 export default function PujaGuideScreen() {
   const { colors, isDark, tone } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [guide, setGuide] = useState<PujaGuide | null>(null);
 
@@ -59,28 +59,28 @@ export default function PujaGuideScreen() {
           </LinearGradient>
 
           {/* Samagri checklist */}
-          <Section title="Samagri — what you need" icon="basket-outline" color={colors.primary} colors={colors}>
+          <Section title={tx('Samagri — what you need')} icon="basket-outline" color={colors.primary} colors={colors}>
             {guide.samagri.map((s, i) => (
               <Row key={i} icon="checkbox-blank-circle-outline" color={colors.primary} text={s} colors={colors} />
             ))}
           </Section>
 
           {/* Offerings */}
-          <Section title="Favourite offerings" icon="flower-outline" color="#2D6A4F" colors={colors}>
+          <Section title={tx('Favourite offerings')} icon="flower-outline" color="#2D6A4F" colors={colors}>
             {guide.offerings.map((s, i) => (
               <Row key={i} icon="heart-outline" color="#2D6A4F" text={s} colors={colors} />
             ))}
           </Section>
 
           {/* Strictly avoid */}
-          <Section title="Strictly avoid" icon="cancel" color={colors.festival} colors={colors} accent>
+          <Section title={tx('Strictly avoid')} icon="cancel" color={colors.festival} colors={colors} accent>
             {guide.strictlyAvoid.map((s, i) => (
               <Row key={i} icon="close-circle-outline" color={colors.festival} text={s} colors={colors} />
             ))}
           </Section>
 
           {/* Vidhi steps */}
-          <Section title="Puja vidhi — step by step" icon="format-list-numbered" color="#7C3AED" colors={colors}>
+          <Section title={tx('Puja vidhi — step by step')} icon="format-list-numbered" color="#7C3AED" colors={colors}>
             {guide.steps.map((s, i) => (
               <View key={i} style={st.stepRow}>
                 <View style={[st.stepNo, { backgroundColor: '#7C3AED18' }]}>
@@ -93,7 +93,7 @@ export default function PujaGuideScreen() {
 
           {/* Mantra */}
           <View style={[st.mantraCard, { backgroundColor: tone(guide.color).bg, borderColor: tone(guide.color).fg + '35' }]}>
-            <Text style={[st.mantraLabel, { color: tone(guide.color).fg }]}>MOOL MANTRA</Text>
+            <Text style={[st.mantraLabel, { color: tone(guide.color).fg }]}>{tx('MOOL MANTRA')}</Text>
             <Text style={[st.mantraText, { color: colors.text }]}>{guide.mantra}</Text>
           </View>
 
@@ -104,20 +104,20 @@ export default function PujaGuideScreen() {
               onPress={() => router.push({ pathname: '/play', params: { query: guide.playQuery, title: `${guide.deity} Puja` } })}
             >
               <MaterialCommunityIcons name="play-circle-outline" size={18} color="#FFF" />
-              <Text style={st.actionBtnText}>Watch vidhi</Text>
+              <Text style={st.actionBtnText}>{tx('Watch vidhi')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[st.actionBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.cardBorder }]}
               onPress={() => router.push('/aarti')}
             >
               <Diya size={20} color={colors.primary} />
-              <Text style={[st.actionBtnText, { color: colors.text }]}>Aarti & mantra</Text>
+              <Text style={[st.actionBtnText, { color: colors.text }]}>{tx('Aarti & mantra')}</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={[st.note, { color: colors.textTertiary }]}>
-            Traditions vary by region and family — your kula-parampara comes first. 🙏
-          </Text>
+          <Text style={[st.note, { color: colors.textTertiary }]}>{tx(
+            'Traditions vary by region and family — your kula-parampara comes first. 🙏'
+          )}</Text>
         </ScrollView>
       </View>
     );
@@ -126,7 +126,7 @@ export default function PujaGuideScreen() {
   // ─── Deity grid ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <Header title={tr('f.puja')} subtitle="किसकी पूजा करनी है? Choose the deity" />
+      <Header title={tr('f.puja')} subtitle={tx('किसकी पूजा करनी है? Choose the deity')} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.grid, { paddingBottom: screenBottomPadding }]}>
         {PUJA_GUIDES.map((g) => {

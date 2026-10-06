@@ -53,7 +53,7 @@ export default function LibraryScreen() {
   const { user, isAdmin } = useAuth();
   const { colors, isDark, tone } = useTheme();
   const dialog = useDialog();
-  const { t } = useLanguage();
+  const { t, tx } = useLanguage();
   const { headerPaddingTop, tabContentPadding, bottomInset } = useLayoutInsets();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -282,7 +282,7 @@ export default function LibraryScreen() {
                 <Text style={[st.downloadCount, { color: colors.textTertiary }]}>{item.downloadCount}</Text>
               </View>
             )}
-            <Text style={[st.bookCategory, { color: tone(cat.color).fg, backgroundColor: tone(cat.color).bg }]}>{cat.name}</Text>
+            <Text style={[st.bookCategory, { color: tone(cat.color).fg, backgroundColor: tone(cat.color).bg }]}>{tx(cat.name)}</Text>
           </View>
         </View>
         <TouchableOpacity style={[st.dlBtn, { backgroundColor: colors.primary + '12' }]} onPress={() => downloadPDF(item)}>
@@ -347,7 +347,7 @@ export default function LibraryScreen() {
             style={[st.catChip, { backgroundColor: selectedCategory === cat.id ? colors.primary : colors.surface, borderColor: selectedCategory === cat.id ? colors.primary : colors.border }]}
             onPress={() => setSelectedCategory(cat.id)}>
             <MaterialCommunityIcons name={cat.icon as any} size={14} color={selectedCategory === cat.id ? '#FFF' : tone(cat.color).fg} />
-            <Text style={[st.catText, { color: selectedCategory === cat.id ? '#FFF' : colors.text }]}>{cat.name}</Text>
+            <Text style={[st.catText, { color: selectedCategory === cat.id ? '#FFF' : colors.text }]}>{tx(cat.name)}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -356,7 +356,7 @@ export default function LibraryScreen() {
       {loading ? (
         <View style={st.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Loading library...</Text>
+          <Text style={{ color: colors.textSecondary, marginTop: 8 }}>{tx('Loading library...')}</Text>
         </View>
       ) : (
         <FlatList
@@ -404,7 +404,7 @@ export default function LibraryScreen() {
             {uploading && (
               <View style={[st.uploadStatus, { backgroundColor: colors.primary + '10' }]}>
                 <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Uploading...</Text>
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>{tx('Uploading...')}</Text>
               </View>
             )}
 
@@ -414,25 +414,25 @@ export default function LibraryScreen() {
               {selectedFile && <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{formatFileSize(selectedFile.size || 0)}</Text>}
             </TouchableOpacity>
 
-            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]} placeholder="Book Title *" placeholderTextColor={colors.textTertiary} value={uploadData.title} onChangeText={t => setUploadData({ ...uploadData, title: t })} />
-            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]} placeholder="Author" placeholderTextColor={colors.textTertiary} value={uploadData.author} onChangeText={t => setUploadData({ ...uploadData, author: t })} />
+            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]} placeholder={tx('Book Title *')} placeholderTextColor={colors.textTertiary} value={uploadData.title} onChangeText={t => setUploadData({ ...uploadData, title: t })} />
+            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]} placeholder={tx('Author')} placeholderTextColor={colors.textTertiary} value={uploadData.author} onChangeText={t => setUploadData({ ...uploadData, author: t })} />
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
                 <TouchableOpacity key={cat.id} style={[st.catSelect, { backgroundColor: uploadData.category === cat.id ? cat.color : colors.background, borderColor: cat.color }]} onPress={() => { setCustomCat(''); setUploadData({ ...uploadData, category: cat.id }); }}>
-                  <Text style={[st.catSelectText, { color: uploadData.category === cat.id ? '#FFF' : cat.color }]}>{cat.name}</Text>
+                  <Text style={[st.catSelectText, { color: uploadData.category === cat.id ? '#FFF' : cat.color }]}>{tx(cat.name)}</Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity style={[st.catSelect, { backgroundColor: customCat.trim() ? colors.primary : colors.background, borderColor: colors.primary }]} onPress={() => setUploadData({ ...uploadData, category: 'custom' })}>
                 <MaterialCommunityIcons name="plus" size={13} color={customCat.trim() ? '#FFF' : colors.primary} />
-                <Text style={[st.catSelectText, { color: customCat.trim() ? '#FFF' : colors.primary }]}>Custom</Text>
+                <Text style={[st.catSelectText, { color: customCat.trim() ? '#FFF' : colors.primary }]}>{tx('Custom')}</Text>
               </TouchableOpacity>
             </ScrollView>
 
             {uploadData.category === 'custom' && (
               <TextInput
                 style={[st.modalInput, { color: colors.text, borderColor: colors.primary, backgroundColor: colors.background }]}
-                placeholder="Custom category name (e.g. Sant Sahitya)"
+                placeholder={tx('Custom category name (e.g. Sant Sahitya)')}
                 placeholderTextColor={colors.textTertiary}
                 value={customCat}
                 onChangeText={setCustomCat}
@@ -440,7 +440,7 @@ export default function LibraryScreen() {
               />
             )}
 
-            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, height: 80, textAlignVertical: 'top' }]} placeholder="Description (optional)" placeholderTextColor={colors.textTertiary} value={uploadData.description} onChangeText={t => setUploadData({ ...uploadData, description: t })} multiline numberOfLines={3} />
+            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, height: 80, textAlignVertical: 'top' }]} placeholder={tx('Description (optional)')} placeholderTextColor={colors.textTertiary} value={uploadData.description} onChangeText={t => setUploadData({ ...uploadData, description: t })} multiline numberOfLines={3} />
 
             <TouchableOpacity onPress={handleUpload} disabled={uploading} activeOpacity={0.8}>
               <LinearGradient colors={isAdmin ? ['#C2410C', '#E8743B'] : ['#2D6A4F', '#4CAF50']} style={st.uploadBtn}>
@@ -461,7 +461,7 @@ export default function LibraryScreen() {
         <View style={st.modalOverlay}>
           <View style={[st.modalContent, { backgroundColor: colors.surface, maxHeight: '80%' }]}>
             <View style={st.modalHeader}>
-              <Text style={[st.modalTitle, { color: colors.text }]}>Review Queue ({submissions.length})</Text>
+              <Text style={[st.modalTitle, { color: colors.text }]}>{tx('Review Queue (')}{submissions.length})</Text>
               <TouchableOpacity onPress={() => setShowReviewQueue(false)}>
                 <Ionicons name="close" size={24} color={colors.textTertiary} />
               </TouchableOpacity>
@@ -470,8 +470,8 @@ export default function LibraryScreen() {
               {submissions.length === 0 ? (
                 <View style={{ alignItems: 'center', padding: 40 }}>
                   <MaterialCommunityIcons name="check-decagram" size={48} color="#4ADE80" />
-                  <Text style={[st.emptyTitle, { color: colors.text, marginTop: 12 }]}>All clear!</Text>
-                  <Text style={{ color: colors.textSecondary }}>No pending submissions</Text>
+                  <Text style={[st.emptyTitle, { color: colors.text, marginTop: 12 }]}>{tx('All clear!')}</Text>
+                  <Text style={{ color: colors.textSecondary }}>{tx('No pending submissions')}</Text>
                 </View>
               ) : submissions.map(item => (
                 <View key={item.id} style={[st.reviewCard, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>

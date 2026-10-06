@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { TextStyle } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DS } from '../constants/ds';
+import { PHRASES } from '../constants/translations/phrases';
 import { ALL_TRANSLATIONS, SUPPORTED_LANGUAGES, LOCALE, type LanguageCode } from '../constants/translations';
 
 interface LanguageContextType {
@@ -10,6 +11,8 @@ interface LanguageContextType {
   t: (key: string) => string;
   /** t() with {placeholders} filled, e.g. tf('panch.until', { t: '05:51' }). */
   tf: (key: string, vars: Record<string, string | number>) => string;
+  /** Translate a phrase by its English wording (falls back to the English). */
+  tx: (english: string) => string;
   /** Locale for toLocaleDateString / toLocaleTimeString in the chosen language. */
   locale: string;
   /** Style override: Indic scripts break apart with letter-spacing, so drop it. */
@@ -26,6 +29,7 @@ const LanguageContext = createContext<LanguageContextType>({
   setLanguage: () => {},
   t: (key: string) => key,
   tf: (key: string) => key,
+  tx: (s: string) => s,
   locale: 'en-IN',
   noTrack: {},
   display: { fontFamily: DS.font.display, fontWeight: 'normal' },
@@ -66,6 +70,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return t(key).replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? String(vars[k]) : `{${k}}`));
   }, [t]);
 
+  const tx = useCallback((english: string): string => {
+    if (language === 'hi') return PHRASES[english]?.[0] || english;
+    if (language === 'bn' || language === 'as') return PHRASES[english]?.[1] || english;
+    if (language === 'mr') return PHRASES[english]?.[0] || english;
+    return english;
+  }, [language]);
+
   const locale = LOCALE[language] || 'en-IN';
   const noTrack = useMemo(() => (language === 'en' ? {} : { letterSpacing: 0 }), [language]);
 
@@ -76,7 +87,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, [language]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, tf, locale, noTrack, display }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, tf, tx, locale, noTrack, display }}>
       {children}
     </LanguageContext.Provider>
   );

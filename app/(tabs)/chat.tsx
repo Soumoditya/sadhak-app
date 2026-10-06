@@ -40,7 +40,7 @@ function relTime(ts?: number): string {
 export default function CommunityScreen() {
   const { user } = useAuth();
   const { colors, tone } = useTheme();
-  const { t } = useLanguage();
+  const { t, tx } = useLanguage();
   const dialog = useDialog();
   const { insets, tabScrollBottom } = useDsInsets();
 
@@ -122,7 +122,7 @@ export default function CommunityScreen() {
           right={canCreate ? (
             <TouchableOpacity
               onPress={() => setCreateOpen(true)}
-              accessibilityLabel="New"
+              accessibilityLabel={tx('New')}
               style={[s.newBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
             >
               <Icon name="plus" size={18} color="#FFF" weight="regular" />
@@ -202,7 +202,7 @@ export default function CommunityScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <View style={s.roomTop}>
-                <Text style={[s.roomName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+                <Text style={[s.roomName, { color: colors.text }]} numberOfLines={1}>{tx(item.name)}</Text>
                 {!!item.lastMessageTime && (
                   <Text style={[s.roomTime, { color: colors.textTertiary }]}>{relTime(item.lastMessageTime)}</Text>
                 )}
@@ -217,10 +217,8 @@ export default function CommunityScreen() {
           tab === 'dms' ? (
             <View style={s.empty}>
               <MaterialCommunityIcons name="message-outline" size={36} color={colors.textTertiary} />
-              <Text style={[s.emptyTitle, { color: colors.text }]}>No direct messages yet</Text>
-              <Text style={[s.emptySub, { color: colors.textSecondary }]}>
-                Find fellow Sadhaks in the feed and start a conversation.
-              </Text>
+              <Text style={[s.emptyTitle, { color: colors.text }]}>{tx('No direct messages yet')}</Text>
+              <Text style={[s.emptySub, { color: colors.textSecondary }]}>{tx('Find fellow Sadhaks in the feed and start a conversation.')}</Text>
             </View>
           ) : (
             <View style={s.empty}>
@@ -239,8 +237,8 @@ export default function CommunityScreen() {
         <View style={s.sheetOverlay}>
           <View style={[s.sheet, { backgroundColor: colors.surface, paddingBottom: 24 + insets.bottom }]}>
             <View style={[s.sheetHandle, { backgroundColor: colors.divider }]} />
-            <Text style={[s.sheetTitle, { color: colors.text }]}>New {cType === 'broadcast' ? 'Channel' : 'Group'}</Text>
-            <Text style={[s.sheetSub, { color: colors.textSecondary }]}>Give it a name and short description.</Text>
+            <Text style={[s.sheetTitle, { color: colors.text }]}>{tx('New')} {cType === 'broadcast' ? 'Channel' : 'Group'}</Text>
+            <Text style={[s.sheetSub, { color: colors.textSecondary }]}>{tx('Give it a name and short description.')}</Text>
 
             <View style={s.typeRow}>
               {(['group', 'broadcast'] as const).map((t) => (
@@ -263,18 +261,18 @@ export default function CommunityScreen() {
 
             <TextInput
               style={[s.field, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.background }]}
-              placeholder="Name" placeholderTextColor={colors.textTertiary}
+              placeholder={tx('Name')} placeholderTextColor={colors.textTertiary}
               value={cName} onChangeText={setCName} maxLength={40}
             />
             <TextInput
               style={[s.field, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.background, height: 88, textAlignVertical: 'top' }]}
-              placeholder="Description (optional)" placeholderTextColor={colors.textTertiary}
+              placeholder={tx('Description (optional)')} placeholderTextColor={colors.textTertiary}
               value={cDesc} onChangeText={setCDesc} multiline maxLength={140}
             />
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Button title="Cancel" variant="secondary" onPress={() => setCreateOpen(false)} />
-              <Button title="Create" loading={saving} disabled={!cName.trim()} onPress={create} />
+              <Button title={tx('Cancel')} variant="secondary" onPress={() => setCreateOpen(false)} style={{ flex: 1 }} />
+              <Button title={tx('Create')} loading={saving} disabled={!cName.trim()} onPress={create} style={{ flex: 1 }} />
             </View>
           </View>
         </View>

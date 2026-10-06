@@ -10,6 +10,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { goBackOrHome } from '../components/ui/Header';
+import { LanguageChip, ThemeToggle } from '../components/ui/QuickSettings';
 
 const STORE_KEY = 'sadhak_japa_state';
 const GOLD = '#F5B841';
@@ -19,7 +20,7 @@ const TARGETS = [27, 54, 108] as const;
 export default function JapaScreen() {
   const dialog = useDialog();
   const { colors, isDark } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [count, setCount] = useState(0);
@@ -85,16 +86,20 @@ export default function JapaScreen() {
           <Ionicons name="chevron-back" size={22} color={pal.fg} />
         </TouchableOpacity>
         <Text style={[st.title, { color: pal.fg }]}>{tr('t.japa')}</Text>
-        <TouchableOpacity style={[st.iconBtn, { backgroundColor: pal.panel, borderColor: pal.line, opacity: count ? 1 : 0.4 }]} onPress={reset} hitSlop={8}>
-          <MaterialCommunityIcons name="restore" size={21} color={pal.fg} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <LanguageChip />
+          <ThemeToggle />
+          <TouchableOpacity style={[st.iconBtn, { backgroundColor: pal.panel, borderColor: pal.line, opacity: count ? 1 : 0.4 }]} onPress={reset} hitSlop={8} accessibilityLabel="Reset">
+            <MaterialCommunityIcons name="restore" size={21} color={pal.fg} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Stats */}
       <View style={[st.stats, { backgroundColor: pal.panel, borderColor: pal.line }]}>
-        <Stat label="Malas" value={malas} pal={pal} />
+        <Stat label={tx('Malas')} value={malas} pal={pal} />
         <View style={[st.statDivider, { backgroundColor: pal.line }]} />
-        <Stat label="Total chants" value={count} pal={pal} />
+        <Stat label={tx('Total chants')} value={count} pal={pal} />
       </View>
 
       {/* The whole middle area is the tap target, not just the circle. */}
@@ -111,14 +116,14 @@ export default function JapaScreen() {
             />
           </Svg>
           <Text style={[st.count, { color: pal.fg }]}>{inMala}</Text>
-          <Text style={[st.of, { color: pal.muted }]}>of {target}</Text>
+          <Text style={[st.of, { color: pal.muted }]}>/ {target}</Text>
         </Animated.View>
-        <Text style={[st.hint, { color: pal.faint }]}>Tap anywhere to count</Text>
+        <Text style={[st.hint, { color: pal.faint }]}>{tx('Tap anywhere to count')}</Text>
       </Pressable>
 
       {/* Mala size */}
       <View style={[st.bottom, { paddingBottom: insets.bottom + 24 }]}>
-        <Text style={[st.bottomLabel, { color: pal.faint }]}>BEADS PER MALA</Text>
+        <Text style={[st.bottomLabel, { color: pal.faint }]}>{tx('BEADS PER MALA')}</Text>
         <View style={st.targets}>
           {TARGETS.map((m) => {
             const active = target === m;

@@ -8,6 +8,8 @@ import { useDsInsets } from '../constants/ds';
 import { PRAKRITI_QUIZ, DOSHAS, type Dosha } from '../constants/ayurveda';
 import { toneSolid } from '../constants/theme';
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 const STORE_KEY = 'sadhak_prakriti_result';
 const ORDER: Dosha[] = ['vata', 'pitta', 'kapha'];
 
@@ -33,6 +35,8 @@ function parseStored(v: string): Result | null {
 }
 
 export default function AyurvedaScreen() {
+  const { tx } = useLanguage();
+
   const { colors, tone } = useTheme();
   const { screenBottom } = useDsInsets();
   const [answers, setAnswers] = useState<Record<number, Dosha>>({});
@@ -88,7 +92,7 @@ export default function AyurvedaScreen() {
     const g = DOSHAS[view];
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Header title="Your Ayurvedic Type" subtitle={sec ? `${p.name}-${sec.name} prakriti` : `${p.name} · ${p.nameHi}`} />
+        <Header title={tx('Your Ayurvedic Type')} subtitle={sec ? `${p.name}-${sec.name} prakriti` : `${p.name} · ${p.nameHi}`} />
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
           <View style={[st.hero, { backgroundColor: tone(p.color).bg, borderColor: tone(p.color).fg + '35' }]}>
             <View style={[st.heroIcon, { backgroundColor: tone(p.color).bg }]}><MaterialCommunityIcons name={p.icon as any} size={34} color={tone(p.color).fg} /></View>
@@ -129,17 +133,19 @@ export default function AyurvedaScreen() {
             })}
           </View>
 
-          <Sec title="When balanced" icon="white-balance-sunny" color={colors.tulsiGreen || '#2D6A4F'} colors={colors}><Text style={[st.body, { color: colors.textSecondary }]}>{g.balanced}</Text></Sec>
-          <Sec title="Signs of imbalance" icon="alert-circle-outline" color={colors.festival || '#DC2626'} colors={colors}><Text style={[st.body, { color: colors.textSecondary }]}>{g.imbalanced}</Text></Sec>
-          <Sec title="Favour these" icon="check-circle-outline" color={colors.tulsiGreen || '#2D6A4F'} colors={colors}><List items={g.favor} color={colors.tulsiGreen || '#2D6A4F'} colors={colors} /></Sec>
-          <Sec title="Reduce these" icon="minus-circle-outline" color={colors.festival || '#DC2626'} colors={colors}><List items={g.reduce} color={colors.festival || '#DC2626'} colors={colors} /></Sec>
-          <Sec title="Daily routine (dinacharya)" icon="weather-sunset" color={colors.primary} colors={colors}><List items={g.routine} color={colors.primary} colors={colors} /></Sec>
+          <Sec title={tx('When balanced')} icon="white-balance-sunny" color={colors.tulsiGreen || '#2D6A4F'} colors={colors}><Text style={[st.body, { color: colors.textSecondary }]}>{g.balanced}</Text></Sec>
+          <Sec title={tx('Signs of imbalance')} icon="alert-circle-outline" color={colors.festival || '#DC2626'} colors={colors}><Text style={[st.body, { color: colors.textSecondary }]}>{g.imbalanced}</Text></Sec>
+          <Sec title={tx('Favour these')} icon="check-circle-outline" color={colors.tulsiGreen || '#2D6A4F'} colors={colors}><List items={g.favor} color={colors.tulsiGreen || '#2D6A4F'} colors={colors} /></Sec>
+          <Sec title={tx('Reduce these')} icon="minus-circle-outline" color={colors.festival || '#DC2626'} colors={colors}><List items={g.reduce} color={colors.festival || '#DC2626'} colors={colors} /></Sec>
+          <Sec title={tx('Daily routine (dinacharya)')} icon="weather-sunset" color={colors.primary} colors={colors}><List items={g.routine} color={colors.primary} colors={colors} /></Sec>
 
           <TouchableOpacity onPress={retake} style={[st.retake, { borderColor: colors.cardBorder }]}>
             <MaterialCommunityIcons name="refresh" size={16} color={colors.textSecondary} />
-            <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Retake the assessment</Text>
+            <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>{tx('Retake the assessment')}</Text>
           </TouchableOpacity>
-          <Text style={[st.disc, { color: colors.textTertiary }]}>Educational wellness guidance rooted in Ayurveda, not a substitute for medical advice.</Text>
+          <Text style={[st.disc, { color: colors.textTertiary }]}>{tx(
+            'Educational wellness guidance rooted in Ayurveda, not a substitute for medical advice.'
+          )}</Text>
         </ScrollView>
       </View>
     );
@@ -150,10 +156,10 @@ export default function AyurvedaScreen() {
   const isLast = step === total - 1;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title="Discover Your Prakriti" subtitle="Your Ayurvedic mind-body constitution" />
+      <Header title={tx('Discover Your Prakriti')} subtitle={tx('Your Ayurvedic mind-body constitution')} />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
         <View style={st.progressHead}>
-          <Text style={[st.progressText, { color: colors.textSecondary }]}>Question {step + 1} of {total}</Text>
+          <Text style={[st.progressText, { color: colors.textSecondary }]}>{tx('Question')} {step + 1}of {total}</Text>
           <Text style={[st.progressText, { color: colors.textTertiary }]}>{answeredCount}/{total} answered</Text>
         </View>
         <View style={[st.progressTrack, { backgroundColor: colors.cardBorder }]}>
@@ -161,9 +167,7 @@ export default function AyurvedaScreen() {
         </View>
 
         {step === 0 && (
-          <Text style={[st.intro, { color: colors.textSecondary }]}>
-            Choose what has been true for most of your life, not just today.
-          </Text>
+          <Text style={[st.intro, { color: colors.textSecondary }]}>{tx('Choose what has been true for most of your life, not just today.')}</Text>
         )}
 
         <View style={[st.qCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -184,7 +188,7 @@ export default function AyurvedaScreen() {
           <TouchableOpacity onPress={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}
             style={[st.navBtn, { borderColor: colors.cardBorder, opacity: step === 0 ? 0.35 : 1 }]}>
             <Ionicons name="chevron-back" size={16} color={colors.textSecondary} />
-            <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Back</Text>
+            <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>{tx('Back')}</Text>
           </TouchableOpacity>
           {isLast ? (
             <TouchableOpacity onPress={compute} disabled={!allAnswered}
@@ -195,7 +199,7 @@ export default function AyurvedaScreen() {
           ) : (
             <TouchableOpacity onPress={() => setStep((s) => s + 1)} disabled={!answers[step]}
               style={[st.navBtn, { borderColor: colors.cardBorder, opacity: answers[step] ? 1 : 0.35 }]}>
-              <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Next</Text>
+              <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>{tx('Next')}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
           )}

@@ -10,7 +10,11 @@ import { useDialog } from "../../contexts/DialogContext";
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 
+import { useLanguage } from '../../contexts/LanguageContext';
+
 export default function ProfileSetupScreen() {
+  const { tx } = useLanguage();
+
   const { updateProfile } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
@@ -90,37 +94,32 @@ export default function ProfileSetupScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Image source={require('../../assets/images/emblem.png')} style={styles.emblem} />
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Personalize Sadhak</Text>
-          <Text style={[styles.headerSub, { color: colors.textSecondary }]}>A few details for accurate Panchang and guidance</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{tx('Personalize Sadhak')}</Text>
+          <Text style={[styles.headerSub, { color: colors.textSecondary }]}>{tx('A few details for accurate Panchang and guidance')}</Text>
         </View>
 
         <View style={styles.content}>
           {/* Gender */}
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            <MaterialCommunityIcons name="gender-male-female" size={18} color={colors.primary} /> Gender
-          </Text>
+            <MaterialCommunityIcons name="gender-male-female" size={18} color={colors.primary} /> {tx('Gender')}</Text>
           <View style={styles.selectionRow}>
-            <SelectionButton selected={gender === 'male'} onPress={() => setGender('male')} icon="human-male" label="Male / पुरुष" iconLib="mci" />
-            <SelectionButton selected={gender === 'female'} onPress={() => setGender('female')} icon="human-female" label="Female / स्त्री" iconLib="mci" />
+            <SelectionButton selected={gender === 'male'} onPress={() => setGender('male')} icon="human-male" label={tx('Male / पुरुष')} iconLib="mci" />
+            <SelectionButton selected={gender === 'female'} onPress={() => setGender('female')} icon="human-female" label={tx('Female / स्त्री')} iconLib="mci" />
           </View>
 
           {/* Marriage Status */}
           <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>
-            <MaterialCommunityIcons name="ring" size={18} color={colors.primary} /> Marriage Status
-          </Text>
+            <MaterialCommunityIcons name="ring" size={18} color={colors.primary} /> {tx('Marriage Status')}</Text>
           <View style={styles.selectionColumn}>
-            <SelectionButton selected={marriageStatus === 'unmarried'} onPress={() => setMarriageStatus('unmarried')} icon="heart-outline" label="Unmarried / अविवाहित" iconLib="ion" />
-            <SelectionButton selected={marriageStatus === 'married'} onPress={() => setMarriageStatus('married')} icon="heart" label="Married / विवाहित" iconLib="ion" />
-            <SelectionButton selected={marriageStatus === 'widowed'} onPress={() => setMarriageStatus('widowed')} icon="heart-dislike-outline" label="Widowed / विधवा/विधुर" iconLib="ion" />
+            <SelectionButton selected={marriageStatus === 'unmarried'} onPress={() => setMarriageStatus('unmarried')} icon="heart-outline" label={tx('Unmarried / अविवाहित')} iconLib="ion" />
+            <SelectionButton selected={marriageStatus === 'married'} onPress={() => setMarriageStatus('married')} icon="heart" label={tx('Married / विवाहित')} iconLib="ion" />
+            <SelectionButton selected={marriageStatus === 'widowed'} onPress={() => setMarriageStatus('widowed')} icon="heart-dislike-outline" label={tx('Widowed / विधवा/विधुर')} iconLib="ion" />
           </View>
 
           {/* Location */}
           <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>
-            <Ionicons name="location-outline" size={18} color={colors.primary} /> Location
-          </Text>
-          <Text style={[styles.locationHint, { color: colors.textSecondary }]}>
-            For accurate sunrise/sunset, festival timings, and nearby temples
-          </Text>
+            <Ionicons name="location-outline" size={18} color={colors.primary} /> {tx('Location')}</Text>
+          <Text style={[styles.locationHint, { color: colors.textSecondary }]}>{tx('For accurate sunrise/sunset, festival timings, and nearby temples')}</Text>
           {location ? (
             <View style={[styles.locationCard, { backgroundColor: `${colors.tulsiGreen}15`, borderColor: colors.tulsiGreen }]}>
               <Ionicons name="location" size={22} color={colors.tulsiGreen} />
@@ -140,7 +139,7 @@ export default function ProfileSetupScreen() {
               ) : (
                 <>
                   <Ionicons name="navigate-outline" size={20} color={colors.primary} />
-                  <Text style={[styles.locationBtnText, { color: colors.primary }]}>Detect My Location</Text>
+                  <Text style={[styles.locationBtnText, { color: colors.primary }]}>{tx('Detect My Location')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -152,7 +151,7 @@ export default function ProfileSetupScreen() {
               {loading ? <ActivityIndicator color="#FFFFFF" /> : (
                 <>
                   <MaterialCommunityIcons name="check-all" size={22} color="#FFFFFF" />
-                  <Text style={styles.completeBtnText}>Start My Journey</Text>
+                  <Text style={styles.completeBtnText}>{tx('Start My Journey')}</Text>
                 </>
               )}
             </LinearGradient>
@@ -160,7 +159,7 @@ export default function ProfileSetupScreen() {
 
           {/* Skip */}
           <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.skipBtn}>
-            <Text style={[styles.skipText, { color: colors.textTertiary }]}>Skip for now</Text>
+            <Text style={[styles.skipText, { color: colors.textTertiary }]}>{tx('Skip for now')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

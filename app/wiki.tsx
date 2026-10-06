@@ -9,7 +9,7 @@ import { WIKI, WIKI_CATEGORIES, type WikiArticle, type WikiCat } from '../consta
 
 export default function WikiScreen() {
   const { colors, tone } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const { screenBottom } = useDsInsets();
   const [cat, setCat] = useState<WikiCat | 'all'>('all');
   const [q, setQ] = useState('');
@@ -44,7 +44,7 @@ export default function WikiScreen() {
           <Text style={[st.artBody, { color: colors.text }]}>{article.body}</Text>
           {related.length > 0 && (
             <View style={{ marginTop: 26 }}>
-              <Text style={[st.relLabel, { color: colors.textTertiary }]}>MORE IN {c.label.toUpperCase()}</Text>
+              <Text style={[st.relLabel, { color: colors.textTertiary }]}>{tx('MORE IN')} {c.label.toUpperCase()}</Text>
               {related.map((r) => (
                 <TouchableOpacity key={r.id} onPress={() => setArticle(r)} activeOpacity={0.8}
                   style={[st.relRow, { borderColor: colors.cardBorder }]}>
@@ -56,7 +56,7 @@ export default function WikiScreen() {
           )}
           <TouchableOpacity onPress={() => setArticle(null)} style={[st.back, { borderColor: colors.cardBorder }]}>
             <Ionicons name="chevron-back" size={16} color={colors.textSecondary} />
-            <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Back to articles</Text>
+            <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>{tx('Back to articles')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -66,11 +66,11 @@ export default function WikiScreen() {
   // ── Index ──
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title={tr('f.wiki')} subtitle="Deities · scriptures · festivals · concepts" />
+      <Header title={tr('f.wiki')} subtitle={tx('Deities · scriptures · festivals · concepts')} />
       <View style={{ paddingHorizontal: 20 }}>
         <View style={[st.search, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <Ionicons name="search" size={17} color={colors.textTertiary} />
-          <TextInput style={[st.searchIn, { color: colors.text }]} placeholder="Search the wiki…" placeholderTextColor={colors.textTertiary} value={q} onChangeText={setQ} />
+          <TextInput style={[st.searchIn, { color: colors.text }]} placeholder={tx('Search the wiki…')} placeholderTextColor={colors.textTertiary} value={q} onChangeText={setQ} />
         </View>
       </View>
       {/* Fixed-height, non-shrinking row: the old maxHeight-only ScrollView got
@@ -81,7 +81,7 @@ export default function WikiScreen() {
           return (
             <TouchableOpacity key={key} onPress={() => setCat(key)} style={[st.catChip, { backgroundColor: active ? color : colors.surface, borderColor: active ? color : colors.cardBorder }]}>
               <MaterialCommunityIcons name={icon} size={14} color={active ? '#FFF' : color} />
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: active ? '#FFF' : colors.textSecondary }}>{label}</Text>
+              <Text style={{ fontSize: 12.5, fontWeight: '700', color: active ? '#FFF' : colors.textSecondary }}>{tx(label)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -101,7 +101,7 @@ export default function WikiScreen() {
             </TouchableOpacity>
           );
         })}
-        {list.length === 0 && <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 30 }}>No articles match your search.</Text>}
+        {list.length === 0 && <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 30 }}>{tx('No articles match your search.')}</Text>}
       </ScrollView>
     </View>
   );

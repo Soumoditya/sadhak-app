@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
-import { router } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Screen, AppBar, Icon, ToolRow } from '../../components/ui';
@@ -9,7 +8,7 @@ import { TOOLS, TOOL_GROUPS } from '../../constants/tools';
 // Every feature, grouped by what you're doing, with a one-line "what is this".
 export default function ToolsScreen() {
   const { colors } = useTheme();
-  const { t, display, noTrack } = useLanguage();
+  const { t, display } = useLanguage();
   const [q, setQ] = useState('');
 
   const query = q.trim().toLowerCase();
@@ -57,19 +56,6 @@ export default function ToolsScreen() {
         ))
       )}
 
-      {/* App-level shortcuts */}
-      <View style={[s.footer, { borderTopColor: colors.divider }]}>
-        {[
-          { icon: 'user-circle' as const, label: t('nav.profile'), route: '/(tabs)/profile' },
-          { icon: 'gear-six' as const, label: t('t.settings'), route: '/settings' },
-          { icon: 'info' as const, label: t('tools.about'), route: '/about' },
-        ].map((l) => (
-          <Pressable key={l.route} onPress={() => router.push(l.route as any)} style={({ pressed }) => [s.footBtn, { backgroundColor: colors.surfaceSecondary, opacity: pressed ? 0.6 : 1 }]}>
-            <Icon name={l.icon} size={18} color={colors.textSecondary} />
-            <Text style={[s.footText, { color: colors.textSecondary }, noTrack]} numberOfLines={1}>{l.label}</Text>
-          </Pressable>
-        ))}
-      </View>
     </Screen>
   );
 }
@@ -79,7 +65,4 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
   group: { fontSize: 19, lineHeight: 27, marginBottom: 10 },
   empty: { textAlign: 'center', marginTop: 24, fontSize: 14 },
-  footer: { flexDirection: 'row', gap: 8, marginTop: 28, paddingTop: 18, borderTopWidth: 1 },
-  footBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 14 },
-  footText: { fontSize: 13, fontWeight: '700' },
 });

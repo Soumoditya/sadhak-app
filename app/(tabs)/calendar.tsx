@@ -59,7 +59,7 @@ export default function CalendarScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
-  const { t, locale, noTrack, display } = useLanguage();
+  const { t, locale, noTrack, display, tx } = useLanguage();
   // Weekday/month names in the chosen language (1 Jan 2023 was a Sunday).
   const dayNames = useMemo(() => Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i).toLocaleDateString(locale, { weekday: 'short' })), [locale]);
   const monthNames = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(2023, i, 1).toLocaleDateString(locale, { month: 'long' })), [locale]);
@@ -387,7 +387,7 @@ export default function CalendarScreen() {
             ].map((item, idx) => (
               <View key={idx} style={st.legendItem}>
                 {item.swatch}
-                <Text style={[st.legendText, { color: colors.textTertiary }]}>{item.label}</Text>
+                <Text style={[st.legendText, { color: colors.textTertiary }]}>{tx(item.label)}</Text>
               </View>
             ))}
           </View>
@@ -547,7 +547,7 @@ export default function CalendarScreen() {
             </Text>
             <TextInput
               style={[st.noteInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-              placeholder="Write your note…"
+              placeholder={tx('Write your note…')}
               placeholderTextColor={colors.textTertiary}
               value={noteText}
               onChangeText={setNoteText}
@@ -558,7 +558,7 @@ export default function CalendarScreen() {
             <TouchableOpacity onPress={addNote} activeOpacity={0.85}>
               <LinearGradient colors={['#C2410C', '#E8743B']} style={st.primaryBtn}>
                 <MaterialCommunityIcons name="content-save-outline" size={19} color="#FFF" />
-                <Text style={st.primaryBtnText}>Save Note</Text>
+                <Text style={st.primaryBtnText}>{tx('Save Note')}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -571,7 +571,7 @@ export default function CalendarScreen() {
           <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + bottomInset }]}>
             <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
             <View style={st.sheetHeader}>
-              <Text style={[st.sheetTitle, { color: colors.text }]}>Set Reminder</Text>
+              <Text style={[st.sheetTitle, { color: colors.text }]}>{tx('Set Reminder')}</Text>
               <TouchableOpacity onPress={() => setReminderSheet(false)} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textTertiary} />
               </TouchableOpacity>
@@ -589,7 +589,7 @@ export default function CalendarScreen() {
               <Text style={[st.remTimeBig, { color: colors.primary }]}>{fmt12(remHour, remMinute)}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
                 <MaterialCommunityIcons name="clock-edit-outline" size={13} color={colors.textSecondary} />
-                <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>Tap to change</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>{tx('Tap to change')}</Text>
               </View>
             </TouchableOpacity>
             {showClock && (
@@ -610,7 +610,7 @@ export default function CalendarScreen() {
             <TouchableOpacity onPress={scheduleReminder} activeOpacity={0.85}>
               <LinearGradient colors={['#C2410C', '#E8743B']} style={st.primaryBtn}>
                 <MaterialCommunityIcons name="bell-check-outline" size={19} color="#FFF" />
-                <Text style={st.primaryBtnText}>Set for {fmt12(remHour, remMinute)}</Text>
+                <Text style={st.primaryBtnText}>{tx('Set for')} {fmt12(remHour, remMinute)}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>

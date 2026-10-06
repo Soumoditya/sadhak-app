@@ -17,6 +17,7 @@ import { QuickSettingsProvider } from '../components/ui/QuickSettings';
 import { ensureNotificationsScheduled, applyNotificationPrefs, prefsFromProfile } from '../services/notifications';
 import { requestFirstRunPermissions } from '../services/firstRunPermissions';
 import { downloadPendingUpdate, applyUpdateNow } from '../services/appUpdates';
+import { openFile } from '../services/downloads';
 import { useDialog } from '../contexts/DialogContext';
 
 SplashScreen.preventAutoHideAsync();
@@ -151,7 +152,10 @@ function RootLayoutInner() {
       const key = `${resp?.notification?.request?.identifier}:${resp?.notification?.date}`;
       if (!resp || key === lastHandled) return; // listener + cold-start lookup can both report the same tap
       lastHandled = key;
-      const route = resp?.notification?.request?.content?.data?.route as string | undefined;
+      const data = resp?.notification?.request?.content?.data as any;
+      // "Saved to Downloads" notifications open the file itself.
+      if (data?.openUri) { openFile(String(data.openUri), String(data.mime || '*/*')); return; }
+      const route = data?.route as string | undefined;
       if (route) {
         try { router.push(route as any); } catch {}
       }
@@ -245,15 +249,15 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <DialogProvider>
-          <LanguageProvider>
+        <LanguageProvider>
+          <DialogProvider>
             <QuickSettingsProvider>
               <AuthProvider>
                 <RootLayoutInner />
               </AuthProvider>
             </QuickSettingsProvider>
-          </LanguageProvider>
-        </DialogProvider>
+          </DialogProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

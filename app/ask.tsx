@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList,
   KeyboardAvoidingView, Platform, ActivityIndicator, Image,
@@ -27,9 +28,10 @@ interface ChatItem extends AiMessage {
 export default function AskScreen() {
   const { profile, user } = useAuth();
   const { colors, isDark } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const dialog = useDialog();
   const { headerPaddingTop, backBtnTop, bottomInset, insets } = useLayoutInsets();
+  const kb = useKeyboardInset();
   const astroMode = useLocalSearchParams().astro === '1';
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [input, setInput] = useState('');
@@ -126,7 +128,7 @@ export default function AskScreen() {
       />
 
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={{ flex: 1, paddingBottom: kb }}
         // Android: rely on native windowSoftInputMode=adjustResize. The old
         // behavior='height' + top-inset offset double-counted and left a large
         // gap between the composer and keyboard after dismiss. iOS still needs padding.
@@ -136,10 +138,10 @@ export default function AskScreen() {
         {messages.length === 0 ? (
           <View style={st.emptyWrap}>
             <Image source={require('../assets/images/emblem.png')} style={st.emptyEmblem} />
-            <Text style={[st.emptyTitle, { color: colors.text }]}>Namaste 🙏</Text>
-            <Text style={[st.emptySub, { color: colors.textSecondary }]}>
-              Ask anything about dharma, scriptures, festivals, puja, mantras or daily practice.
-            </Text>
+            <Text style={[st.emptyTitle, { color: colors.text }]}>{tx('Namaste 🙏')}</Text>
+            <Text style={[st.emptySub, { color: colors.textSecondary }]}>{tx(
+              'Ask anything about dharma, scriptures, festivals, puja, mantras or daily practice.'
+            )}</Text>
             <View style={st.starters}>
               {STARTER_QUESTIONS.map((q) => (
                 <TouchableOpacity
@@ -167,15 +169,15 @@ export default function AskScreen() {
         {thinking && (
           <View style={[st.thinkingBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={{ color: colors.textSecondary, fontSize: 12.5 }}>Sadhak AI is reflecting…</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12.5 }}>{tx('Sadhak AI is reflecting…')}</Text>
           </View>
         )}
 
         {/* Input */}
-        <View style={[st.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider, paddingBottom: 10 + bottomInset }]}>
+        <View style={[st.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider, paddingBottom: 10 + (kb ? 0 : bottomInset) }]}>
           <TextInput
             style={[st.input, { color: colors.text, backgroundColor: isDark ? colors.surfaceElevated : '#F5F1EC' }]}
-            placeholder="Ask about dharma, puja, mantra…"
+            placeholder={tx('Ask about dharma, puja, mantra…')}
             placeholderTextColor={colors.textTertiary}
             value={input}
             onChangeText={setInput}

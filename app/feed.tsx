@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Image,
   FlatList, ActivityIndicator, RefreshControl, Modal, KeyboardAvoidingView, Platform,
@@ -34,8 +35,9 @@ function timeAgo(createdAt: any): string {
 export default function FeedScreen() {
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
-  const { t: tr } = useLanguage();
+  const { t: tr, tx } = useLanguage();
   const { headerPaddingTop, backBtnTop, screenBottomPadding, bottomInset } = useLayoutInsets();
+  const kb = useKeyboardInset();
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -214,7 +216,7 @@ export default function FeedScreen() {
       }
       ListEmptyComponent={
         !searching && userResults.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.textTertiary }]}>No results for “{term}”.</Text>
+          <Text style={[styles.empty, { color: colors.textTertiary }]}>{tx('No results for “')}{term}”.</Text>
         ) : null
       }
     />
@@ -222,12 +224,12 @@ export default function FeedScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header title={tr('t.explore')} subtitle="Posts from the Sadhak community" />
+      <Header title={tr('t.explore')} subtitle={tx('Posts from the Sadhak community')} />
       <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
         <Ionicons name="search" size={18} color={colors.textTertiary} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search people, #topics, posts…"
+          placeholder={tx('Search people, #topics, posts…')}
           placeholderTextColor={colors.textTertiary}
           value={term}
           onChangeText={setTerm}
@@ -254,8 +256,8 @@ export default function FeedScreen() {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="post-outline" size={54} color={colors.textTertiary} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No posts yet</Text>
-              <Text style={[styles.empty, { color: colors.textTertiary }]}>Be the first to share with the community.</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{tx('No posts yet')}</Text>
+              <Text style={[styles.empty, { color: colors.textTertiary }]}>{tx('Be the first to share with the community.')}</Text>
             </View>
           }
         />
@@ -275,7 +277,7 @@ export default function FeedScreen() {
       {/* ═══ Comments sheet — 75% height, Instagram-style layout ═══ */}
       <Modal visible={!!commentsFor} transparent animationType="slide" onRequestClose={() => setCommentsFor(null)}>
         <KeyboardAvoidingView
-          style={styles.sheetOverlay}
+          style={[styles.sheetOverlay, { paddingBottom: kb }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setCommentsFor(null)} />
@@ -299,7 +301,7 @@ export default function FeedScreen() {
               ListEmptyComponent={
                 <View style={{ alignItems: 'center', marginTop: 60, gap: 8 }}>
                   <MaterialCommunityIcons name="comment-text-outline" size={44} color={colors.textTertiary} />
-                  <Text style={[styles.empty, { color: colors.textTertiary }]}>Be the first to comment.</Text>
+                  <Text style={[styles.empty, { color: colors.textTertiary }]}>{tx('Be the first to comment.')}</Text>
                 </View>
               }
               renderItem={({ item: c }) => (
@@ -318,10 +320,10 @@ export default function FeedScreen() {
                 </View>
               )}
             />
-            <View style={[styles.commentInputRow, { borderTopColor: colors.divider, backgroundColor: colors.surface, paddingBottom: 12 + bottomInset }]}>
+            <View style={[styles.commentInputRow, { borderTopColor: colors.divider, backgroundColor: colors.surface, paddingBottom: 12 + (kb ? 0 : bottomInset) }]}>
               <TextInput
                 style={[styles.commentInput, { color: colors.text, backgroundColor: colors.background }]}
-                placeholder="Write a comment…"
+                placeholder={tx('Write a comment…')}
                 placeholderTextColor={colors.textTertiary}
                 value={commentText}
                 onChangeText={setCommentText}

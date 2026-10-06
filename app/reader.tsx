@@ -8,6 +8,8 @@ import { sanitizeCloudinaryPdfUrl } from '../services/cloudinary';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLayoutInsets } from '../constants/layout';
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 // In-app PDF reader.
 // The PDF is downloaded natively, then base64-embedded into a data-URL HTML so
 // pdf.js loads it without any file:// origin issues — one of the reasons the
@@ -70,6 +72,8 @@ const VIEWER_HTML = (bg: string, fg: string, pdfBase64: string) => `<!DOCTYPE ht
 </script></body></html>`;
 
 export default function ReaderScreen() {
+  const { tx } = useLanguage();
+
   const { url, title } = useLocalSearchParams<{ url: string; title?: string }>();
   const { colors, isDark } = useTheme();
   const { headerPaddingTop, bottomInset } = useLayoutInsets();
@@ -120,7 +124,7 @@ export default function ReaderScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[st.title, { color: colors.text }]} numberOfLines={1}>{title || 'Reading'}</Text>
-          {pages > 0 && <Text style={[st.pageInfo, { color: colors.textTertiary }]}>Page {page} of {pages}</Text>}
+          {pages > 0 && <Text style={[st.pageInfo, { color: colors.textTertiary }]}>{tx('Page')} {page}of {pages}</Text>}
         </View>
         {!String(url || '').startsWith('file://') && (
           <TouchableOpacity onPress={() => Linking.openURL(String(url))} style={[st.iconBtn, { backgroundColor: colors.background }]} hitSlop={8}>
@@ -151,14 +155,14 @@ export default function ReaderScreen() {
               onPress={() => { setFailed(null); setPhase('download'); setHtml(null); }}
             >
               <MaterialCommunityIcons name="refresh" size={16} color="#FFF" />
-              <Text style={st.errorBtnPrimaryText}>Try again</Text>
+              <Text style={st.errorBtnPrimaryText}>{tx('Try again')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[st.errorBtnGhost, { borderColor: colors.cardBorder }]}
               onPress={() => Linking.openURL(sanitizeCloudinaryPdfUrl(String(url)))}
             >
               <MaterialCommunityIcons name="open-in-new" size={16} color={colors.textSecondary} />
-              <Text style={[st.errorBtnGhostText, { color: colors.textSecondary }]}>Open externally</Text>
+              <Text style={[st.errorBtnGhostText, { color: colors.textSecondary }]}>{tx('Open externally')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -185,14 +189,14 @@ export default function ReaderScreen() {
           {phase !== 'ready' && (
             <View style={[StyleSheet.absoluteFill, st.center, { backgroundColor: colors.background }]}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>Preparing pages…</Text>
+              <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>{tx('Preparing pages…')}</Text>
             </View>
           )}
         </View>
       ) : (
         <View style={st.center}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>Downloading document…</Text>
+          <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>{tx('Downloading document…')}</Text>
         </View>
       )}
       <View style={{ height: bottomInset }} />

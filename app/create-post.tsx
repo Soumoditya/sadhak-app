@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Image,
   ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -16,11 +17,16 @@ import { useLayoutInsets } from '../constants/layout';
 import { uploadToCloudinary } from '../services/cloudinary';
 import { createPost, extractHashtags } from '../services/posts';
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 export default function CreatePostScreen() {
+  const { tx } = useLanguage();
+
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
   const { headerPaddingTop, backBtnTop, screenBottomPadding } = useLayoutInsets();
+  const kb = useKeyboardInset();
 
   const [text, setText] = useState('');
   const [localImage, setLocalImage] = useState<string | null>(null);
@@ -86,20 +92,20 @@ export default function CreatePostScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
-        title="New Post"
-        subtitle="Share with the community"
+        title={tx('New Post')}
+        subtitle={tx('Share with the community')}
         right={
           <TouchableOpacity
             style={[styles.postBtn, { backgroundColor: colors.primary, opacity: canPost ? 1 : 0.45 }]}
             disabled={!canPost}
             onPress={submit}
           >
-            {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>Share</Text>}
+            {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>{tx('Share')}</Text>}
           </TouchableOpacity>
         }
       />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: kb }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: screenBottomPadding }} keyboardShouldPersistTaps="handled">
           {/* Author row */}
           <View style={styles.authorRow}>
@@ -118,7 +124,7 @@ export default function CreatePostScreen() {
 
           <TextInput
             style={[styles.input, { color: colors.text }]}
-            placeholder="Share a thought, question, or blessing…  Use #hashtags"
+            placeholder={tx('Share a thought, question, or blessing…  Use #hashtags')}
             placeholderTextColor={colors.textTertiary}
             multiline
             autoFocus
@@ -150,7 +156,7 @@ export default function CreatePostScreen() {
         <View style={[styles.toolbar, { borderTopColor: colors.divider, backgroundColor: colors.surface, paddingBottom: screenBottomPadding }]}>
           <TouchableOpacity style={styles.toolBtn} onPress={pickImage}>
             <MaterialCommunityIcons name="image-plus" size={22} color={colors.primary} />
-            <Text style={[styles.toolText, { color: colors.textSecondary }]}>Photo</Text>
+            <Text style={[styles.toolText, { color: colors.textSecondary }]}>{tx('Photo')}</Text>
           </TouchableOpacity>
           <Text style={[styles.counter, { color: colors.textTertiary }]}>{text.length}/2000</Text>
         </View>

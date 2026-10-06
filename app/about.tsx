@@ -11,7 +11,7 @@ import { updateLabel } from '../services/appUpdates';
 
 export default function AboutScreen() {
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { t, tx } = useLanguage();
 
   const links = [
     { label: t('settings.privacyPolicy'), icon: 'shield-lock-outline', route: '/privacy' },
@@ -50,7 +50,7 @@ export default function AboutScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={styles.cardHeader}>
             <MaterialCommunityIcons name="code-tags" size={22} color="#4ADE80" />
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Developer</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{tx('Developer')}</Text>
           </View>
           <Text style={[styles.cardBody, { color: colors.textSecondary }]}>{DEVELOPER_NAME}</Text>
           <TouchableOpacity onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} style={styles.emailRow}>

@@ -5,12 +5,12 @@ import { router } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { DS, useDsInsets } from '../../constants/ds';
-import { QuickSettingsButton } from './QuickSettings';
+import { LanguageChip, ThemeToggle } from './QuickSettings';
 
 /**
  * Screen header for every pushed screen: back, display-face title, optional
- * right actions, and the theme + language button so those are one tap away
- * everywhere (pass quick={false} on immersive screens that draw their own).
+ * right actions, and the same language chip + theme toggle as Home and the
+ * tabs (pass quick={false} on screens that draw their own, e.g. Settings).
  */
 interface Props {
   title: string;
@@ -31,12 +31,12 @@ export function goBackOrHome() {
 
 export default function Header({ title, subtitle, back = true, right, onBack, quick = true }: Props) {
   const { colors } = useTheme();
-  const { display, noTrack } = useLanguage();
+  const { display, noTrack, tx } = useLanguage();
   const { insets } = useDsInsets();
   // Long names ("Temples & Bhandara") step down a size instead of truncating
   // next to header actions.
   const crowded = !!right;
-  const titleSize = title.length > 18 || (crowded && title.length > 12) ? 18 : title.length > 13 ? 20 : 22;
+  const titleSize = crowded && title.length > 14 ? 16 : title.length > 16 || (crowded && title.length > 10) ? 18 : title.length > 11 ? 20 : 22;
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + 8, paddingBottom: DS.space.md }]}>
       <View style={styles.row}>
@@ -58,13 +58,14 @@ export default function Header({ title, subtitle, back = true, right, onBack, qu
             adjustsFontSizeToFit
             minimumFontScale={0.8}
           >
-            {title}
+            {tx(title)}
           </Text>
-          {!!subtitle && <Text style={[styles.sub, { color: colors.textTertiary }, noTrack]} numberOfLines={1}>{subtitle}</Text>}
+          {!!subtitle && <Text style={[styles.sub, { color: colors.textTertiary }, noTrack]} numberOfLines={1}>{tx(subtitle)}</Text>}
         </View>
         <View style={styles.right}>
+          {quick && <LanguageChip size={38} />}
+          {quick && <ThemeToggle size={38} />}
           {right}
-          {quick && <QuickSettingsButton />}
         </View>
       </View>
     </View>

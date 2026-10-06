@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { DS } from '../../constants/ds';
 import Icon, { fromMaterial } from './Icon';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Rows pass Material icon names; show the Phosphor glyph when one maps.
 
@@ -24,6 +25,7 @@ export default function SettingsRow({
   switchValue, onSwitchChange, danger, iconColor,
 }: Props) {
   const { colors } = useTheme();
+  const { tx } = useLanguage();
   const Wrap: any = onPress ? TouchableOpacity : View;
   const wrapProps = onPress ? { onPress, activeOpacity: 0.7 } : {};
   const tint = danger ? '#EF4444' : iconColor || colors.textSecondary;
@@ -36,8 +38,8 @@ export default function SettingsRow({
           : <MaterialCommunityIcons name={icon as any} size={18} color={tint} />}
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.label, { color: danger ? '#EF4444' : colors.text }]}>{label}</Text>
-        {detail && <Text style={[styles.detail, { color: colors.textTertiary }]}>{detail}</Text>}
+        <Text style={[styles.label, { color: danger ? '#EF4444' : colors.text }]}>{tx(label)}</Text>
+        {detail && <Text style={[styles.detail, { color: colors.textTertiary }]}>{typeof detail === 'string' ? tx(detail) : detail}</Text>}
       </View>
       {right === 'switch' ? (
         <Switch value={!!switchValue} onValueChange={onSwitchChange} trackColor={{ true: colors.primary + '80', false: colors.cardBorder }} thumbColor={switchValue ? colors.primary : '#F3F4F6'} />

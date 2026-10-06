@@ -5,6 +5,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Header } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -94,6 +96,8 @@ const FAQ_SECTIONS: { title: string; icon: string; color: string; items: FAQItem
 ];
 
 export default function FAQScreen() {
+  const { tx } = useLanguage();
+
   const { colors, isDark } = useTheme();
   const { screenBottom } = useDsInsets();
   const [expandedSection, setExpandedSection] = useState<number | null>(0);
@@ -112,15 +116,13 @@ export default function FAQScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header title="Help & FAQ" subtitle="Answers about Sadhak" />
+      <Header title={tx('Help & FAQ')} subtitle={tx('Answers about Sadhak')} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottom }}>
       {/* Hero */}
       <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
         <MaterialCommunityIcons name="help-circle-outline" size={40} color={colors.primary} />
-        <Text style={[styles.heroTitle, { color: colors.text }]}>How can we help?</Text>
-        <Text style={[styles.heroDesc, { color: colors.textSecondary }]}>
-          Find answers to common questions about Sadhak
-        </Text>
+        <Text style={[styles.heroTitle, { color: colors.text }]}>{tx('How can we help?')}</Text>
+        <Text style={[styles.heroDesc, { color: colors.textSecondary }]}>{tx('Find answers to common questions about Sadhak')}</Text>
       </View>
 
       {/* FAQ Sections */}
@@ -175,29 +177,27 @@ export default function FAQScreen() {
 
       {/* Contact */}
       <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        <Text style={[styles.contactTitle, { color: colors.text }]}>Still need help?</Text>
-        <Text style={[styles.contactDesc, { color: colors.textSecondary }]}>
-          Reach out to us and we'll get back to you
-        </Text>
+        <Text style={[styles.contactTitle, { color: colors.text }]}>{tx('Still need help?')}</Text>
+        <Text style={[styles.contactDesc, { color: colors.textSecondary }]}>{tx('Reach out to us and we\'ll get back to you')}</Text>
         <View style={styles.contactRow}>
           <TouchableOpacity
             style={[styles.contactBtn, { backgroundColor: colors.primary + '15' }]}
             onPress={() => Linking.openURL('mailto:soumodityapramanik@gmail.com')}
           >
             <MaterialCommunityIcons name="email-outline" size={20} color={colors.primary} />
-            <Text style={[styles.contactBtnText, { color: colors.primary }]}>Email Us</Text>
+            <Text style={[styles.contactBtnText, { color: colors.primary }]}>{tx('Email Us')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.contactBtn, { backgroundColor: colors.tulsiGreen + '15' }]}
             onPress={() => Linking.openURL('https://wa.me/919064882049')}
           >
             <MaterialCommunityIcons name="whatsapp" size={20} color={colors.tulsiGreen} />
-            <Text style={[styles.contactBtnText, { color: colors.tulsiGreen }]}>WhatsApp</Text>
+            <Text style={[styles.contactBtnText, { color: colors.tulsiGreen }]}>{tx('WhatsApp')}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <Text style={[styles.version, { color: colors.textTertiary }]}>Sadhak v1.6.0 • Made with 🙏 in India</Text>
+      <Text style={[styles.version, { color: colors.textTertiary }]}>{tx('Sadhak v1.6.0 • Made with 🙏 in India')}</Text>
       <View style={{ height: 40 }} />
       </ScrollView>
     </View>

@@ -9,20 +9,14 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { calculatePanchang } from '../../services/panchang';
 import { getDailyGroomingAdvice, getGroomingStatusColor } from '../../services/groomingRules';
 import { getUpcomingObservances, type Observance } from '../../services/upcoming';
+import { muhurtaNow } from '../../services/muhurtaNow';
+import MoonPhase from '../../components/ui/MoonPhase';
 import { Screen, Icon, ToolTile, LanguageChip, ThemeToggle } from '../../components/ui';
 import { TOOLS } from '../../constants/tools';
+import { SHLOKAS, SHLOKA_CARDS, shlokaIndexFor } from '../../constants/shlokas';
+import { shareImageAsset, shlokaShareMessage } from '../../services/shareApp';
+import { useDialog } from '../../contexts/DialogContext';
 import { DS } from '../../constants/ds';
-
-// ─── Rotating shlokas (one per day) ──────────────────────────────────
-const SHLOKAS = [
-  { text: 'योगः कर्मसु कौशलम्।', translation: 'Yoga is skill in action.', source: 'Bhagavad Gita 2.50' },
-  { text: 'सत्यमेव जयते।', translation: 'Truth alone triumphs.', source: 'Mundaka Upanishad 3.1.6' },
-  { text: 'वसुधैव कुटुम्बकम्।', translation: 'The world is one family.', source: 'Maha Upanishad 6.71' },
-  { text: 'अहिंसा परमो धर्मः।', translation: 'Non-violence is the highest duty.', source: 'Mahabharata' },
-  { text: 'तमसो मा ज्योतिर्गमय।', translation: 'Lead me from darkness to light.', source: 'Brihadaranyaka Upanishad 1.3.28' },
-  { text: 'श्रद्धावान् लभते ज्ञानम्।', translation: 'The faithful attain knowledge.', source: 'Bhagavad Gita 4.39' },
-  { text: 'ॐ सह नाववतु।', translation: 'May we be protected together.', source: 'Taittiriya Upanishad' },
-];
 
 const GRID_COLS = 4;
 
@@ -49,7 +43,19 @@ export default function HomeScreen() {
     return () => task.cancel();
   }, [today.toDateString(), lat, lng]);
 
-  const shloka = SHLOKAS[today.getDate() % SHLOKAS.length];
+  const shlokaIdx = shlokaIndexFor(today);
+  const shloka = SHLOKAS[shlokaIdx];
+  const meaning = language === 'hi' || language === 'mr' ? shloka.hi : language === 'bn' || language === 'as' ? shloka.bn : shloka.en;
+  const dialog = useDialog();
+  const [sharing, setSharing] = useState(false);
+  const shareShloka = async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const how = await shareImageAsset(SHLOKA_CARDS[shlokaIdx], `Sadhak-Shloka-${shlokaIdx + 1}.jpg`, shlokaShareMessage(shloka.text, shloka.en, shloka.source), 'Share shloka');
+      if (how === 'image') dialog.alert('Invite copied', 'The invite message with the link is copied. Paste it as the caption if your app asks for one.', undefined, { tone: 'success' });
+    } finally { setSharing(false); }
+  };
   const firstName = profile?.displayName?.split(' ')[0] || 'Sadhak';
   const hour = today.getHours();
   const greeting = t(hour < 4 ? 'ui.greet.night' : hour < 12 ? 'ui.greet.morning' : hour < 17 ? 'ui.greet.day' : hour < 20 ? 'ui.greet.evening' : 'ui.greet.night');
@@ -59,6 +65,8 @@ export default function HomeScreen() {
   // Festival names exist in English and Hindi; lead with the one that
   // matches the reader's script.
   const deva = language === 'hi' || language === 'mr';
+  const now = useMemo(() => muhurtaNow(panchang), [panchang, Math.floor(Date.now() / 60000)]);
+  const todayFest = upcoming?.find((o) => o.daysAway === 0 && o.kind === 'festival');
   const [gridW, setGridW] = useState(0);
   const tileW = gridW ? Math.floor(gridW / GRID_COLS) : 0;
 
@@ -96,20 +104,42 @@ export default function HomeScreen() {
               <Circle key={r} cx={160} cy={60} r={r} fill="#FFFFFF" opacity={0.05 + i * 0.025} />
             ))}
           </Svg>
-          <Text style={[s.heroOver, noTrack]} numberOfLines={1}>
-            {t('ui.today')} · {today.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
-          </Text>
+          <View style={s.heroTop}>
+            <Text style={[s.heroOver, noTrack]} numberOfLines={1}>
+              {t('ui.today')} · {today.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
+            </Text>
+            <MoonPhase tithi={panchang.tithi.number} size={30} />
+          </View>
           <Text style={s.heroTithi} numberOfLines={1} adjustsFontSizeToFit>
             {panchang.tithi.nameHi}
           </Text>
           <Text style={s.heroSub} numberOfLines={1}>
             {panchang.hinduMonth.nameHi} {panchang.tithi.pakshaHi} · {panchang.nakshatra.nameHi}
           </Text>
-          {language === 'en' && (
-            <Text style={s.heroSubEn} numberOfLines={1}>
-              {panchang.hinduMonth.name} · {panchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna'} {panchang.tithi.name}
-            </Text>
-          )}
+          <Text style={s.heroSubEn} numberOfLines={1}>
+            {language === 'en' ? `${panchang.hinduMonth.name} · ${panchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna'} ${panchang.tithi.name}` : ''}
+            {panchang.tithi.endTime ? `${language === 'en' ? ' · ' : ''}${tf('home.tithiUntil', { t: panchang.tithi.endTime })}` : ''}
+          </Text>
+
+          {/* Right now: the active (or next) muhurta, and today's festival */}
+          <View style={s.nowRow}>
+            {now.active || now.next ? (
+              <View style={[s.nowPill, { backgroundColor: now.active ? (now.active.good ? 'rgba(134,239,172,0.22)' : 'rgba(254,202,202,0.25)') : 'rgba(255,255,255,0.14)' }]}>
+                <View style={[s.nowDot, { backgroundColor: now.active ? (now.active.good ? '#86EFAC' : '#FECACA') : 'rgba(255,255,255,0.7)' }]} />
+                <Text style={[s.nowText, noTrack]} numberOfLines={1}>
+                  {now.active
+                    ? `${tf('panch.activeNow', { name: t(`mu.${now.active.key}`) })} · ${tf('panch.until', { t: now.active.end })}`
+                    : `${tf('panch.next', { name: t(`mu.${now.next!.key}`) })} ${tf('panch.at', { t: now.next!.start })}`}
+                </Text>
+              </View>
+            ) : null}
+            {todayFest && (
+              <View style={[s.nowPill, { backgroundColor: 'rgba(255,236,179,0.25)' }]}>
+                <Icon name="confetti" size={13} color="#FFE7A3" />
+                <Text style={[s.nowText, noTrack]} numberOfLines={1}>{deva ? todayFest.nameHi : todayFest.name}</Text>
+              </View>
+            )}
+          </View>
           <View style={s.heroTimes}>
             <HeroTime icon="sun-horizon" label={t('ui.sunrise')} value={panchang.sunrise} />
             <HeroTime icon="moon-stars" label={t('ui.sunset')} value={panchang.sunset} />
@@ -130,11 +160,15 @@ export default function HomeScreen() {
           <Icon name="caret-right" size={13} color={colors.primary} weight="regular" />
         </Pressable>
       </View>
-      <View
-        style={[s.grid, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-        onLayout={(e) => setGridW(e.nativeEvent.layout.width - 16)}
-      >
-        {!!tileW && TOOLS.map((tool) => <ToolTile key={tool.key} tool={tool} width={tileW} />)}
+      <View style={[s.grid, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onLayout={(e) => setGridW(e.nativeEvent.layout.width - 16)}>
+        {/* Fixed rows of four with equal-width cells: even gaps on every phone. */}
+        {!!tileW && Array.from({ length: Math.ceil(TOOLS.length / GRID_COLS) }, (_, r) => (
+          <View key={r} style={s.gridRow}>
+            {TOOLS.slice(r * GRID_COLS, r * GRID_COLS + GRID_COLS).map((tool) => (
+              <View key={tool.key} style={s.gridCell}><ToolTile tool={tool} width={tileW} /></View>
+            ))}
+          </View>
+        ))}
       </View>
 
       {/* ═══ Coming up ═══ */}
@@ -208,8 +242,17 @@ export default function HomeScreen() {
         <Text style={[s.shlokaOm, { color: colors.primary }]}>ॐ</Text>
         <Text style={[s.shlokaLabel, { color: colors.primary }, noTrack]}>{t('home.shlokaOfDay')}</Text>
         <Text style={[s.shlokaText, { color: colors.text }]}>{shloka.text}</Text>
-        <Text style={[s.shlokaTrans, { color: colors.textSecondary }]}>{shloka.translation}</Text>
+        <Text style={[s.shlokaTrans, { color: colors.textSecondary }]}>{meaning}</Text>
         <Text style={[s.shlokaSrc, { color: colors.textTertiary }]}>{shloka.source}</Text>
+        <Pressable
+          onPress={shareShloka}
+          disabled={sharing}
+          accessibilityRole="button"
+          style={({ pressed }) => [s.shareBtn, { borderColor: colors.primary + '55', backgroundColor: colors.primary + (pressed ? '22' : '10'), opacity: sharing ? 0.6 : 1 }]}
+        >
+          <Icon name="share-network" size={16} color={colors.primary} />
+          <Text style={[s.shareText, { color: colors.primary }]}>{t('home.shareShloka')}</Text>
+        </Pressable>
       </View>
     </Screen>
   );
@@ -237,7 +280,12 @@ const s = StyleSheet.create({
 
   hero: { borderRadius: 28, padding: 20, overflow: 'hidden' },
   heroRings: { position: 'absolute', top: -20, right: -40 },
-  heroOver: { color: 'rgba(255,255,255,0.85)', fontSize: 12.5, fontWeight: '700', letterSpacing: 0.3 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  nowRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  nowPill: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 100, maxWidth: '100%' },
+  nowDot: { width: 7, height: 7, borderRadius: 4 },
+  nowText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '700', flexShrink: 1 },
+  heroOver: { flex: 1, color: 'rgba(255,255,255,0.85)', fontSize: 12.5, fontWeight: '700', letterSpacing: 0.3 },
   heroTithi: { color: '#FFFFFF', fontSize: 42, lineHeight: 62, fontFamily: DS.font.deva, marginTop: 6 },
   heroSub: { color: 'rgba(255,255,255,0.92)', fontSize: 14.5, lineHeight: 22, fontFamily: DS.font.deva },
   heroSubEn: { color: 'rgba(255,255,255,0.72)', fontSize: 12.5, marginTop: 2 },
@@ -253,7 +301,9 @@ const s = StyleSheet.create({
   sectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   sectionActionText: { fontSize: 13, fontWeight: '800' },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', borderRadius: 24, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 8, rowGap: 6 },
+  grid: { borderRadius: 24, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 8, gap: 10 },
+  gridRow: { flexDirection: 'row' },
+  gridCell: { flex: 1, alignItems: 'center' },
 
   list: { borderRadius: 22, borderWidth: 1, paddingHorizontal: 14 },
   obs: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
@@ -276,5 +326,7 @@ const s = StyleSheet.create({
   shlokaLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
   shlokaText: { fontSize: 24, lineHeight: 42, marginTop: 8, textAlign: 'center', fontFamily: DS.font.deva },
   shlokaTrans: { fontSize: 14, lineHeight: 21, marginTop: 4, textAlign: 'center' },
+  shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 100, borderWidth: 1 },
+  shareText: { fontSize: 13.5, fontWeight: '800' },
   shlokaSrc: { fontSize: 12, fontWeight: '700', marginTop: 8, textAlign: 'center' },
 });

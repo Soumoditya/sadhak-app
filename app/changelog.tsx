@@ -10,7 +10,7 @@ import { APP_VERSION, CHANGELOG } from '../constants/appInfo';
 
 export default function ChangelogScreen() {
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { t, tx } = useLanguage();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -25,7 +25,7 @@ export default function ChangelogScreen() {
               </View>
               {idx === 0 && (
                 <View style={styles.latestBadge}>
-                  <Text style={styles.latestText}>Latest</Text>
+                  <Text style={styles.latestText}>{tx('Latest')}</Text>
                 </View>
               )}
               <Text style={[styles.dateText, { color: colors.textTertiary }]}>{entry.date}</Text>
