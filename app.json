@@ -2,13 +2,13 @@
   "expo": {
     "name": "Sadhak",
     "slug": "sadhak-app",
-    "version": "1.15.0",
+    "version": "1.16.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sadhak",
     "userInterfaceStyle": "automatic",
     "android": {
-      "versionCode": 17,
+      "versionCode": 18,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/adaptive-foreground.png",

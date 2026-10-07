@@ -928,4 +928,5 @@ export const PHRASES: Record<string, [string, string]> = {
   "Serpent": ["सर्प", "সাপ"],
   "Sheep": ["भेड़", "ভেড়া"],
   "Tiger": ["बाघ", "বাঘ"],
+  "Offer, pour, light and do aarti with your finger": ["अर्पित करें, जल चढ़ाएँ, दीप जलाएँ और उँगली से आरती करें", "নিবেদন করুন, জল ঢালুন, প্রদীপ জ্বালান আর আঙুলে আরতি করুন"],
 };

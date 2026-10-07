@@ -26,6 +26,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.16.0',
+    date: '2026-10-07',
+    title: 'The Satya Jyotish puja comes to Sadhak',
+    changes: [
+      'Virtual puja from Satya Jyotish: Shiva Abhishek, Havan, Ganesh Puja and Tulsi Puja in painted temples',
+      'Pour water, milk, curd and honey, shower flowers and bel leaves, light lamps and incense, offer ahuti to the fire',
+      'Do aarti with your finger, three circles around the deity, with mantras for every offering',
+      'Real temple bell and conch sounds; daily puja streak',
+      'Planet marks in the kundli shown in brackets: Sa(R), Me(R,C)',
+    ],
+  },
+  {
     version: '1.15.0',
     date: '2026-10-07',
     title: 'Virtual puja, regional calendars and a richer Panchang',
