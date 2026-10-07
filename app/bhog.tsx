@@ -30,6 +30,19 @@ export default function BhogScreen() {
     return next;
   });
   const allergenLabel = (a: Allergen) => tx(ALLERGENS.find((x) => x.key === a)!.label);
+  // Anything else the user types (e.g. "jaggery", "potato") is matched against ingredients.
+  const [custom, setCustom] = useState<string[]>([]);
+  const [customInput, setCustomInput] = useState('');
+  useEffect(() => {
+    AsyncStorage.getItem('sadhak_bhog_avoid_custom').then((v) => { if (v) setCustom(JSON.parse(v)); }).catch(() => {});
+  }, []);
+  const saveCustom = (next: string[]) => { setCustom(next); AsyncStorage.setItem('sadhak_bhog_avoid_custom', JSON.stringify(next)).catch(() => {}); };
+  const addCustom = () => {
+    const v = customInput.trim().toLowerCase();
+    if (v && !custom.includes(v)) saveCustom([...custom, v]);
+    setCustomInput('');
+  };
+  const hasCustom = (r: BhogRecipe) => custom.some((c) => r.ingredients.some((i) => i.item.toLowerCase().includes(c)));
 
   useEffect(() => {
     if (!recipe) return;
@@ -39,7 +52,7 @@ export default function BhogScreen() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const safe = BHOG_RECIPES.filter((r) => !allergensOf(r).some((a) => avoid.includes(a)));
+    const safe = BHOG_RECIPES.filter((r) => !allergensOf(r).some((a) => avoid.includes(a)) && !hasCustom(r));
     if (!q) return safe;
     // Match by name, occasion OR ingredient: "what can I make with sabudana?"
     return safe.filter(r =>
@@ -48,7 +61,7 @@ export default function BhogScreen() {
       r.occasion.toLowerCase().includes(q) ||
       r.ingredients.some(i => i.item.toLowerCase().includes(q)),
     );
-  }, [query, avoid]);
+  }, [query, avoid, custom]);
 
   const surpriseMe = () => {
     const pool = filtered.length ? filtered : BHOG_RECIPES;
@@ -185,7 +198,28 @@ export default function BhogScreen() {
             </TouchableOpacity>
           );
         })}
+        {custom.map((c) => (
+          <TouchableOpacity key={c} onPress={() => saveCustom(custom.filter((x) => x !== c))} style={[st.avoidChip, { borderColor: colors.error, backgroundColor: colors.error + '14' }]}>
+            <Ionicons name="close" size={13} color={colors.error} />
+            <Text style={[st.avoidText, { color: colors.error }]}>{c}</Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
+      <View style={[st.customRow, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+        <Ionicons name="remove-circle-outline" size={17} color={colors.textTertiary} />
+        <TextInput
+          style={[st.searchInput, { color: colors.text }]}
+          placeholder={tx('Type something else to avoid (e.g. jaggery)')}
+          placeholderTextColor={colors.textTertiary}
+          value={customInput}
+          onChangeText={setCustomInput}
+          onSubmitEditing={addCustom}
+          returnKeyType="done"
+        />
+        {!!customInput.trim() && (
+          <TouchableOpacity onPress={addCustom} hitSlop={8}><Text style={{ color: colors.primary, fontWeight: '800' }}>{tx('Add')}</Text></TouchableOpacity>
+        )}
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.list, { paddingBottom: screenBottomPadding }]}>
         {filtered.length === 0 && (
@@ -252,6 +286,7 @@ const st = StyleSheet.create({
   avoidLabel: { fontSize: 11.5, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', marginRight: 2 },
   avoidChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 11, height: 30, borderRadius: 15, borderWidth: 1 },
   avoidText: { fontSize: 12, fontWeight: '700' },
+  customRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 42, marginHorizontal: 20, marginTop: 8 },
   cardAllergen: { fontSize: 11, marginTop: 2, fontStyle: 'italic' },
   allergyNote: { flexDirection: 'row', gap: 8, alignItems: 'center', marginHorizontal: 16, marginTop: 12, borderRadius: 14, borderWidth: 1, padding: 12 },
   card: { flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, borderWidth: 1, gap: 12 },

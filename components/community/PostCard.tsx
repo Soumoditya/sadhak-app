@@ -9,7 +9,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { getLatestComments, deletePost, timeAgo, updatePostText, setPostPinned, type Post, type PostComment } from '../../services/posts';
-import { WEBSITE_URL } from '../../constants/appInfo';
+import { shareText } from '../../services/shareApp';
 import Avatar from './Avatar';
 
 /**
@@ -17,7 +17,7 @@ import Avatar from './Avatar';
  * caption, and the latest two comments inline with "View all".
  */
 export default function PostCard({
-  post, uid, onLike, onOpenComments, onDeleted, onImage, onChanged, commentsVersion = 0,
+  post, uid, onLike, onOpenComments, onDeleted, onImage, onChanged, commentsVersion = 0, flat = false,
 }: {
   post: Post;
   uid?: string;
@@ -29,6 +29,8 @@ export default function PostCard({
   onChanged?: (p: Post) => void;
   /** Bump to re-fetch the inline comment preview. */
   commentsVersion?: number;
+  /** Edge to edge, no card frame (a person's posts opened from their grid). */
+  flat?: boolean;
 }) {
   const { colors } = useTheme();
   const { tx } = useLanguage();
@@ -77,7 +79,7 @@ export default function PostCard({
   };
 
   const share = () => {
-    Share.share({ message: `${post.authorName} on Sadhak:\n\n${post.text}${post.imageUrl ? `\n${post.imageUrl}` : ''}\n\n${WEBSITE_URL}` }).catch(() => {});
+    shareText(`${post.authorName} on Sadhak:\n\n${post.text}${post.imageUrl ? `\n${post.imageUrl}` : ''}`);
   };
 
   const caption = !!post.text ? (
@@ -90,7 +92,7 @@ export default function PostCard({
       ) : null;
 
   return (
-    <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+    <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }, flat && s.flat]}>
       <View style={s.head}>
         <TouchableOpacity onPress={() => openUser(post.authorId)} style={s.author} activeOpacity={0.7}>
           <Avatar uri={post.authorPfp} name={post.authorName} size={38} />
@@ -136,9 +138,9 @@ export default function PostCard({
           <Text style={[s.viewAll, { color: colors.textTertiary }]}>{tx('View all comments')} ({post.commentCount})</Text>
         </TouchableOpacity>
       )}
-      {preview.map((c) => (
+      {preview.filter((c) => !c.deleted).map((c) => (
         <Text key={c.id} style={[s.preview, { color: colors.textSecondary }]} numberOfLines={2} onPress={() => onOpenComments(post)}>
-          <Text style={{ fontWeight: '800', color: colors.text }}>{c.authorName}  </Text>{c.text}
+          <Text style={{ fontWeight: '800', color: colors.text }}>{c.authorName}  </Text>{c.text || (c.imageUrl ? '📷' : '')}
         </Text>
       ))}
       {!post.commentCount && (
@@ -193,6 +195,7 @@ export default function PostCard({
 
 const s = StyleSheet.create({
   card: { borderRadius: 18, borderWidth: 1, paddingVertical: 12, overflow: 'hidden' },
+  flat: { borderRadius: 0, borderWidth: 0, backgroundColor: 'transparent', paddingBottom: 18 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, marginBottom: 10 },
   author: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   name: { fontSize: 14.5, fontWeight: '800' },

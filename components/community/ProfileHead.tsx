@@ -7,6 +7,8 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { DS } from '../../constants/ds';
 import type { Post } from '../../services/posts';
 import Avatar from './Avatar';
+import { ActionSheet } from '../ui';
+import { handoffPosts } from '../../services/posts';
 
 /** Avatar + counts + name/handle/bio block shared by own and public profiles. */
 export function ProfileHead({
@@ -72,7 +74,7 @@ export function PostGrid({ posts, uid, name, sort = 'new' }: { posts: Post[]; ui
           key={p.id}
           style={s.cell}
           activeOpacity={0.85}
-          onPress={() => router.push({ pathname: '/posts', params: { uid, start: p.id, name: name || '', sort } })}
+          onPress={() => { handoffPosts(uid, posts); router.push({ pathname: '/posts', params: { uid, start: p.id, name: name || '', sort } }); }}
         >
           {p.imageUrl ? (
             <Image source={{ uri: p.imageUrl }} style={s.img} />
@@ -110,8 +112,7 @@ const s = StyleSheet.create({
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { fontSize: 13 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
-  seg: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 2 },
-  segBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9 },
+  drop: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 32, paddingHorizontal: 11, borderRadius: 16, borderWidth: 1 },
   cell: { width: CELL, height: CELL, borderRadius: 8, overflow: 'hidden' },
   img: { width: '100%', height: '100%' },
   textCell: { flex: 1, borderWidth: 1, borderRadius: 8, padding: 8, justifyContent: 'center' },
@@ -120,24 +121,32 @@ const s = StyleSheet.create({
   pin: { position: 'absolute', right: 6, top: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 8, padding: 3 },
 });
 
-/** Hot / New / Top switch for a profile's posts. */
-export function PostSort({ value, onChange }: { value: 'hot' | 'new' | 'top'; onChange: (v: 'hot' | 'new' | 'top') => void }) {
+export type ProfileSort = 'new' | 'old' | 'top';
+
+/** New / Old / Top filter for a profile's posts: one small dropdown. */
+export function PostSort({ value, onChange }: { value: ProfileSort; onChange: (v: ProfileSort) => void }) {
   const { colors } = useTheme();
   const { tx } = useLanguage();
-  const opts: { k: 'hot' | 'new' | 'top'; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-    { k: 'new', label: 'New', icon: 'time-outline' }, { k: 'hot', label: 'Hot', icon: 'flame-outline' }, { k: 'top', label: 'Top', icon: 'trending-up-outline' },
+  const [open, setOpen] = React.useState(false);
+  const opts: { k: ProfileSort; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+    { k: 'new', label: 'Newest first', icon: 'time-outline' },
+    { k: 'old', label: 'Oldest first', icon: 'hourglass-outline' },
+    { k: 'top', label: 'Most liked', icon: 'trending-up-outline' },
   ];
+  const cur = opts.find((o) => o.k === value) || opts[0];
   return (
-    <View style={[s.seg, { backgroundColor: colors.surfaceSecondary }]}>
-      {opts.map((o) => {
-        const on = value === o.k;
-        return (
-          <TouchableOpacity key={o.k} onPress={() => onChange(o.k)} style={[s.segBtn, on && { backgroundColor: colors.surface }]} accessibilityState={{ selected: on }}>
-            <Ionicons name={o.icon} size={13} color={on ? colors.primary : colors.textSecondary} />
-            <Text style={{ fontSize: 12, fontWeight: '800', color: on ? colors.primary : colors.textSecondary }}>{tx(o.label)}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+    <>
+      <TouchableOpacity onPress={() => setOpen(true)} style={[s.drop, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} accessibilityLabel={tx('Sort posts')}>
+        <Ionicons name="funnel-outline" size={13} color={colors.textSecondary} />
+        <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.text }}>{tx(cur.k === 'new' ? 'New' : cur.k === 'old' ? 'Old' : 'Top')}</Text>
+        <Ionicons name="chevron-down" size={13} color={colors.textTertiary} />
+      </TouchableOpacity>
+      <ActionSheet
+        visible={open}
+        title={tx('Sort posts')}
+        onClose={() => setOpen(false)}
+        actions={opts.map((o) => ({ label: `${tx(o.label)}${o.k === value ? '  ✓' : ''}`, icon: o.icon, onPress: () => onChange(o.k) }))}
+      />
+    </>
   );
 }

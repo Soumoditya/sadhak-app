@@ -26,6 +26,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.17.0',
+    date: '2026-10-07',
+    title: 'Threaded comments, message requests and a calmer calendar',
+    changes: [
+      'Comments with replies, up and down votes, edit and delete, Top / Newest / Oldest, and photos',
+      'Message requests: people you follow reach you directly, others ask first (Accept, Delete or Block)',
+      'Calendar redesigned: smooth month swipe, grahan with sutak times, a timeline for every day, grooming in plain words',
+      'Jyotish: opens instantly, cleaner chart lines, planets read house by house, save or share the chart as an image',
+      'Sadhak AI keeps your past chats and knows your kundli',
+      'Virtual puja with real temple recordings, background mantra and an aarti that moves on its own',
+      'Books save inside the app; PDFs and images save without asking for a folder',
+      'Three gentle reminders a day in your language, plus festival, Ekadashi and grahan alerts; a clearer notification icon',
+      'Profile posts open like Instagram, with a New / Old / Top filter',
+    ],
+  },
+  {
     version: '1.16.0',
     date: '2026-10-07',
     title: 'The Satya Jyotish puja comes to Sadhak',

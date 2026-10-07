@@ -117,6 +117,23 @@ export interface Prediction {
   remedies?: string[]; transit?: string; lucky?: { color?: string; number?: string; direction?: string };
 }
 
+/**
+ * The model sometimes answered with raw or cut-off JSON, which then showed up
+ * as code in the guidance card. Recover the fields when possible, otherwise
+ * report the reading as unusable so the on-device one stays.
+ */
+export function cleanPrediction<T extends Prediction>(p: T | null | undefined): T | null {
+  if (!p) return null;
+  const o = p.overview || '';
+  if (/^\s*[{\[`]|"overview"\s*:|```/.test(o)) {
+    const m = o.match(/\{[\s\S]*\}/);
+    try { const inner = JSON.parse(m ? m[0] : o); if (inner && typeof inner.overview === 'string') return cleanPrediction({ ...p, ...inner }); } catch {}
+    return null;
+  }
+  const list = (a?: string[]) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && x.trim() && !/[{}]/.test(x)) : undefined);
+  return { ...p, goodFor: list(p.goodFor), avoid: list(p.avoid), doToday: list(p.doToday), remedies: list(p.remedies) };
+}
+
 /** Fetch a fresh prediction (transits + AI interpretation) for a period. */
 export async function getPrediction(kundli: Kundli, period: PredictionPeriod, name?: string): Promise<Prediction> {
   const res = await fetch(PREDICT_URL, {
@@ -125,7 +142,9 @@ export async function getPrediction(kundli: Kundli, period: PredictionPeriod, na
   });
   const text = await res.text();
   if (!res.ok) { let m = text; try { m = JSON.parse(text).error || text; } catch {} throw new Error(String(m).slice(0, 160)); }
-  return JSON.parse(text) as Prediction;
+  const p = cleanPrediction(JSON.parse(text) as Prediction);
+  if (!p) throw new Error('Unreadable reading');
+  return p;
 }
 
 /** Today's daily guidance, cached per-day in Firestore so it's computed once/day. */
@@ -138,8 +157,8 @@ export async function getCachedDaily(uid: string, kundli: Kundli, name?: string)
   try {
     const snap = await getDoc(ref);
     if (snap.exists()) {
-      const cached = snap.data() as Prediction & { chartKey?: string };
-      if (cached.chartKey === chartKey) return cached;
+      const cached = cleanPrediction(snap.data() as Prediction & { chartKey?: string });
+      if (cached && cached.chartKey === chartKey) return cached;
     }
   } catch {}
   const p = await getPrediction(kundli, 'daily', name);

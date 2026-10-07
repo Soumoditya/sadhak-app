@@ -10,7 +10,8 @@
 import { Canvas, Picture, createPicture, useImage } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image, Platform, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useDerivedValue, useFrameCallback, useSharedValue, type FrameInfo } from 'react-native-reanimated';
@@ -81,10 +82,28 @@ function Stage({ scene }: { scene: Scene }) {
   const insets = useSafeAreaInsets();
   const { language } = useLanguage();
   const lang: Lang = language === 'hi' || language === 'mr' ? 'hi' : language === 'bn' || language === 'as' ? 'bn' : 'en';
-  const bellPlayer = useAudioPlayer(require('../../assets/sounds/bell.wav'));
-  const conchPlayer = useAudioPlayer(require('../../assets/sounds/shankh.wav'));
-  const playSound = (name: 'bell' | 'conch') => {
-    const p = name === 'bell' ? bellPlayer : conchPlayer;
+  // Real recordings (CC0, Freesound): temple bells, shankh, the scene's mantra
+  // as a quiet loop, an aarti song while the thali circles, Ganga aarti at the end.
+  const bellPlayer = useAudioPlayer(require('../../assets/sounds/bell.m4a'));
+  const conchPlayer = useAudioPlayer(require('../../assets/sounds/shankh.m4a'));
+  const ambiencePlayer = useAudioPlayer(require('../../assets/sounds/aarti-ambience.m4a'));
+  const aartiPlayer = useAudioPlayer(require('../../assets/sounds/aarti-song.m4a'));
+  const mantraPlayer = useAudioPlayer(scene.id === 'shiva' ? require('../../assets/sounds/mantra-shiva.m4a') : require('../../assets/sounds/mantra-temple.m4a'));
+  const [musicOn, setMusicOn] = useState(true);
+  useEffect(() => {
+    AsyncStorage.getItem('sadhak_puja_music').then((v) => { if (v === 'off') setMusicOn(false); }).catch(() => {});
+  }, []);
+  useEffect(() => {
+    try {
+      mantraPlayer.loop = true;
+      mantraPlayer.volume = 0.35;
+      if (musicOn) mantraPlayer.play(); else mantraPlayer.pause();
+    } catch {}
+  }, [musicOn, mantraPlayer]);
+  useEffect(() => () => { try { mantraPlayer.pause(); aartiPlayer.pause(); } catch {} }, []);
+  const toggleMusic = () => setMusicOn((m) => { AsyncStorage.setItem('sadhak_puja_music', m ? 'off' : 'on').catch(() => {}); return !m; });
+  const playSound = (name: 'bell' | 'conch' | 'ambience') => {
+    const p = name === 'bell' ? bellPlayer : name === 'conch' ? conchPlayer : ambiencePlayer;
     try { p.seekTo(0); p.play(); } catch {}
   };
   const [size, setSize] = useState<{ W: number; H: number } | undefined>();
@@ -99,6 +118,8 @@ function Stage({ scene }: { scene: Scene }) {
   const events = useSharedValue<StageEvent[]>([]);
   const aarti = useSharedValue<Aarti>({ on: 0, x: 0, y: 0 });
   const turn = useSharedValue({ last: 0, total: 0, circles: 0 });
+  // Aarti circles by itself until the reader takes the thali with a finger.
+  const auto = useSharedValue({ on: 0, t0: 0, cx: 0, cy: 0, r: 0 });
 
   // The stage clock must never go back: every event's age is measured against it. A frame
   // callback that is re-registered (an inline one is, on every render) restarts its
@@ -109,8 +130,21 @@ function Stage({ scene }: { scene: Scene }) {
     'worklet';
     if (start.value < 0) start.value = frame.timestamp;
     now.value = (frame.timestamp - start.value) / 1000;
+    const a = auto.value;
+    if (a.on) {
+      const th = (now.value - a.t0) * 2.4; // about one circle every 2.6 s
+      aarti.value = { on: 1, x: a.cx + a.r * Math.sin(th), y: a.cy - a.r * 0.85 * Math.cos(th) };
+      const full = Math.floor(th / (Math.PI * 2));
+      if (full > turn.value.circles) {
+        turn.value = { ...turn.value, circles: full, total: full * Math.PI * 2 };
+        runOnJS(onCircleJS)(full);
+      }
+    }
   }, []);
   useFrameCallback(tick);
+
+  const onCircleRef = useRef<(n: number) => void>(() => {});
+  function onCircleJS(n: number) { onCircleRef.current(n); }
 
   // Twenty hooks, always the same twenty: the sprite list is fixed.
   const imgs = [
@@ -177,6 +211,7 @@ function Stage({ scene }: { scene: Scene }) {
       events.value = [...events.value, { kind: K.BLESS, t0: now.value, sprite: 18, sx: 0, sy: 0, colour: '', seed: 1, grain: 0, left: 0 }];
       buzz('done');
       playSound('conch');
+      setTimeout(() => playSound('ambience'), 2500);
       logEvent('puja_done', { scene: scene.id });
       void recordPuja().then(setDone);
     }, 1500);
@@ -194,6 +229,12 @@ function Stage({ scene }: { scene: Scene }) {
       setCircles(0);
       setAartiOn(true);
       buzz('medium');
+      try { mantraPlayer.volume = 0.12; aartiPlayer.seekTo(0); aartiPlayer.volume = 0.9; aartiPlayer.play(); } catch {}
+      playSound('bell');
+      // Nobody took the thali? It circles by itself.
+      setTimeout(() => {
+        if (turn.value.circles === 0 && turn.value.total === 0) auto.value = { on: 1, t0: now.value, cx: geo.tx, cy: geo.ty, r: geo.U * 0.26 };
+      }, 1400);
       return;
     }
     const at = buttonCentre(col, row);
@@ -236,21 +277,26 @@ function Stage({ scene }: { scene: Scene }) {
   const onCircle = (n: number) => {
     setCircles(n);
     buzz('medium');
+    playSound('bell');
     setMantra((m) => (m + 1) % scene.mantras.length);
     if (n >= AARTI_CIRCLES) {
       setTimeout(() => {
+        auto.value = { ...auto.value, on: 0 };
         aarti.value = { on: 0, x: 0, y: 0 };
         setAartiOn(false);
+        try { aartiPlayer.pause(); mantraPlayer.volume = 0.35; } catch {}
         finishIfAll(used.includes('aarti') ? used : [...used, 'aarti']);
       }, 500);
     }
   };
 
+  onCircleRef.current = onCircle;
   const tx = geo?.tx ?? 0;
   const ty = geo?.ty ?? 0;
   const pan = Gesture.Pan()
     .enabled(aartiOn)
     .onBegin((e) => {
+      auto.value = { ...auto.value, on: 0 };
       turn.value = { ...turn.value, last: Math.atan2(e.y - ty, e.x - tx) };
       aarti.value = { on: 1, x: e.x, y: e.y };
     })
@@ -284,6 +330,9 @@ function Stage({ scene }: { scene: Scene }) {
           <View style={{ flex: 1 }}>
             <AppText style={styles.title}>{scene.title[lang]}</AppText>
           </View>
+          <Pressable accessibilityRole="button" accessibilityLabel={musicOn ? 'Mute music' : 'Play music'} onPress={toggleMusic} style={styles.round} hitSlop={8}>
+            <Ionicons name={musicOn ? 'musical-notes' : 'volume-mute'} size={19} color="#fff6e0" />
+          </Pressable>
           <View style={styles.pill}>
             <AppText style={styles.pillText}>{`${used.length}/${scene.offerings.length}`}</AppText>
           </View>
@@ -353,7 +402,7 @@ function Stage({ scene }: { scene: Scene }) {
   );
 }
 
-const HINT = { en: 'Circle the aarti around {d}', hi: '{d} के चारों ओर आरती घुमाएँ', bn: '{d}-কে ঘিরে আরতি ঘোরান' } as const;
+const HINT = { en: 'Circle the aarti around {d}, or watch', hi: '{d} के चारों ओर आरती घुमाएँ, या देखें', bn: '{d}-কে ঘিরে আরতি ঘোরান, বা দেখুন' } as const;
 const DONE = {
   en: { title: 'Puja complete', body: 'May {d} bless you and your family.', streak: '{n} days in a row', close: 'Done' },
   hi: { title: 'पूजा संपन्न', body: '{d} आपको और आपके परिवार को आशीर्वाद दें।', streak: 'लगातार {n} दिन', close: 'ठीक है' },

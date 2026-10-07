@@ -40,7 +40,7 @@ export async function askSadhakAI(history: AiMessage[], userName?: string, chart
   // The default rule forbids personal predictions; in chart mode that would make
   // the model refuse exactly what the user opened the chat for.
   const astroRule = chartContext
-    ? 'You may interpret the user\'s own birth chart (given below) as reflective guidance, but never state future events as certain.'
+    ? 'You know the user\'s own birth chart (given below). Use it whenever they ask about themselves, their life, timing or astrology, as reflective guidance; never state future events as certain. For general questions, just answer normally.'
     : 'Do not make astrological predictions about a person\'s future; you may explain jyotish concepts.';
   const astro = chartContext
     ? `\n\nThe user's authentic Vedic birth chart (sidereal, Lahiri — treat as exact fact):\n${chartContext}\nWhen they ask about themselves/their life/astrology, ground answers in THIS chart. Interpretations are guidance, not guaranteed prediction; be warm and never fatalistic.`

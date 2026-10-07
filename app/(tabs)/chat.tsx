@@ -8,7 +8,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Avatar from '../../components/community/Avatar';
-import { subscribeDms } from '../../services/social';
+import { subscribeDms, isDmRequest, type DmEntry } from '../../services/social';
 import { db, rtdb, collection, getDocs, addDoc, serverTimestamp, ref, onValue, off } from '../../config/firebase';
 import { Screen, Button, Diya, Icon, fromMaterial, AppBar, ActionSheet } from '../../components/ui';
 import { DS, useDsInsets } from '../../constants/ds';
@@ -56,14 +56,22 @@ export default function CommunityScreen() {
   const [groups, setGroups] = useState<Room[]>([]);
   const [channels, setChannels] = useState<Room[]>([]);
   const [dms, setDms] = useState<Room[]>([]);
+  const [requests, setRequests] = useState<Room[]>([]);
+  const [showRequests, setShowRequests] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) return;
-    return subscribeDms(user.uid, (list) => setDms(list.map((d) => ({
+    const toRoom = (d: DmEntry): Room => ({
       id: d.roomId, name: d.otherName, description: '', type: 'dm', icon: 'account', color: '#C2410C',
       pfp: d.otherPfp, lastMessage: d.lastMessage, lastMessageTime: d.lastMessageTime,
-    }))));
+    });
+    // People you follow land in Chats; anyone else waits in Requests.
+    return subscribeDms(user.uid, (list) => {
+      setDms(list.filter((d) => !d.blocked && !isDmRequest(d)).map(toRoom));
+      setRequests(list.filter(isDmRequest).map(toRoom));
+    });
   }, [user?.uid]);
+  useEffect(() => { if (!requests.length) setShowRequests(false); }, [requests.length]);
   // People who already chat land on their chats first.
   useEffect(() => { if (!touched && dms.length) setTabState('dms'); }, [dms.length]);
   const [q, setQ] = useState('');
@@ -123,10 +131,10 @@ export default function CommunityScreen() {
   const openRoom = (r: Room) => router.push({ pathname: '/chatroom', params: { roomId: r.id, roomName: r.name, roomType: r.type } });
 
   const list = useMemo(() => {
-    const items = tab === 'rooms' ? rooms : tab === 'groups' ? groups : tab === 'channels' ? channels : dms;
+    const items = tab === 'rooms' ? rooms : tab === 'groups' ? groups : tab === 'channels' ? channels : showRequests ? requests : dms;
     const query = q.trim().toLowerCase();
     return query ? items.filter(r => r.name.toLowerCase().includes(query) || (r.description || '').toLowerCase().includes(query)) : items;
-  }, [tab, rooms, groups, channels, dms, q]);
+  }, [tab, rooms, groups, channels, dms, requests, showRequests, q]);
   const counts: Record<ChatTab, number> = { dms: dms.length, rooms: rooms.length, groups: groups.length, channels: channels.length };
 
   const canCreate = tab === 'groups' || tab === 'channels';
@@ -209,7 +217,20 @@ export default function CommunityScreen() {
         keyExtractor={(r) => r.id}
         contentContainerStyle={{ paddingBottom: tabScrollBottom, paddingTop: 4 }}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={canCreate ? (
+        ListHeaderComponent={tab === 'dms' && (requests.length > 0 || showRequests) ? (
+          <TouchableOpacity onPress={() => setShowRequests((v) => !v)} style={s.row} activeOpacity={0.7}>
+            <View style={[s.avatarBox, { backgroundColor: colors.primary + '14', borderRadius: 24 }]}>
+              <Ionicons name={showRequests ? 'arrow-back' : 'mail-unread-outline'} size={22} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.rowName, { color: colors.text }]}>{showRequests ? tx('Back to chats') : tx('Message requests')}</Text>
+              {!showRequests && <Text style={[s.rowLast, { color: colors.textSecondary }]}>{requests.length} {tx(requests.length === 1 ? 'person wants to chat' : 'people want to chat')}</Text>}
+            </View>
+            {!showRequests && (
+              <View style={[s.count, { backgroundColor: colors.primary }]}><Text style={[s.countText, { color: '#FFF' }]}>{requests.length}</Text></View>
+            )}
+          </TouchableOpacity>
+        ) : canCreate ? (
           <TouchableOpacity onPress={() => { setCType(tab === 'channels' ? 'broadcast' : 'group'); setCreateOpen(true); }} style={s.row} activeOpacity={0.7}>
             <View style={[s.avatarBox, { backgroundColor: colors.primary + '14', borderRadius: 24 }]}>
               <Ionicons name="add" size={24} color={colors.primary} />

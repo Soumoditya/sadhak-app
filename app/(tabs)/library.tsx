@@ -23,6 +23,8 @@ import { myRating, rateBook, average, ratingScore } from '../../services/ratings
 import { increment } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BookCover from '../../components/library/BookCover';
+import { DOWNLOADS_DIR, listDownloads } from '../../services/downloads';
+import { shareFile } from '../../services/shareApp';
 
 const LAST_READ = 'sadhak_last_read';
 type LastRead = { id: string; title: string; author: string; url: string; category: string; at: number };
@@ -31,7 +33,7 @@ const CATEGORIES = [
   { id: 'all', name: 'All', icon: 'bookshelf', color: '#C2410C' },
   { id: 'vedas', name: 'Vedas & Upanishads', icon: 'book-open-page-variant', color: '#FF6B00' },
   { id: 'puranas', name: 'Puranas', icon: 'book-multiple', color: '#8B0000' },
-  { id: 'gita', name: 'Bhagavad Gita', icon: 'book-cross', color: '#1565C0' },
+  { id: 'gita', name: 'Bhagavad Gita', icon: 'om', color: '#1565C0' },
   { id: 'epics', name: 'Ramayana & Mahabharata', icon: 'sword-cross', color: '#2D6A4F' },
   { id: 'stotras', name: 'Stotras & Mantras', icon: 'music-note', color: '#9C27B0' },
   { id: 'dharma', name: 'Dharmashastra', icon: 'scale-balance', color: '#D32F2F' },
@@ -83,6 +85,8 @@ export default function LibraryScreen() {
   const [myStars, setMyStars] = useState(0);
   const [savingRate, setSavingRate] = useState(false);
   const [lastRead, setLastRead] = useState<LastRead | null>(null);
+  const [offline, setOffline] = useState<{ name: string; uri: string }[]>([]);
+  useEffect(() => { listDownloads().then(setOffline); }, []);
   useEffect(() => {
     AsyncStorage.getItem(LAST_READ).then((v) => { if (v) setLastRead(JSON.parse(v)); }).catch(() => {});
   }, []);
@@ -267,15 +271,17 @@ export default function LibraryScreen() {
     try {
       setDownloadingId(book.id);
       const fileName = `${book.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-      const fileUri = FileSystem.documentDirectory + fileName;
+      await FileSystem.makeDirectoryAsync(DOWNLOADS_DIR, { intermediates: true }).catch(() => {});
+      const fileUri = DOWNLOADS_DIR + fileName;
       const download = await FileSystem.downloadAsync(book.cloudinaryUrl, fileUri);
       if (download.status !== 200) throw new Error(`Server replied HTTP ${download.status}.`);
       try { await updateDoc(doc(db, 'library', book.id), { downloadCount: increment(1) }); } catch (e) {}
-      dialog.alert('Downloaded', `"${book.title}" is saved offline. What next?`, [
-        { text: 'Read now', onPress: () => openPDF(download.uri, book.title) },
-        { text: 'Share / save', onPress: async () => { try { await Sharing.shareAsync(download.uri); } catch {} } },
-        { text: 'Done', style: 'cancel' },
-      ]);
+      setOffline(await listDownloads());
+      dialog.alert(tx('Saved offline'), `"${book.title}"`, [
+        { text: tx('Read now'), onPress: () => openPDF(download.uri, book.title) },
+        { text: tx('Share'), onPress: () => shareFile(download.uri, 'application/pdf', `"${book.title}" from the Sadhak library`) },
+        { text: tx('Done'), style: 'cancel' },
+      ], { tone: 'success' });
     } catch (error: any) {
       // Real reason instead of a generic guess — debuggable from a screenshot.
       dialog.alert('Download failed', String(error?.message || error).slice(0, 200));
@@ -417,6 +423,20 @@ export default function LibraryScreen() {
                         <Ionicons name="book-outline" size={18} color="#FFF" />
                       </View>
                     </TouchableOpacity>
+                  )}
+
+                  {offline.length > 0 && (
+                    <>
+                      <Text style={[st.section, { color: colors.text }, display]}>{tx('Downloaded')}</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 20 }} style={{ marginHorizontal: -20, paddingLeft: 20 }}>
+                        {offline.map((f) => (
+                          <TouchableOpacity key={f.uri} onPress={() => openPDF(f.uri, f.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' '))} style={[st.offline, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} activeOpacity={0.8}>
+                            <MaterialCommunityIcons name="file-pdf-box" size={22} color={colors.primary} />
+                            <Text style={{ color: colors.text, fontSize: 12.5, fontWeight: '700', maxWidth: 140 }} numberOfLines={2}>{f.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ')}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </>
                   )}
 
                   <Text style={[st.section, { color: colors.text }, display]}>{tx('Browse by category')}</Text>
@@ -665,6 +685,7 @@ const st = StyleSheet.create({
   kicker: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1 },
   playBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   section: { fontSize: 18, fontWeight: '800', marginTop: 20, marginBottom: 10 },
+  offline: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, borderWidth: 1 },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   catTile: { width: '22%', flexGrow: 1, borderRadius: 14, padding: 10, minHeight: 96, gap: 6 },
   catTileName: { fontSize: 11.5, fontWeight: '700', lineHeight: 15 },

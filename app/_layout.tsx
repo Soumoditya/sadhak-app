@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { View, Animated, StyleSheet, Image, Dimensions, Text, Easing, Modal } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
@@ -259,6 +260,7 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError && !fontTimeout) return null;
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
       <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
       <ThemeProvider>
@@ -274,5 +276,6 @@ export default function RootLayout() {
       </ThemeProvider>
       </KeyboardProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

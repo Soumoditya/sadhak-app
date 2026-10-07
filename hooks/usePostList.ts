@@ -21,8 +21,8 @@ export function usePostList(initial: Post[] = []) {
 
   const onDeleted = useCallback((id: string) => setPosts((prev) => prev.filter((p) => p.id !== id)), []);
 
-  const onCommentAdded = useCallback((id: string) => {
-    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, commentCount: p.commentCount + 1 } : p)));
+  const onCommentAdded = useCallback((id: string, delta = 1) => {
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, commentCount: Math.max(0, p.commentCount + delta) } : p)));
     setVersion((v) => v + 1);
   }, []);
 

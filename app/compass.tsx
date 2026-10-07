@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, ScrollView,
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Magnetometer, DeviceMotion, Accelerometer } from 'expo-sensors';
-import { logEvent } from '../services/diagnostics';
+import { logEvent, flush } from '../services/diagnostics';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Line, Path, Text as SvgText, G } from 'react-native-svg';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -102,62 +102,87 @@ export default function CompassScreen() {
     if (src === cur) feed(v);
   };
 
+  // What each source did, for the on-screen status and the diagnostics report.
+  const dbg = useRef<Record<string, string>>({}).current;
+  const [dbgText, setDbgText] = useState('');
+
   useEffect(() => {
     const subs: { remove: () => void }[] = [];
     let cancelled = false;
+    const note = (k: string, v: string) => { dbg[k] = v; };
+    const err = (e: any) => String(e?.message || e).slice(0, 80);
+
+    // All three start at once; none waits for another (or for a permission dialog).
+    // 1) Rotation-vector sensor (no location needed).
     (async () => {
-      // 1) Android's fused heading (tilt-compensated, true north with location).
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted' && !cancelled) {
-          const sub = await Location.watchHeadingAsync((h) => {
-            const useTrue = h.trueHeading != null && h.trueHeading >= 0;
-            const v = useTrue ? h.trueHeading : h.magHeading;
-            if (v == null || v < 0) return;
-            if (active.current === 'fused' || !active.current) {
-              setTrueNorth(useTrue);
-              setAccuracy(typeof h.accuracy === 'number' ? h.accuracy : null);
-            }
-            onReading('fused', v);
-          });
-          if (cancelled) sub.remove(); else subs.push(sub);
-        }
-      } catch {}
-      // 2) Rotation-vector sensor (no location needed).
+        const ok = await DeviceMotion.isAvailableAsync();
+        note('motion', ok ? 'available' : 'not available');
+        if (!ok || cancelled) return;
+        DeviceMotion.setUpdateInterval(60);
+        subs.push(DeviceMotion.addListener((m) => {
+          const a = m.rotation?.alpha;
+          if (typeof a !== 'number') { note('motion', 'no alpha'); return; }
+          onReading('motion', norm((-a * 180) / Math.PI));
+        }));
+      } catch (e) { note('motion', `error ${err(e)}`); }
+    })();
+    // 2) Magnetometer, tilt-compensated with the accelerometer on Android
+    //    (same maths as SensorManager.getRotationMatrix + getOrientation).
+    (async () => {
       try {
-        if (!cancelled && (await DeviceMotion.isAvailableAsync())) {
-          DeviceMotion.setUpdateInterval(60);
-          subs.push(DeviceMotion.addListener((m) => {
-            const a = m.rotation?.alpha;
-            if (typeof a !== 'number') return;
-            onReading('motion', norm((-a * 180) / Math.PI));
-          }));
-        }
-      } catch {}
-      // 3) Magnetometer, tilt-compensated with the accelerometer on Android
-      //    (same maths as SensorManager.getRotationMatrix + getOrientation).
-      try {
-        if (!cancelled && (await Magnetometer.isAvailableAsync())) {
-          const g = { x: 0, y: 0, z: 1 };
+        const ok = await Magnetometer.isAvailableAsync();
+        note('magnetometer', ok ? 'available' : 'not available');
+        if (!ok || cancelled) return;
+        const g = { x: 0, y: 0, z: 1 };
+        try {
           if (Platform.OS === 'android' && (await Accelerometer.isAvailableAsync())) {
             Accelerometer.setUpdateInterval(60);
             subs.push(Accelerometer.addListener((a) => { g.x = g.x * 0.8 + a.x * 0.2; g.y = g.y * 0.8 + a.y * 0.2; g.z = g.z * 0.8 + a.z * 0.2; }));
           }
-          Magnetometer.setUpdateInterval(60);
-          subs.push(Magnetometer.addListener(({ x: ex, y: ey, z: ez }) => {
-            const hx = ey * g.z - ez * g.y, hy = ez * g.x - ex * g.z, hz = ex * g.y - ey * g.x;
-            const hn = Math.hypot(hx, hy, hz), an = Math.hypot(g.x, g.y, g.z);
-            if (hn < 0.1 || an < 0.1) return;
-            const Hx = hx / hn, Hy = hy / hn, Hz = hz / hn;
-            const Ax = g.x / an, Ay = g.y / an, Az = g.z / an;
-            const My = Az * Hx - Ax * Hz;
-            onReading('magnetometer', norm((Math.atan2(Hy, My) * 180) / Math.PI));
-          }));
-        }
-      } catch {}
-      // Nothing reported after 3 s: no usable sensor.
-      setTimeout(() => { if (!cancelled && !active.current) { setSource('none'); logEvent('compass_none'); } }, 3000);
+        } catch (e) { note('accelerometer', `error ${err(e)}`); }
+        Magnetometer.setUpdateInterval(60);
+        subs.push(Magnetometer.addListener(({ x: ex, y: ey, z: ez }) => {
+          const hx = ey * g.z - ez * g.y, hy = ez * g.x - ex * g.z, hz = ex * g.y - ey * g.x;
+          const hn = Math.hypot(hx, hy, hz), an = Math.hypot(g.x, g.y, g.z);
+          if (hn < 0.1 || an < 0.1) { note('magnetometer', `weak field ${Math.round(Math.hypot(ex, ey, ez))}`); return; }
+          const Hx = hx / hn, Hy = hy / hn, Hz = hz / hn;
+          const Ax = g.x / an, Ay = g.y / an, Az = g.z / an;
+          const My = Az * Hx - Ax * Hz;
+          onReading('magnetometer', norm((Math.atan2(Hy, My) * 180) / Math.PI));
+        }));
+      } catch (e) { note('magnetometer', `error ${err(e)}`); }
     })();
+    // 3) Android's fused heading (tilt-compensated, true north with location).
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        note('fused', `permission ${status}`);
+        if (status !== 'granted' || cancelled) return;
+        const sub = await Location.watchHeadingAsync((h) => {
+          const useTrue = h.trueHeading != null && h.trueHeading >= 0;
+          const v = useTrue ? h.trueHeading : h.magHeading;
+          if (v == null || v < 0) { note('fused', `invalid ${v}`); return; }
+          if (active.current === 'fused' || !active.current) {
+            setTrueNorth(useTrue);
+            setAccuracy(typeof h.accuracy === 'number' ? h.accuracy : null);
+          }
+          onReading('fused', v);
+        });
+        if (cancelled) sub.remove(); else subs.push(sub);
+      } catch (e) { note('fused', `error ${err(e)}`); }
+    })();
+
+    const summary = () => ORDER.map((k) => `${k}: ${dbg[k] || 'pending'}, ${stats[k].n} readings`).join(' | ') + (dbg.accelerometer ? ` | accel: ${dbg.accelerometer}` : '');
+    // Report what happened after 4 s, and give up on the dial only if nothing moved.
+    const check = setTimeout(() => {
+      if (cancelled) return;
+      const s = summary();
+      setDbgText(s);
+      logEvent(active.current ? 'compass_ok' : 'compass_none', { s, active: active.current || 'none' });
+      flush().catch(() => {});
+      if (!active.current) setSource('none');
+    }, 4000);
     // Readings per second of the active source, for the status line.
     let prevN = 0;
     const tick = setInterval(() => {
@@ -165,7 +190,7 @@ export default function CompassScreen() {
       if (!k) return;
       setRate(stats[k].n - prevN); prevN = stats[k].n;
     }, 1000);
-    return () => { cancelled = true; clearInterval(tick); subs.forEach((x) => x.remove()); };
+    return () => { cancelled = true; clearTimeout(check); clearInterval(tick); subs.forEach((x) => x.remove()); };
   }, []);
 
   const cycleSource = () => {
@@ -216,6 +241,7 @@ export default function CompassScreen() {
             <Text style={[st.emptySub, { color: colors.textSecondary }]}>{tx(
               'This phone doesn\'t report a heading. Allow location access, or try on a phone with a compass sensor.'
             )}</Text>
+            {!!dbgText && <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 14, textAlign: 'center' }}>{dbgText}</Text>}
           </View>
         ) : (
           <>

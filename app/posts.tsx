@@ -8,7 +8,7 @@ import ImageViewer from '../components/community/ImageViewer';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDsInsets } from '../constants/ds';
-import { getUserPosts, rankPosts, withPinnedFirst, type FeedSort } from '../services/posts';
+import { getUserPosts, rankPosts, withPinnedFirst, takeHandoff, type FeedSort, type Post } from '../services/posts';
 import { usePostList } from '../hooks/usePostList';
 
 /** A person's posts as a vertical feed, opened at the tapped post. */
@@ -17,13 +17,27 @@ export default function PostsScreen() {
   const { colors } = useTheme();
   const { tx } = useLanguage();
   const { insets } = useDsInsets();
-  const list = usePostList();
-  const [loading, setLoading] = useState(true);
+  // Like Instagram: the grid hands over its posts, so the list opens at once
+  // with the tapped post on top. Earlier posts are added above it a moment
+  // later without moving the view, so you can scroll up to them too.
+  const [handed] = useState<Post[] | undefined>(() => (uid ? takeHandoff(uid) : undefined));
+  const startIdx = Math.max(0, handed && start ? handed.findIndex((x) => x.id === start) : 0);
+  const list = usePostList(handed ? handed.slice(startIdx) : []);
+  const [loading, setLoading] = useState(!handed);
   const [viewImage, setViewImage] = useState<string | null>(null);
   const ref = useRef<FlatList>(null);
 
   useEffect(() => {
     if (!uid) return;
+    if (handed) {
+      const t = setTimeout(() => list.setPosts((cur) => [...handed.slice(0, startIdx), ...cur]), 350);
+      // Refresh counts quietly, keeping the order the person is looking at.
+      getUserPosts(uid).then((fresh) => {
+        const byId = new Map(fresh.map((p) => [p.id, p]));
+        list.setPosts((cur) => cur.filter((p) => byId.has(p.id)).map((p) => byId.get(p.id)!));
+      }).catch(() => {});
+      return () => clearTimeout(t);
+    }
     getUserPosts(uid).then((raw) => {
       const p = withPinnedFirst(rankPosts(raw, (sort as FeedSort) || 'new', 'all'));
       list.setPosts(p);
@@ -40,7 +54,9 @@ export default function PostsScreen() {
           ref={ref}
           data={list.posts}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={{ padding: 14, gap: 14, paddingBottom: 24 + insets.bottom }}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: 24 + insets.bottom }}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          showsVerticalScrollIndicator={false}
           onScrollToIndexFailed={(e) => {
             ref.current?.scrollToOffset({ offset: e.averageItemLength * e.index, animated: false });
             setTimeout(() => ref.current?.scrollToIndex({ index: e.index, animated: false }), 120);
@@ -52,7 +68,8 @@ export default function PostsScreen() {
               onLike={list.like}
               onOpenComments={list.setCommentsFor}
               onDeleted={list.onDeleted}
-      onChanged={list.onChanged}
+              onChanged={list.onChanged}
+              flat
               onImage={setViewImage}
               commentsVersion={list.version}
             />

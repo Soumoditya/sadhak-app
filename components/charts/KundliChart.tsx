@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, { Rect, Line, Polygon, Text as SvgText, TSpan, G, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Rect, Line, Polygon, Text as SvgText, TSpan, G, Defs, LinearGradient, Stop, ClipPath } from 'react-native-svg';
 
 // Kundli chart in the three regional styles:
 //  • north: houses fixed (diamond), signs rotate with the lagna
@@ -31,7 +31,8 @@ interface Props {
 
 export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style = 'north', size = 300, lang = 'en', colors }: Props) {
   const abbr = ABBR[lang === 'mr' ? 'hi' : lang === 'as' ? 'bn' : lang] || ABBR.en;
-  const line = { stroke: colors.primary, strokeOpacity: 0.45, strokeWidth: 1.2 };
+  const line = { stroke: colors.primary, strokeWidth: 1.2 };
+  const RX = 10;
   const bySign: Record<number, ChartGraha[]> = {};
   for (let i = 0; i < 12; i++) bySign[i] = [];
   grahas.forEach((g) => bySign[g.signIndex]?.push(g));
@@ -102,15 +103,23 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
           <Stop offset="0" stopColor={colors.surface} />
           <Stop offset="1" stopColor={colors.surfaceSecondary} />
         </LinearGradient>
+        <ClipPath id="kclip"><Rect x={0} y={0} width={S} height={S} rx={RX} /></ClipPath>
       </Defs>
-      <Rect x={1} y={1} width={S - 2} height={S - 2} rx={10} fill="url(#kbg)" stroke={colors.primary} strokeOpacity={0.7} strokeWidth={1.6} />
+      <Rect x={0} y={0} width={S} height={S} rx={RX} fill="url(#kbg)" />
     </>
   );
+  // All division lines go in one layer: the opacity is applied to the layer,
+  // so crossings and shared edges are never darker than a single line, and
+  // the clip makes lines meet the rounded frame exactly.
+  const grid = (children: React.ReactNode) => (
+    <G clipPath="url(#kclip)" opacity={0.5}>{children}</G>
+  );
+  const frame = <Rect x={0.9} y={0.9} width={S - 1.8} height={S - 1.8} rx={RX - 0.9} fill="none" stroke={colors.primary} strokeOpacity={0.75} strokeWidth={1.8} />;
 
   // Sign number, always in brackets and in the same corner of its cell.
   const num = (sign: number, x: number, y: number, anchor: 'start' | 'middle' | 'end' = 'middle', lagna = false, withAs = false) => (
     <SvgText x={x} y={y} fontSize={9.5} fontWeight={lagna ? '800' : '700'} fill={lagna ? colors.primary : colors.textTertiary} textAnchor={anchor}>
-      {`(${sign + 1})${withAs ? ` ${abbr.Lagna}` : ''}`}
+      {`${sign + 1}${withAs ? ` ${abbr.Lagna}` : ''}`}
     </SvgText>
   );
 
@@ -132,12 +141,12 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
       <Svg width={size} height={size} viewBox={`0 0 ${S} ${S}`}>
         {bg}
         <Polygon points={`${MID},0 ${S * 0.75},${S * 0.25} ${MID},${MID} ${S * 0.25},${S * 0.25}`} fill={colors.primary} fillOpacity={0.09} />
-        <Line x1={0} y1={0} x2={S} y2={S} {...line} />
-        <Line x1={S} y1={0} x2={0} y2={S} {...line} />
-        <Line x1={MID} y1={0} x2={S} y2={MID} {...line} />
-        <Line x1={S} y1={MID} x2={MID} y2={S} {...line} />
-        <Line x1={MID} y1={S} x2={0} y2={MID} {...line} />
-        <Line x1={0} y1={MID} x2={MID} y2={0} {...line} />
+        {grid(<>
+          <Line x1={0} y1={0} x2={S} y2={S} {...line} />
+          <Line x1={S} y1={0} x2={0} y2={S} {...line} />
+          <Polygon points={`${MID},0 ${S},${MID} ${MID},${S} 0,${MID}`} fill="none" {...line} strokeLinejoin="miter" />
+        </>)}
+        {frame}
         {Array.from({ length: 12 }, (_, i) => i + 1).map((house) => {
           const [fx, fy] = POS[house];
           const [ax, ay] = APEX[house];
@@ -170,12 +179,21 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
     return (
       <Svg width={size} height={size} viewBox={`0 0 ${S} ${S}`}>
         {bg}
+        {SLOT.map(([col, row], sign) => sign === lagnaSignIndex
+          ? <Rect key={`f${sign}`} x={col * c} y={row * c} width={c} height={c} fill={colors.primary} fillOpacity={0.09} clipPath="url(#kclip)" />
+          : null)}
+        {grid(<>
+          {[c, 2 * c, 3 * c].map((v) => <Line key={`v${v}`} x1={v} y1={0} x2={v} y2={v === 2 * c ? c : S} {...line} />)}
+          <Line x1={2 * c} y1={3 * c} x2={2 * c} y2={S} {...line} />
+          {[c, 2 * c, 3 * c].map((v) => <Line key={`h${v}`} x1={0} y1={v} x2={v === 2 * c ? c : S} y2={v} {...line} />)}
+          <Line x1={3 * c} y1={2 * c} x2={S} y2={2 * c} {...line} />
+        </>)}
+        {frame}
         {SLOT.map(([col, row], sign) => {
           const x = col * c, y = row * c;
           const isLagna = sign === lagnaSignIndex;
           return (
             <G key={sign}>
-              <Rect x={x} y={y} width={c} height={c} fill={isLagna ? colors.primary : 'transparent'} fillOpacity={isLagna ? 0.09 : 0} stroke={colors.primary} strokeOpacity={0.45} strokeWidth={1.1} />
               {isLagna && <Line x1={x} y1={y + 16} x2={x + 16} y2={y} stroke={colors.primary} strokeWidth={1.6} />}
               {num(sign, x + c - 5, y + 12, 'end', isLagna)}
               {cell(bySign[sign], x + c / 2, y + c / 2 + 5, c - 8, `s${sign}`)}
@@ -207,6 +225,20 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${S} ${S}`}>
       {bg}
+      {cells.map(({ sign, pts }) => sign === lagnaSignIndex
+        ? <Polygon key={`f${sign}`} points={pts.map((p) => p.join(',')).join(' ')} fill={colors.primary} fillOpacity={0.1} clipPath="url(#kclip)" />
+        : null)}
+      {grid(<>
+        <Line x1={t} y1={0} x2={t} y2={S} {...line} />
+        <Line x1={2 * t} y1={0} x2={2 * t} y2={S} {...line} />
+        <Line x1={0} y1={t} x2={S} y2={t} {...line} />
+        <Line x1={0} y1={2 * t} x2={S} y2={2 * t} {...line} />
+        <Line x1={0} y1={0} x2={t} y2={t} {...line} />
+        <Line x1={S} y1={0} x2={2 * t} y2={t} {...line} />
+        <Line x1={0} y1={S} x2={t} y2={2 * t} {...line} />
+        <Line x1={S} y1={S} x2={2 * t} y2={2 * t} {...line} />
+      </>)}
+      {frame}
       {cells.map(({ sign, pts }) => {
         const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
         const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
@@ -230,7 +262,6 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
         }
         return (
           <G key={sign}>
-            <Polygon points={pts.map((p) => p.join(',')).join(' ')} fill={isLagna ? colors.primary : 'transparent'} fillOpacity={isLagna ? 0.1 : 0} stroke={colors.primary} strokeOpacity={0.45} strokeWidth={1.1} />
             {label}
             {isLagna && !tri && <SvgText x={Math.min(...pts.map((p) => p[0])) + 6} y={Math.min(...pts.map((p) => p[1])) + 12} fontSize={9} fontWeight="800" fill={colors.primary}>{abbr.Lagna}</SvgText>}
             {cell(bySign[sign], px, py, tri ? 52 : 84, `e${sign}`, 0, tri)}

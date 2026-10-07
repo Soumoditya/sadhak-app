@@ -75,6 +75,26 @@ function nativeShare(): any {
   }
 }
 
+/** One line that goes under everything shared from the app. */
+export const PROMO = `🙏 Shared from Sadhak, the Hindu spiritual companion app. Free: ${WEBSITE_URL}`;
+export const withPromo = (text: string) => (text.includes(WEBSITE_URL) ? text : `${text.trim()}\n\n${PROMO}`);
+
+/** Share text with the Sadhak line under it. */
+export async function shareText(text: string, title = 'Share') {
+  try { await Share.share({ message: withPromo(text), title }); } catch {}
+}
+
+/** Share a local file (image, PDF) with the Sadhak caption in the same share. */
+export async function shareFile(uri: string, mime: string, caption = '', title = 'Share') {
+  const message = withPromo(caption || '');
+  const RNShare = nativeShare();
+  if (RNShare) {
+    try { await RNShare.open({ url: uri, type: mime, message, title, failOnCancel: false }); return; } catch {}
+  }
+  await Clipboard.setStringAsync(message).catch(() => {});
+  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: mime, dialogTitle: title });
+}
+
 export function shareSadhak() {
   return shareImageAsset(require('../assets/images/share-card.jpg'), 'Sadhak.jpg', SHARE_MESSAGE, 'Share Sadhak');
 }

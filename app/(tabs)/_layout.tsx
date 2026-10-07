@@ -74,6 +74,8 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      // Back returns to the tab you came from (Tools → Calendar → back = Tools).
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         // Docked, opaque bar that also fills the Android navigation area.

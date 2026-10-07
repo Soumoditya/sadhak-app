@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Animated, Easing, Share } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, ScrollView, Animated, Easing, Modal, Pressable } from 'react-native';
 import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -11,11 +11,15 @@ import { Header } from '../components/ui';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
+import { shareText } from '../services/shareApp';
 import { askSadhakAI, STARTER_QUESTIONS, type AiMessage } from '../services/ai';
 import { loadNatal, chartSummary } from '../services/jyotish';
 import { logEvent } from '../services/diagnostics';
 
-const AI_HISTORY_KEY = 'sadhak_ai_history';
+const AI_HISTORY_KEY = 'sadhak_ai_history'; // pre-1.17 single chat
+const AI_CHATS_KEY = 'sadhak_ai_chats';
+type Chat = { id: string; title: string; at: number; messages: ChatItem[] };
+const titleOf = (msgs: { role: string; text: string }[]) => (msgs.find((m) => m.role === 'user')?.text || 'Chat').replace(/\s+/g, ' ').slice(0, 60);
 
 interface ChatItem extends AiMessage {
   id: string;
@@ -49,7 +53,7 @@ function TypingDots({ color }: { color: string }) {
 export default function AskScreen() {
   const { profile, user } = useAuth();
   const { colors, tones } = useTheme();
-  const { t: tr, tx } = useLanguage();
+  const { t: tr, tx, locale } = useLanguage();
   const dialog = useDialog();
   const insets = useSafeAreaInsets();
   const kbOpen = useKeyboardState((s) => s.isVisible);
@@ -62,17 +66,51 @@ export default function AskScreen() {
   const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Sadhak AI always knows the user's own kundli, if they have one.
   useEffect(() => {
-    if (!astroMode || !user?.uid) return;
+    if (!user?.uid) return;
     loadNatal(user.uid).then((n) => { if (n?.kundli) setAstroCtx(chartSummary(n.kundli)); }).catch(() => {});
-  }, [astroMode, user?.uid]);
+  }, [user?.uid]);
 
+  // Past conversations, kept on the phone. The old single-chat history becomes the first one.
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [chatId, setChatId] = useState<string>(() => `c${Date.now()}`);
+  const [historyOpen, setHistoryOpen] = useState(false);
   useEffect(() => {
-    AsyncStorage.getItem(AI_HISTORY_KEY).then((raw) => { if (raw) setMessages(JSON.parse(raw)); }).catch(() => {});
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(AI_CHATS_KEY);
+        let list: Chat[] = raw ? JSON.parse(raw) : [];
+        const old = await AsyncStorage.getItem(AI_HISTORY_KEY);
+        if (old) {
+          const msgs: ChatItem[] = JSON.parse(old);
+          if (msgs.length) list = [{ id: `c${Date.now() - 1}`, title: titleOf(msgs), at: Date.now(), messages: msgs }, ...list];
+          await AsyncStorage.removeItem(AI_HISTORY_KEY);
+          await AsyncStorage.setItem(AI_CHATS_KEY, JSON.stringify(list));
+        }
+        setChats(list);
+        // Reopen the latest conversation if it is from the last 6 hours.
+        if (list[0] && Date.now() - list[0].at < 6 * 3600_000) { setChatId(list[0].id); setMessages(list[0].messages); }
+      } catch {}
+    })();
   }, []);
   useEffect(() => {
-    if (messages.length) AsyncStorage.setItem(AI_HISTORY_KEY, JSON.stringify(messages.slice(-50))).catch(() => {});
+    const clean = messages.filter((m) => !m.error);
+    if (!clean.length) return;
+    setChats((prev) => {
+      const rest = prev.filter((c) => c.id !== chatId);
+      const next = [{ id: chatId, title: titleOf(clean), at: Date.now(), messages: clean.slice(-60) }, ...rest].slice(0, 40);
+      AsyncStorage.setItem(AI_CHATS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   }, [messages]);
+  const openChat = (c: Chat) => { setChatId(c.id); setMessages(c.messages); setReveal(null); setHistoryOpen(false); };
+  const deleteChat = (id: string) => setChats((prev) => {
+    const next = prev.filter((c) => c.id !== id);
+    AsyncStorage.setItem(AI_CHATS_KEY, JSON.stringify(next)).catch(() => {});
+    if (id === chatId) { setMessages([]); setChatId(`c${Date.now()}`); }
+    return next;
+  });
 
   useEffect(() => {
     if (!reveal) return;
@@ -82,12 +120,8 @@ export default function AskScreen() {
     return () => clearTimeout(id);
   }, [reveal, messages]);
 
-  const newChat = async () => {
-    const ok = await dialog.confirm({ title: tx('Start a new chat?'), message: tx('This clears the current conversation.'), confirmText: tx('New chat'), destructive: true });
-    if (!ok) return;
-    setMessages([]); setReveal(null);
-    AsyncStorage.removeItem(AI_HISTORY_KEY).catch(() => {});
-  };
+  // A new chat keeps the old one in History.
+  const newChat = () => { setMessages([]); setReveal(null); setChatId(`c${Date.now()}`); setHistoryOpen(false); };
 
   const send = async (textArg?: string, replaceId?: string) => {
     const text = (textArg ?? input).trim();
@@ -100,7 +134,7 @@ export default function AskScreen() {
     setThinking(true);
     const t0 = Date.now();
     try {
-      const reply = await askSadhakAI(nextHistory.map(({ role, text: t }) => ({ role, text: t })), profile?.displayName?.split(' ')[0], astroMode ? astroCtx : undefined);
+      const reply = await askSadhakAI(nextHistory.map(({ role, text: t }) => ({ role, text: t })), profile?.displayName?.split(' ')[0], astroCtx);
       const id = `m${Date.now()}`;
       setMessages((prev) => [...prev, { id, role: 'model', text: reply }]);
       setReveal({ id, n: 0 });
@@ -163,7 +197,7 @@ export default function AskScreen() {
               <TouchableOpacity onPress={() => copy(m)} hitSlop={8} style={st.actionBtn} accessibilityLabel={tx('Copy')}>
                 <Ionicons name={copied === m.id ? 'checkmark' : 'copy-outline'} size={16} color={colors.textTertiary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => Share.share({ message: `${m.text}\n\n— Sadhak AI` }).catch(() => {})} hitSlop={8} style={st.actionBtn} accessibilityLabel={tx('Share')}>
+              <TouchableOpacity onPress={() => shareText(`${m.text}\n\n(Sadhak AI)`)} hitSlop={8} style={st.actionBtn} accessibilityLabel={tx('Share')}>
                 <Ionicons name="share-social-outline" size={16} color={colors.textTertiary} />
               </TouchableOpacity>
             </View>
@@ -174,7 +208,7 @@ export default function AskScreen() {
   };
 
   const empty = (
-    <View style={[st.emptyWrap, { transform: [{ scaleY: -1 }] }]}>
+    <View style={st.emptyWrap}>
       <View style={[st.emptyIcon, { backgroundColor: tones.plum.bg }]}>
         <MaterialCommunityIcons name="creation" size={30} color={tones.plum.fg} />
       </View>
@@ -197,12 +231,18 @@ export default function AskScreen() {
         title={tr('f.ai')}
         subtitle={tx(astroMode ? 'Reading your birth chart' : 'Your spiritual companion · scripture-grounded')}
         quick={false}
-        right={messages.length > 0 ? (
-          <TouchableOpacity onPress={newChat} style={[st.newBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={8} accessibilityLabel={tx('New chat')}>
-            <Ionicons name="create-outline" size={18} color={colors.text} />
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>{tx('New chat')}</Text>
-          </TouchableOpacity>
-        ) : undefined}
+        right={
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity onPress={() => setHistoryOpen(true)} style={[st.roundBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6} accessibilityLabel={tx('History')}>
+              <Ionicons name="time-outline" size={19} color={colors.text} />
+            </TouchableOpacity>
+            {messages.length > 0 && (
+              <TouchableOpacity onPress={newChat} style={[st.roundBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6} accessibilityLabel={tx('New chat')}>
+                <Ionicons name="create-outline" size={19} color={colors.text} />
+              </TouchableOpacity>
+            )}
+          </View>
+        }
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <FlatList
@@ -210,12 +250,44 @@ export default function AskScreen() {
           data={data}
           keyExtractor={(m) => m.id}
           renderItem={renderItem}
-          ListEmptyComponent={empty}
           contentContainerStyle={{ padding: 14, gap: 14, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         />
+        {data.length === 0 && (
+          <ScrollView style={StyleSheet.absoluteFill} contentContainerStyle={{ padding: 14, paddingBottom: 90, flexGrow: 1, justifyContent: 'center' }} keyboardShouldPersistTaps="handled">
+            {empty}
+          </ScrollView>
+        )}
+        <Modal visible={historyOpen} transparent animationType="fade" onRequestClose={() => setHistoryOpen(false)} statusBarTranslucent navigationBarTranslucent>
+          <Pressable style={st.sheetOverlay} onPress={() => setHistoryOpen(false)}>
+            <Pressable style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 16 + insets.bottom }]} onPress={() => {}}>
+              <View style={st.sheetHead}>
+                <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800', flex: 1 }}>{tx('History')}</Text>
+                <TouchableOpacity onPress={newChat} style={[st.newChipBtn, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="add" size={16} color="#FFF" />
+                  <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }}>{tx('New chat')}</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ maxHeight: 420 }}>
+                {chats.length === 0 && <Text style={{ color: colors.textTertiary, textAlign: 'center', paddingVertical: 24 }}>{tx('No past chats yet.')}</Text>}
+                {chats.map((c) => (
+                  <TouchableOpacity key={c.id} onPress={() => openChat(c)} style={[st.histRow, { borderBottomColor: colors.divider }, c.id === chatId && { backgroundColor: colors.primary + '10' }]}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.textSecondary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.text, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>{c.title}</Text>
+                      <Text style={{ color: colors.textTertiary, fontSize: 12 }}>{new Date(c.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })} · {c.messages.length} {tx('messages')}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => deleteChat(c.id)} hitSlop={10} accessibilityLabel={tx('Delete')}>
+                      <Ionicons name="trash-outline" size={18} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
         <View style={[st.composer, { backgroundColor: colors.background, paddingBottom: 10 + (kbOpen ? 0 : insets.bottom) }]}>
           <View style={[st.inputWrap, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <TextInput
@@ -246,6 +318,12 @@ export default function AskScreen() {
 const st = StyleSheet.create({
   container: { flex: 1 },
   newBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1 },
+  roundBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 16, paddingHorizontal: 16 },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  newChipBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, height: 32, borderRadius: 16 },
+  histRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 6, borderBottomWidth: 1, borderRadius: 8 },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 20 },
   emptyIcon: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   emptyTitle: { fontSize: 22, fontWeight: '800' },

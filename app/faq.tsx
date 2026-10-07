@@ -78,7 +78,7 @@ const FAQ_SECTIONS: { title: string; icon: string; color: string; items: FAQItem
     icon: 'bell-outline',
     color: '#D32F2F',
     items: [
-      { q: 'Why do I get hourly notifications?', a: 'Sadhak sends unique spiritual wisdom, mantras, Hindu facts, and Vedic knowledge every hour to keep you connected with your spiritual journey. Each notification is unique — never repeated!', icon: 'bell-ring-outline' },
+      { q: 'What notifications does Sadhak send?', a: 'Three gentle reminders a day (morning, midday and evening) plus timely alerts for festivals, Ekadashi, grahan with sutak, and grooming days. Nothing is sent during quiet hours (10 PM to 6 AM), and every kind can be turned off in Settings.', icon: 'bell-ring-outline' },
       { q: 'Can I disable notifications?', a: 'Yes! Go to Profile > Settings and toggle off "Spiritual Reminders". You can also control festival reminders, grooming reminders, and Ekadashi reminders individually.', icon: 'bell-off-outline' },
       { q: 'Are notifications time-aware?', a: 'Yes! Morning notifications focus on mantras and morning rituals, afternoon on facts and wisdom, evening on aarti and puja reminders, and night on bedtime shlokas and sleep rituals.', icon: 'clock-outline' },
     ],

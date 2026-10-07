@@ -10,7 +10,7 @@ import { followCounts } from '../../services/social';
 import { shareSadhak } from '../../services/shareApp';
 import { useDialog } from '../../contexts/DialogContext';
 import { Screen, Button, AppBar, Icon } from '../../components/ui';
-import { ProfileHead, PostGrid, PostSort } from '../../components/community/ProfileHead';
+import { ProfileHead, PostGrid, PostSort, type ProfileSort } from '../../components/community/ProfileHead';
 import { DS } from '../../constants/ds';
 
 export default function ProfileScreen() {
@@ -23,7 +23,7 @@ export default function ProfileScreen() {
   const [counts, setCounts] = useState({ followers: 0, following: 0 });
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [sort, setSort] = useState<'hot' | 'new' | 'top'>('new');
+  const [sort, setSort] = useState<ProfileSort>('new');
   const ordered = useMemo(() => withPinnedFirst(rankPosts(myPosts, sort, 'all')), [myPosts, sort]);
 
   // Year the user joined, from createdAt (Firestore Timestamp | Date | ms).

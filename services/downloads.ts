@@ -1,47 +1,39 @@
-// Save a generated file straight into the phone's Downloads folder (Android
-// Storage Access Framework: the user picks Downloads once, then saves are
-// silent), announce it with a notification that opens the file when tapped.
+// Save a generated or downloaded file and announce it with a notification
+// that opens the file when tapped.
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Notifications from 'expo-notifications';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 
-const SAF = FileSystem.StorageAccessFramework;
-const DIR_KEY = 'sadhak_downloads_dir';
+// Files are kept in Sadhak's own folder: no folder picker (Android 11+ won't
+// let apps write into the shared Downloads folder without one). They open in
+// the phone's viewer from the notification, the Library shelf or Share.
+export const DOWNLOADS_DIR = `${FileSystem.documentDirectory}Downloads/`;
 
-async function downloadsDir(ask: boolean): Promise<string | null> {
-  const saved = await AsyncStorage.getItem(DIR_KEY).catch(() => null);
-  if (saved) return saved;
-  if (!ask) return null;
-  const perm = await SAF.requestDirectoryPermissionsAsync(SAF.getUriForDirectoryInRoot('Download'));
-  if (!perm.granted) return null;
-  await AsyncStorage.setItem(DIR_KEY, perm.directoryUri).catch(() => {});
-  return perm.directoryUri;
+/** Copy a local file into Sadhak's downloads. Returns its file:// URI. */
+export async function saveToDownloads(localUri: string, fileName: string, _mime?: string): Promise<string | null> {
+  try {
+    await FileSystem.makeDirectoryAsync(DOWNLOADS_DIR, { intermediates: true }).catch(() => {});
+    const dest = DOWNLOADS_DIR + fileName.replace(/[\\/:*?"<>|]/g, '_');
+    await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => {});
+    await FileSystem.copyAsync({ from: localUri, to: dest });
+    return dest;
+  } catch {
+    return null;
+  }
 }
 
-/**
- * Copy a local file into Downloads. Returns the saved file's content URI, or
- * null when the user declined the folder (callers then offer Share instead).
- */
-export async function saveToDownloads(localUri: string, fileName: string, mime: string): Promise<string | null> {
-  if (Platform.OS !== 'android') return null;
-  const data = await FileSystem.readAsStringAsync(localUri, { encoding: FileSystem.EncodingType.Base64 });
-  const base = fileName.replace(/\.[^.]+$/, '');
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const dir = await downloadsDir(true);
-    if (!dir) return null;
-    try {
-      const uri = await SAF.createFileAsync(dir, base, mime);
-      await FileSystem.writeAsStringAsync(uri, data, { encoding: FileSystem.EncodingType.Base64 });
-      return uri;
-    } catch {
-      // Folder access was revoked or the folder moved: ask again once.
-      await AsyncStorage.removeItem(DIR_KEY).catch(() => {});
-    }
-  }
-  return null;
+/** Saved files, newest first. */
+export async function listDownloads(): Promise<{ name: string; uri: string; size: number; at: number }[]> {
+  try {
+    const names = await FileSystem.readDirectoryAsync(DOWNLOADS_DIR);
+    const out = await Promise.all(names.map(async (name) => {
+      const info: any = await FileSystem.getInfoAsync(DOWNLOADS_DIR + name);
+      return { name, uri: DOWNLOADS_DIR + name, size: info.size || 0, at: (info.modificationTime || 0) * 1000 };
+    }));
+    return out.sort((x, y) => y.at - x.at);
+  } catch { return []; }
 }
 
 export async function notifySaved(title: string, body: string, uri: string, mime: string) {
@@ -57,7 +49,9 @@ export async function notifySaved(title: string, body: string, uri: string, mime
 export async function openFile(uri: string, mime: string, localFallback?: string) {
   try {
     if (Platform.OS === 'android') {
-      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', { data: uri, flags: 1, type: mime });
+      // Other apps can't read file:// paths; hand them a content:// URI.
+      const data = uri.startsWith('file://') ? await FileSystem.getContentUriAsync(uri) : uri;
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', { data, flags: 1, type: mime });
       return;
     }
   } catch {}

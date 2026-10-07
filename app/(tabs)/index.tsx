@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, InteractionManager, ScrollView, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -233,6 +234,32 @@ export default function HomeScreen() {
         </LinearGradient>
       </Pressable>
 
+      {/* ═══ Tools: four main ones, the rest in a scrolling row ═══ */}
+      <View style={s.sectionHead}>
+        <Text style={[s.sectionTitle, { color: colors.text }, display]}>{t('home.tools')}</Text>
+        <Pressable onPress={() => router.push('/(tabs)/tools')} hitSlop={8} style={s.sectionAction}>
+          <Text style={[s.sectionActionText, { color: colors.primary }]}>{t('home.allTools')}</Text>
+          <Icon name="caret-right" size={13} color={colors.primary} weight="regular" />
+        </Pressable>
+      </View>
+      <View style={[s.grid, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onLayout={(e) => setGridW(e.nativeEvent.layout.width - 16)}>
+        {!!tileW && (
+          <ScrollView ref={rowRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 6 }}>
+            {[...mainTools, ...moreTools].map((tool) => <ToolTile key={tool.key} tool={tool} width={tileW} />)}
+            <Pressable
+              onPress={() => router.push('/(tabs)/tools')}
+              style={({ pressed }) => [s.moreTile, { width: tileW, opacity: pressed ? 0.6 : 1 }]}
+              accessibilityRole="button"
+            >
+              <View style={[s.moreGlyph, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceSecondary }]}>
+                <Icon name="squares-four" size={24} color={colors.textSecondary} />
+              </View>
+              <Text style={[s.moreLabel, { color: colors.text }]} numberOfLines={1}>{t('home.more')}</Text>
+            </Pressable>
+          </ScrollView>
+        )}
+      </View>
+
       {!!japaOpen && (
         <Pressable onPress={() => router.push('/japa')} style={({ pressed }) => [s.continue, { backgroundColor: tones.haldi.bg, opacity: pressed ? 0.7 : 1 }]}>
           <Icon name="hands-praying" size={16} color={tones.haldi.fg} />
@@ -276,32 +303,6 @@ export default function HomeScreen() {
         <Icon name="caret-right" size={16} color={colors.textTertiary} weight="regular" />
       </Pressable>
 
-      {/* ═══ Tools: four main ones, the rest in a scrolling row ═══ */}
-      <View style={s.sectionHead}>
-        <Text style={[s.sectionTitle, { color: colors.text }, display]}>{t('home.tools')}</Text>
-        <Pressable onPress={() => router.push('/(tabs)/tools')} hitSlop={8} style={s.sectionAction}>
-          <Text style={[s.sectionActionText, { color: colors.primary }]}>{t('home.allTools')}</Text>
-          <Icon name="caret-right" size={13} color={colors.primary} weight="regular" />
-        </Pressable>
-      </View>
-      <View style={[s.grid, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onLayout={(e) => setGridW(e.nativeEvent.layout.width - 16)}>
-        {!!tileW && (
-          <ScrollView ref={rowRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 6 }}>
-            {[...mainTools, ...moreTools].map((tool) => <ToolTile key={tool.key} tool={tool} width={tileW} />)}
-            <Pressable
-              onPress={() => router.push('/(tabs)/tools')}
-              style={({ pressed }) => [s.moreTile, { width: tileW, opacity: pressed ? 0.6 : 1 }]}
-              accessibilityRole="button"
-            >
-              <View style={[s.moreGlyph, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceSecondary }]}>
-                <Icon name="squares-four" size={24} color={colors.textSecondary} />
-              </View>
-              <Text style={[s.moreLabel, { color: colors.text }]} numberOfLines={1}>{t('home.more')}</Text>
-            </Pressable>
-          </ScrollView>
-        )}
-      </View>
-
       {/* ═══ Shloka of the day ═══ */}
       <View style={[s.shloka, { backgroundColor: isDark ? colors.surface : '#FFF8EE', borderColor: isDark ? colors.cardBorder : '#F1DEC4' }]}>
         <Text style={[s.shlokaOm, { color: colors.primary }]}>ॐ</Text>
@@ -313,10 +314,11 @@ export default function HomeScreen() {
           onPress={shareShloka}
           disabled={sharing}
           accessibilityRole="button"
-          style={({ pressed }) => [s.shareBtn, { borderColor: colors.primary + '55', backgroundColor: colors.primary + (pressed ? '22' : '10'), opacity: sharing ? 0.6 : 1 }]}
+          accessibilityLabel={tx('Share')}
+          hitSlop={10}
+          style={({ pressed }) => [s.shareIcon, { opacity: sharing ? 0.5 : pressed ? 0.6 : 1 }]}
         >
-          <Icon name="share-network" size={16} color={colors.primary} />
-          <Text style={[s.shareText, { color: colors.primary }]}>{tx('Share')}</Text>
+          <Ionicons name="paper-plane-outline" size={21} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -457,7 +459,7 @@ const s = StyleSheet.create({
   shlokaLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
   shlokaText: { fontSize: 24, lineHeight: 42, marginTop: 8, textAlign: 'center', fontFamily: DS.font.deva },
   shlokaTrans: { fontSize: 14, lineHeight: 21, marginTop: 4, textAlign: 'center' },
-  shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 100, borderWidth: 1 },
+  shareIcon: { position: 'absolute', top: 14, right: 14, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   shareText: { fontSize: 13.5, fontWeight: '800' },
   shlokaSrc: { fontSize: 12, fontWeight: '700', marginTop: 8, textAlign: 'center' },
 });

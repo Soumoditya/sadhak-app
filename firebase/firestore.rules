@@ -103,9 +103,18 @@ service cloud.firestore {
       allow update, delete: if signedIn() && (resource.data.authorId == request.auth.uid || isAdmin());
       allow update: if signedIn()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount', 'likedBy', 'commentCount']);
-      match /{sub=**} {
+      // Threaded comments: the author writes and edits their own; anyone may
+      // only change their own vote; the post's author may remove comments.
+      match /comments/{cid} {
         allow read: if signedIn();
-        allow write: if signedIn();
+        allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+        allow update: if signedIn() && (resource.data.authorId == request.auth.uid
+          || get(/databases/$(database)/documents/posts/$(postId)).data.authorId == request.auth.uid
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
+              && request.resource.data.get('votes', {}).diff(resource.data.get('votes', {})).affectedKeys().hasOnly([request.auth.uid])));
+        allow delete: if signedIn() && (resource.data.authorId == request.auth.uid
+          || get(/databases/$(database)/documents/posts/$(postId)).data.authorId == request.auth.uid
+          || isAdmin());
       }
     }
   }

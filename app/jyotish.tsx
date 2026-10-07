@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  ActivityIndicator, Platform, BackHandler, Switch, useWindowDimensions, InteractionManager,
+  ActivityIndicator, Platform, BackHandler, Switch, useWindowDimensions, InteractionManager, Image,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,18 +20,21 @@ import {
   type BirthInput, type Kundli, type Prediction, type PredictionPeriod,
 } from '../services/jyotish';
 import { downloadKundliPdf, shareKundliPdf } from '../services/jyotishPdf';
+import { captureView, saveImageToGallery } from '../services/snapshot';
+import { shareFile } from '../services/shareApp';
+import { ActionSheet } from '../components/ui';
 import { openFile } from '../services/downloads';
-import { cacheNatal } from '../services/natalCache';
+import { cacheNatal, readCachedNatal, cacheBirth } from '../services/natalCache';
 import { HORA_HI } from '../services/hora';
 import { NAKSHATRA_NAMES } from '../services/panchang';
-import { grahaFlags, analyse, SIGNS, SIGNS_HI, type Loc, saturnPeriods, antardashas, extraBirthDetails, fmtDeg, localPrediction, type SaturnPeriod } from '../services/jyotishExtras';
+import { grahaFlags, analyse, SIGNS, SIGNS_HI, SIGN_LORD, type Loc, saturnPeriods, antardashas, extraBirthDetails, fmtDeg, localPrediction, type SaturnPeriod } from '../services/jyotishExtras';
 import { calculatePanchang } from '../services/panchang';
 import { scheduleDailyAstroReminder, cancelDailyAstroReminder, getAstroReminder } from '../services/notifications';
 
 export default function JyotishScreen() {
   const { user, profile, updateProfile } = useAuth();
   const { colors, tones } = useTheme();
-  const { t: tr, tx, language, display, native, locale } = useLanguage();
+  const { t: tr, tx, language, display, native, locale, noTrack } = useLanguage();
   // Localiser for the on-device readings (yogas, doshas, guidance).
   const loc = useMemo<Loc>(() => ({
     t: (str, v) => { const base = tx(str); return v ? base.replace(/\{(\w+)\}/g, (_, k) => (v[k] != null ? String(v[k]) : `{${k}}`)) : base; },
@@ -91,9 +94,17 @@ export default function JyotishScreen() {
     let active = true;
     (async () => {
       if (!user?.uid) { setLoading(false); setEditing(true); return; }
-      const natal = await loadNatal(user.uid);
+      // Paint the chart kept on this phone at once; the cloud copy follows.
+      const local = await readCachedNatal(user.uid);
+      if (local && active && !birthEdited.current) {
+        prefill(local.birth); setKundli(local.kundli); setSavedBirth(local.birth); setLoading(false);
+      }
+      const natal = await loadNatal(user.uid).catch(() => null);
       if (!active) return;
-      if (natal) { prefill(natal.birth); setKundli(natal.kundli); setSavedBirth(natal.birth); cacheNatal(user.uid, natal.kundli); } else { setEditing(true); }
+      if (natal) {
+        if (!birthEdited.current) { prefill(natal.birth); setKundli(natal.kundli); setSavedBirth(natal.birth); }
+        cacheNatal(user.uid, natal.kundli); cacheBirth(user.uid, natal.birth);
+      } else if (!local) { setEditing(true); }
       setLoading(false);
       // The running dasha + Sade Sati depend on today's date; refresh a stale
       // cached chart quietly so they don't stay frozen at the first compute.
@@ -103,7 +114,7 @@ export default function JyotishScreen() {
           // Don't clobber a chart the user re-entered while this was in flight.
           if (!birthEdited.current) {
             await saveKundli(user.uid, natal.birth, fresh);
-            cacheNatal(user.uid, fresh);
+            cacheNatal(user.uid, fresh); cacheBirth(user.uid, natal.birth);
             if (active && !birthEdited.current) setKundli(fresh);
           }
         } catch {}
@@ -132,15 +143,10 @@ export default function JyotishScreen() {
       setPdfBusy('save');
       const r = await downloadKundliPdf(kundli, savedBirth, profile?.displayName);
       if (r.saved) {
-        dialog.alert('Saved to Downloads', `${r.fileName}`, [
-          { text: 'OK', style: 'cancel' },
-          { text: 'Open', onPress: () => openFile(r.savedUri!, 'application/pdf', r.uri) },
-        ], { tone: 'success' });
+        // Opens straight in the phone's PDF viewer; a notification keeps it handy.
+        openFile(r.savedUri!, 'application/pdf', r.uri);
       } else {
-        dialog.alert('Downloads not chosen', 'Pick the Downloads folder to save there, or share the PDF instead.', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Share instead', onPress: sharePdf },
-        ]);
+        sharePdf();
       }
     } catch (e: any) { dialog.alert('PDF failed', String(e?.message || e).slice(0, 160)); }
     finally { setPdfBusy(false); }
@@ -214,6 +220,27 @@ export default function JyotishScreen() {
 
   const loadPeriod = (period: PredictionPeriod) => showPeriod(period);
 
+  // Chart as an image: watermarked, shared with the app line or saved to the gallery.
+  const chartShotRef = useRef<View>(null);
+  const [shooting, setShooting] = useState(false);
+  const [styleMenu, setStyleMenu] = useState(false);
+  const chartImage = async (how: 'share' | 'save') => {
+    try {
+      setShooting(true);
+      await new Promise((r) => setTimeout(r, 120)); // let the watermark draw
+      const uri = await captureView(chartShotRef, `Sadhak-Kundli-${chartTab.toUpperCase()}.png`);
+      setShooting(false);
+      if (how === 'share') await shareFile(uri, 'image/png', `${tx('My birth chart')} (${tx(chartTab === 'd1' ? 'Rashi' : chartTab === 'd9' ? 'Navamsa' : chartTab === 'd10' ? 'Dasamsa' : 'Moon chart')})`, 'Kundli');
+      else {
+        const ok = await saveImageToGallery(uri);
+        dialog.alert(ok ? tx('Saved to gallery') : tx('Photos permission needed'), ok ? '' : tx('Allow photo access to save images.'), undefined, { tone: ok ? 'success' : 'warning' });
+      }
+    } catch (e: any) {
+      setShooting(false);
+      dialog.alert(tx('Could not make the image'), String(e?.message || e).slice(0, 140));
+    }
+  };
+
   const pad = (n: number) => String(n).padStart(2, '0');
   const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   const timeStr = `${pad(time.getHours())}:${pad(time.getMinutes())}`;
@@ -255,7 +282,7 @@ export default function JyotishScreen() {
       const k = await computeAndSaveKundli(user.uid, birth);
       await updateProfile({ hasBirthChart: true } as any); // non-sensitive flag
       setKundli(k); setSavedBirth(birth);
-      if (user?.uid) cacheNatal(user.uid, k);
+      if (user?.uid) { cacheNatal(user.uid, k); cacheBirth(user.uid, birth); }
       setEditing(false);
     } catch (e: any) {
       dialog.alert('Could not save', String(e?.message || e).slice(0, 160));
@@ -437,46 +464,61 @@ export default function JyotishScreen() {
         <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={s.cardHead}>
             <Text style={[s.cardTitle, { color: colors.text }, display]}>{tx('Birth chart')}</Text>
-            <View style={[s.segment, { backgroundColor: colors.surfaceSecondary }]}>
-              {(['north', 'south', 'east'] as const).map((st) => (
-                <TouchableOpacity key={st} onPress={() => pickStyle(st)} style={[s.segBtn, chartStyle === st && { backgroundColor: colors.surface }]}>
-                  <Text style={[s.segText, { color: chartStyle === st ? colors.primary : colors.textSecondary }]}>{tx(st === 'north' ? 'North' : st === 'south' ? 'South' : 'East')}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity onPress={() => setStyleMenu(true)} style={[s.headIcon, { borderColor: colors.cardBorder }]} accessibilityLabel={tx('Chart style')}>
+                <Text style={{ color: colors.textSecondary, fontSize: 11.5, fontWeight: '800' }}>{tx(chartStyle === 'north' ? 'North' : chartStyle === 'south' ? 'South' : 'East')}</Text>
+                <Ionicons name="chevron-down" size={12} color={colors.textTertiary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => chartImage('save')} style={[s.headIcon, { borderColor: colors.cardBorder }]} accessibilityLabel={tx('Save image')}>
+                <Ionicons name="download-outline" size={17} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => chartImage('share')} style={[s.headIcon, { borderColor: colors.cardBorder }]} accessibilityLabel={tx('Share')}>
+                <Ionicons name="paper-plane-outline" size={17} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
           </View>
-          <View style={s.chartTabs}>
-            {([['d1', 'D1 · ' + tx('Rashi')], ['d9', 'D9 · ' + tx('Navamsa')], ['d10', 'D10 · ' + tx('Dasamsa')], ['moon', tx('Moon chart')]] as const).map(([key, label]) => {
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.vargaRow}>
+            {([['d1', tx('Rashi') + ' D1'], ['d9', tx('Navamsa') + ' D9'], ['d10', tx('Dasamsa') + ' D10'], ['moon', tx('Moon chart')]] as const).map(([key, label]) => {
               const active = chartTab === key;
               const disabled = key !== 'd1' && !kundli.charts;
               return (
-                <TouchableOpacity key={key} disabled={disabled} onPress={() => setChartTab(key)}
-                  style={[s.chartTab, { backgroundColor: active ? colors.primary : 'transparent', borderColor: active ? colors.primary : colors.cardBorder, opacity: disabled ? 0.4 : 1 }]}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: active ? '#FFF' : colors.textSecondary }}>{label}</Text>
+                <TouchableOpacity key={key} disabled={disabled} onPress={() => setChartTab(key)} style={{ opacity: disabled ? 0.4 : 1, paddingBottom: 6 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: active ? colors.primary : colors.textSecondary }}>{label}</Text>
+                  <View style={{ height: 2.5, borderRadius: 2, marginTop: 4, backgroundColor: active ? colors.primary : 'transparent' }} />
                 </TouchableOpacity>
               );
             })}
+          </ScrollView>
+          {/* Captured as the shared image: chart, names and a Sadhak watermark. */}
+          <View ref={chartShotRef} collapsable={false} style={{ backgroundColor: colors.surface, paddingTop: 8 }}>
+            <Text style={[s.glance, { color: colors.text }]} numberOfLines={2}>
+              {tx('Lagna')} <Text style={{ fontWeight: '800' }}>{native(b.lagna, b.lagnaHi)}</Text>
+              {'  ·  '}{tx('Moon')} <Text style={{ fontWeight: '800' }}>{native(b.rashi, b.rashiHi)}</Text>
+              {'  ·  '}<Text style={{ fontWeight: '800' }}>{native(b.nakshatra, b.nakshatraHi)}</Text> {b.pada}
+            </Text>
+            <Text style={[s.chartSub, { color: colors.textTertiary }]}>
+              {tx(chartTab === 'd1' ? 'Birth chart: overall life and body' : chartTab === 'd9' ? 'Navamsa: marriage, dharma and inner strength' : chartTab === 'd10' ? 'Dasamsa: career and profession' : 'Moon chart: mind and emotions')}
+            </Text>
+            <View style={{ alignItems: 'center' }}>
+              <KundliChart
+                grahas={chartData ? chartData.planets : kundli.planets}
+                lagnaSignIndex={chartData ? chartData.lagnaSignIndex : kundli.lagna.signIndex}
+                flags={chartData ? undefined : flags}
+                style={chartStyle}
+                size={Math.min(width - 72, 320)}
+                lang={language}
+                colors={colors as any}
+              />
+            </View>
+            <Text style={[s.legend, { color: colors.textTertiary }]}>{tx('(R) retrograde · (C) combust · (V) vargottama')}</Text>
+            {shooting && (
+              <View style={s.watermark}>
+                <Image source={require('../assets/images/icon.png')} style={{ width: 18, height: 18, borderRadius: 4 }} />
+                <Text style={{ color: colors.textSecondary, fontSize: 11.5, fontWeight: '800' }}>Sadhak</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 10.5 }}>· sadhak-app.vercel.app</Text>
+              </View>
+            )}
           </View>
-          <Text style={[s.glance, { color: colors.text }]} numberOfLines={2}>
-            {tx('Lagna')} <Text style={{ fontWeight: '800' }}>{native(b.lagna, b.lagnaHi)}</Text>
-            {'  ·  '}{tx('Moon')} <Text style={{ fontWeight: '800' }}>{native(b.rashi, b.rashiHi)}</Text>
-            {'  ·  '}<Text style={{ fontWeight: '800' }}>{native(b.nakshatra, b.nakshatraHi)}</Text> {b.pada}
-          </Text>
-          <Text style={[s.chartSub, { color: colors.textTertiary }]}>
-            {tx(chartTab === 'd1' ? 'Birth chart: overall life and body' : chartTab === 'd9' ? 'Navamsa: marriage, dharma and inner strength' : chartTab === 'd10' ? 'Dasamsa: career and profession' : 'Moon chart: mind and emotions')}
-          </Text>
-          <View style={{ alignItems: 'center' }}>
-            <KundliChart
-              grahas={chartData ? chartData.planets : kundli.planets}
-              lagnaSignIndex={chartData ? chartData.lagnaSignIndex : kundli.lagna.signIndex}
-              flags={chartData ? undefined : flags}
-              style={chartStyle}
-              size={Math.min(width - 72, 320)}
-              lang={language}
-              colors={colors as any}
-            />
-          </View>
-          <Text style={[s.legend, { color: colors.textTertiary }]}>{tx('(R) retrograde · (C) combust · (V) vargottama')}</Text>
         </View>
 
         )}
@@ -565,31 +607,59 @@ export default function JyotishScreen() {
         )}
 
         {/* Grahas */}
-        {tab === 'planets' && (<Section2 title={tx('Planets')} colors={colors} display={display}>
-          {kundli.planets.map((p, i) => {
-            const f = flags[p.name] || {};
-            const dig = p.dignity && p.dignity !== '—' && p.dignity !== 'Neutral' ? p.dignity : null;
-            const tone = dig === 'Exalted' || dig === 'Own sign' ? tones.tulsi : dig === 'Debilitated' ? tones.kumkum : tones.neel;
+        {tab === 'planets' && (<Section2 title={tx('Planets, house by house')} colors={colors} display={display}>
+          {/* Read down the houses 1 to 12, as a chart is read ("what is in my 7th?"). Empty
+              houses still show their sign and lord, which is how an empty house is read. */}
+          <View style={[s.pHead, { borderBottomColor: colors.divider }]}>
+            <Text style={[s.pCol, s.pHouse, { color: colors.textTertiary }, noTrack]}>{tx('House').toUpperCase()}</Text>
+            <Text style={[s.pCol, { flex: 1.15, color: colors.textTertiary }, noTrack]}>{tx('Graha').toUpperCase()}</Text>
+            <Text style={[s.pCol, { flex: 1, color: colors.textTertiary }, noTrack]}>{tx('Sign').toUpperCase()}</Text>
+            <Text style={[s.pCol, { flex: 1.25, color: colors.textTertiary }, noTrack]}>{tx('Nakshatra').toUpperCase()}</Text>
+          </View>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((h, idx) => {
+            const inHouse = kundli.planets.filter((p) => p.house === h);
+            const signIdx = (kundli.lagna.signIndex + h - 1) % 12;
             return (
-              <View key={p.name} style={[s.graha, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
-                <View style={[s.grahaBadge, { backgroundColor: p.name === 'Sun' || p.name === 'Moon' ? tones.saffron.bg : colors.surfaceSecondary }]}>
-                  <Text style={[s.grahaAbbr, { color: p.name === 'Sun' || p.name === 'Moon' ? tones.saffron.fg : colors.text }]}>{(ABBR[language === 'mr' ? 'hi' : language === 'as' ? 'bn' : language] || ABBR.en)[p.name] || p.name.slice(0, 2)}</Text>
+              <View key={h} style={[s.pRow, { backgroundColor: idx % 2 ? colors.surfaceSecondary : 'transparent' }]}>
+                <View style={[s.pHouse, { justifyContent: 'center' }]}>
+                  <Text style={{ color: h === 1 ? colors.primary : colors.textSecondary, fontWeight: '800', fontSize: 14, textAlign: 'center' }}>{h}</Text>
+                  {h === 1 && <Text style={{ color: colors.primary, fontSize: 9.5, fontWeight: '800', textAlign: 'center' }}>{tx('Lagna')}</Text>}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.grahaName, { color: colors.text }]}>{loc.planet(p.name)} <Text style={{ color: colors.textTertiary, fontWeight: '600' }}>· {loc.sign(p.signIndex)} {fmtDeg(p.degree)}</Text></Text>
-                  <Text style={[s.grahaSub, { color: colors.textSecondary }]}>{tx('House')} {p.house} · {tx(HOUSE_MEANING[p.house])} · {typeof p.nakshatraIndex === 'number' ? loc.nak(p.nakshatraIndex) : p.nakshatra} {p.pada}</Text>
-                  {(dig || f.retro || f.combust || f.vargottama) && (
-                    <View style={s.tagRow}>
-                      {dig && <Tag text={tx(dig)} tone={tone} />}
-                      {f.retro && <Tag text={tx('Retrograde')} tone={tones.plum} />}
-                      {f.combust && <Tag text={tx('Combust')} tone={tones.saffron} />}
-                      {f.vargottama && <Tag text={tx('Vargottama')} tone={tones.haldi} />}
+                  {inHouse.length === 0 ? (
+                    <View style={s.pEntry}>
+                      <Text style={{ flex: 1.15, color: colors.textTertiary }}>—</Text>
+                      <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13 }}>{loc.sign(signIdx)}</Text>
+                      <Text style={{ flex: 1.25, color: colors.textTertiary, fontSize: 12.5 }} numberOfLines={1}>{tx('Lord')} {loc.planet(SIGN_LORD[signIdx])}</Text>
                     </View>
-                  )}
+                  ) : inHouse.map((p) => {
+                    const f = flags[p.name] || {};
+                    const marks = [f.retro && 'R', f.combust && 'C', f.vargottama && 'V'].filter(Boolean).join(',');
+                    const dig = p.dignity && p.dignity !== '—' && p.dignity !== 'Neutral' ? p.dignity : null;
+                    const digCol = dig === 'Exalted' || dig === 'Own sign' ? tones.tulsi.fg : dig === 'Debilitated' ? tones.kumkum.fg : colors.textTertiary;
+                    return (
+                      <View key={p.name} style={s.pEntry}>
+                        <View style={{ flex: 1.15 }}>
+                          <Text style={{ color: p.name === 'Sun' || p.name === 'Moon' ? colors.primary : colors.text, fontWeight: '800', fontSize: 14 }}>
+                            {loc.planet(p.name)}{marks ? <Text style={{ color: colors.textTertiary, fontSize: 11.5 }}>{` (${marks})`}</Text> : null}
+                          </Text>
+                          {!!dig && <Text style={{ color: digCol, fontSize: 11, fontWeight: '700' }}>{tx(dig)}</Text>}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: colors.text, fontSize: 13 }}>{loc.sign(p.signIndex)}</Text>
+                          <Text style={{ color: colors.textTertiary, fontSize: 11, fontVariant: ['tabular-nums'] }}>{fmtDeg(p.degree)}</Text>
+                        </View>
+                        <Text style={{ flex: 1.25, color: colors.textSecondary, fontSize: 12.5 }} numberOfLines={2}>
+                          {typeof p.nakshatraIndex === 'number' ? loc.nak(p.nakshatraIndex) : p.nakshatra} <Text style={{ color: colors.textTertiary }}>{p.pada}</Text>
+                        </Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             );
           })}
+          <Text style={[s.legend, { color: colors.textTertiary }]}>{tx('(R) retrograde · (C) combust · (V) vargottama')}</Text>
         </Section2>
 
         )}
@@ -714,6 +784,16 @@ export default function JyotishScreen() {
 
         <Text style={{ color: colors.textTertiary, fontSize: 11.5, textAlign: 'center', marginTop: 4, lineHeight: 17 }}>{tx('Calculated with Swiss Ephemeris · Lahiri ayanamsa · whole-sign houses.')}</Text>
       </ScrollView>
+      <ActionSheet
+        visible={styleMenu}
+        title={tx('Chart style')}
+        onClose={() => setStyleMenu(false)}
+        actions={(['north', 'south', 'east'] as const).map((st) => ({
+          label: tx(st === 'north' ? 'North Indian' : st === 'south' ? 'South Indian' : 'East Indian (Bengal, Odisha)'),
+          icon: chartStyle === st ? 'checkmark-circle' : 'ellipse-outline',
+          onPress: () => pickStyle(st),
+        }))}
+      />
     </View>
   );
 }
@@ -791,6 +871,14 @@ const s = StyleSheet.create({
   segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9, alignItems: 'center' },
   segText: { fontSize: 12, fontWeight: '800' },
   chartTabs: { flexDirection: 'row', gap: 6, marginBottom: 6, flexWrap: 'wrap', justifyContent: 'center' },
+  vargaRow: { gap: 18, paddingVertical: 4 },
+  pHead: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth, gap: 6 },
+  pCol: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6 },
+  pHouse: { width: 44 },
+  pRow: { flexDirection: 'row', borderRadius: 8, paddingVertical: 2 },
+  pEntry: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7 },
+  headIcon: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 32, minWidth: 32, paddingHorizontal: 8, borderRadius: 16, borderWidth: 1, justifyContent: 'center' },
+  watermark: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, paddingBottom: 4 },
   chartTab: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 100, borderWidth: 1 },
   tabBar: { paddingHorizontal: 20, paddingBottom: 10, gap: 8 },
   tabPill: { height: 38, paddingHorizontal: 15, borderRadius: 19, borderWidth: 1, justifyContent: 'center' },

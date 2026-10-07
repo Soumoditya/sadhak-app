@@ -10,7 +10,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
-import { Header } from '../components/ui';
+import { Header, Icon } from '../components/ui';
+import { shareText } from '../services/shareApp';
 import { useDsInsets } from '../constants/ds';
 import TempleMap, { type TempleMapHandle, type MapPin } from '../components/TempleMap';
 import { findNearbyTemples, getCachedTemples, formatDistance, type Temple } from '../services/temples';
@@ -176,7 +177,7 @@ export default function TemplesScreen() {
   const share = (p: Place) => {
     const link = `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}`;
     const when = p.type === 'bhandara' && p.startsAt ? `\n${whenLabel(p.startsAt)}` : '';
-    Share.share({ message: `${p.type === 'bhandara' ? '🍲' : '🛕'} ${p.name}${when}\n${link}\n\nShared from Sadhak` }).catch(() => {});
+    shareText(`${p.type === 'bhandara' ? '🍲' : '🛕'} ${p.name}${when}\n${link}`);
   };
   const remove = (p: Place) => {
     dialog.alert('Remove this place?', `"${p.name}" will be removed from the map for everyone.`, [
@@ -245,7 +246,7 @@ export default function TemplesScreen() {
       >
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={[st.cardIcon, { backgroundColor: c + '16' }]}>
-            <MaterialCommunityIcons name={p.type === 'bhandara' ? 'food-variant' : 'temple-hindu'} size={22} color={c} />
+            {p.type === 'bhandara' ? <MaterialCommunityIcons name="food-variant" size={22} color={c} /> : <Icon name="temple-hindu" size={24} color={c} />}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[st.cardTitle, { color: colors.text }]} numberOfLines={1}>{p.name}</Text>
@@ -283,7 +284,7 @@ export default function TemplesScreen() {
 
     return (
       <View style={st.empty}>
-        <MaterialCommunityIcons name={tab === 'bhandara' ? 'food-variant' : 'temple-hindu'} size={34} color={accent} />
+        {tab === 'bhandara' ? <MaterialCommunityIcons name="food-variant" size={34} color={accent} /> : <Icon name="temple-hindu" size={36} color={accent} />}
         <Text style={[st.emptyTitle, { color: colors.text }]}>
           {status === 'error' && tab === 'temples' ? "Couldn't reach the map service" : tab === 'bhandara' ? 'No bhandaras listed nearby' : `No temples found within ${radius} km`}
         </Text>
@@ -328,7 +329,7 @@ export default function TemplesScreen() {
             const c = k === 'bhandara' ? BHANDARA : TEMPLE;
             return (
               <TouchableOpacity key={k} onPress={() => { setTab(k); setSelectedId(null); }} style={[st.segBtn, active && { backgroundColor: c }]}>
-                <MaterialCommunityIcons name={k === 'temples' ? 'temple-hindu' : 'food-variant'} size={16} color={active ? '#FFF' : colors.textSecondary} />
+                {k === 'temples' ? <Icon name="temple-hindu" size={17} color={active ? '#FFF' : colors.textSecondary} weight="regular" /> : <MaterialCommunityIcons name="food-variant" size={16} color={active ? '#FFF' : colors.textSecondary} />}
                 <Text style={{ color: active ? '#FFF' : colors.textSecondary, fontWeight: '800', fontSize: 13.5 }}>{tx(k === 'temples' ? 'Temples' : 'Bhandara')}</Text>
               </TouchableOpacity>
             );

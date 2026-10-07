@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import { saveToDownloads, notifySaved } from '../services/downloads';
 import { WebView } from 'react-native-webview';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -82,6 +83,14 @@ export default function ReaderScreen() {
   const [failed, setFailed] = useState<string | null>(null);
   const [phase, setPhase] = useState<'download' | 'render' | 'ready'>('download');
   const [html, setHtml] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  // The book is already on the phone (downloaded to read it): keep a copy.
+  const saveOffline = async () => {
+    const src = FileSystem.cacheDirectory + 'reader/sadhak-doc.pdf';
+    const name = `${String(title || 'Book').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').slice(0, 48) || 'Book'}.pdf`;
+    const uri = await saveToDownloads(src, name, 'application/pdf');
+    if (uri) { setSavedAt(uri); notifySaved(tx('Saved for offline reading'), `${name} · ${tx('tap to open')}`, uri, 'application/pdf'); }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -126,9 +135,9 @@ export default function ReaderScreen() {
           <Text style={[st.title, { color: colors.text }]} numberOfLines={1}>{title || 'Reading'}</Text>
           {pages > 0 && <Text style={[st.pageInfo, { color: colors.textTertiary }]}>{tx('Page')} {page}of {pages}</Text>}
         </View>
-        {!String(url || '').startsWith('file://') && (
-          <TouchableOpacity onPress={() => Linking.openURL(String(url))} style={[st.iconBtn, { backgroundColor: colors.background }]} hitSlop={8}>
-            <MaterialCommunityIcons name="open-in-new" size={18} color={colors.textSecondary} />
+        {phase !== 'download' && !failed && (
+          <TouchableOpacity onPress={saveOffline} style={[st.iconBtn, { backgroundColor: colors.background }]} hitSlop={8} accessibilityLabel={tx('Save offline')}>
+            <MaterialCommunityIcons name={savedAt ? 'check-circle' : 'download'} size={19} color={savedAt ? colors.success || '#1B7A42' : colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>

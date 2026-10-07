@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, memo, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal,
-  TextInput, PanResponder, Animated,
+  TextInput, FlatList, InteractionManager, type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
+import { eclipsesInMonth, type Grahan } from '../../services/eclipses';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { holidaysOn, isPublicHoliday, type Holiday } from '../../constants/holidays';
 import { REGIONS, defaultRegion, solarMonthDays, lunarMonth, regionalFestivals, type Region, type RegionalDay, type RegionalFest } from '../../services/regional';
@@ -56,7 +57,142 @@ interface DayInfo {
   tithiNo: number;
   paksha: 'shukla' | 'krishna';
   month: { en: string; hi: string };
+  grahan: Grahan[];
 }
+
+type MonthCtx = { lat: number; lon: number; gender: string; marriage: string; region: Region; language: string; solar: boolean };
+
+// Month data is heavy (a panchang per day), so each month is built once and
+// kept; the pager builds the neighbours while you look at the current one.
+const MONTH_CACHE = new Map<string, Record<number, DayInfo>>();
+const monthKey = (y: number, m: number, c: MonthCtx) => `${y}-${m}|${c.lat.toFixed(2)},${c.lon.toFixed(2)}|${c.gender}|${c.marriage}|${c.region}|${c.language}`;
+function buildMonthInfo(year: number, month: number, c: MonthCtx): Record<number, DayInfo> {
+  const key = monthKey(year, month, c);
+  const hit = MONTH_CACHE.get(key);
+  if (hit) return hit;
+  const map: Record<number, DayInfo> = {};
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  let solar: Record<number, RegionalDay> = {};
+  try { solar = c.solar ? solarMonthDays(year, month, c.region, c.lat, c.lon, c.language) : {}; } catch {}
+  let eclipses: Grahan[] = [];
+  try { eclipses = eclipsesInMonth(year, month, c.lat, c.lon); } catch {}
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const grahan = eclipses.filter((g) => g.peak.getDate() === d);
+    try {
+      const p = calculatePanchang(date, c.lat, c.lon);
+      const g = getDailyGroomingAdvice(date, c.gender as any, c.marriage as any, p.tithi.name);
+      const tn = (p.tithi.name || '').toLowerCase();
+      // Only day-precise festivals mark the grid: an entry must carry a tithi
+      // (or be a fixed Gregorian date).
+      const dayFestivals = [
+        ...lunarFestivalsOn(date, c.lat, c.lon),
+        ...getFixedFestivals(month + 1, d),
+      ].filter(f => f.type === 'major' || f.type === 'minor' || f.type === 'sankranti');
+      map[d] = {
+        status: g.overallStatus,
+        isPurnima: tn.includes('purnima'),
+        isAmavasya: tn.includes('amavasya'),
+        isEkadashi: tn.includes('ekadashi'),
+        festivals: dayFestivals,
+        holidays: holidaysOn(date),
+        regional: solar[d],
+        regionalFests: (() => { try { return regionalFestivals(c.region, date, c.lat, c.lon, solar[d]); } catch { return []; } })(),
+        tithiNo: ((p.tithi.number - 1) % 15) + 1,
+        paksha: p.tithi.paksha,
+        month: lunarMonth(c.region, p.hinduMonth.name, p.tithi.paksha),
+        grahan,
+      };
+    } catch {
+      map[d] = { status: 'allowed', isPurnima: false, isAmavasya: false, isEkadashi: false, festivals: [], holidays: holidaysOn(date), regionalFests: [], tithiNo: 0, paksha: 'shukla', month: { en: '', hi: '' }, grahan };
+    }
+  }
+  if (MONTH_CACHE.size > 24) MONTH_CACHE.delete(MONTH_CACHE.keys().next().value as string);
+  MONTH_CACHE.set(key, map);
+  return map;
+}
+
+const ROW_H = 54;
+const CELL_PX = (w: number) => w / 7;
+const dKey = (y: number, m: number, d: number) => `${y}-${m + 1}-${d}`;
+
+type GridColors = { text: string; textTertiary: string; primary: string; festival: string; info: string; purnima: string; ekadashi: string; amavasya: string; kumkum: string; saffron: string; grahan: string };
+
+/** One month of the pager: six fixed rows so every page has the same height. */
+const MonthPage = memo(function MonthPage({ year, month, width, ctx, selected, today, notes, onSelect, c }: {
+  year: number; month: number; width: number; ctx: MonthCtx; selected: string; today: string;
+  notes: Record<string, string>; onSelect: (d: Date) => void; c: GridColors;
+}) {
+  const key = monthKey(year, month, ctx);
+  const [info, setInfo] = useState<Record<number, DayInfo> | undefined>(() => MONTH_CACHE.get(key));
+  useEffect(() => {
+    if (MONTH_CACHE.get(key)) { setInfo(MONTH_CACHE.get(key)); return; }
+    const task = InteractionManager.runAfterInteractions(() => setInfo(buildMonthInfo(year, month, ctx)));
+    return () => task.cancel();
+  }, [key]);
+  const first = new Date(year, month, 1).getDay();
+  const days = new Date(year, month + 1, 0).getDate();
+  const cw = CELL_PX(width);
+  const cells = Array.from({ length: 42 }, (_, i) => i - first + 1);
+  return (
+    <View style={{ width, flexDirection: 'row', flexWrap: 'wrap' }}>
+      {cells.map((d, i) => {
+        if (d < 1 || d > days) {
+          const other = new Date(year, month, d);
+          return (
+            <View key={i} style={{ width: cw, height: ROW_H, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 14, color: c.textTertiary, opacity: 0.3 }}>{other.getDate()}</Text>
+            </View>
+          );
+        }
+        const k = dKey(year, month, d);
+        const it = info?.[d];
+        const isSel = k === selected;
+        const isToday = k === today;
+        const sunday = (i % 7) === 0;
+        const holiday = !!it?.holidays.some(isPublicHoliday);
+        const dots: string[] = [];
+        if (it) {
+          if (it.festivals.length || it.regionalFests.length) dots.push(it.regionalFests.length ? c.saffron : c.kumkum);
+          if (it.grahan.some((g) => g.visible)) dots.push(c.grahan);
+          if (it.isEkadashi) dots.push(c.ekadashi);
+          if (it.isPurnima) dots.push(c.purnima);
+          if (it.isAmavasya) dots.push(c.amavasya);
+          if (holiday) dots.push(c.info);
+        }
+        const firstOfRegional = it?.regional?.day === 1;
+        return (
+          <TouchableOpacity key={i} activeOpacity={0.6} onPress={() => onSelect(new Date(year, month, d))}
+            style={{ width: cw, height: ROW_H, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityLabel={`${d}${it?.festivals.length ? ', ' + it.festivals.map((f) => f.name).join(', ') : ''}`}>
+            <View style={[cs.dateCircle, isToday && { backgroundColor: c.primary }, isSel && !isToday && { borderWidth: 2, borderColor: c.primary }]}>
+              <Text style={[cs.date, { color: isToday ? '#FFF' : sunday || holiday ? c.festival : c.text }, (isSel || isToday) && { fontWeight: '800' }]}>{d}</Text>
+            </View>
+            <View style={cs.dotRow}>
+              {firstOfRegional
+                ? <Text style={[cs.regional, { color: c.primary }]} numberOfLines={1}>{it!.regional!.monthName.slice(0, 4)}</Text>
+                : dots.slice(0, 3).map((col, j) => <View key={j} style={[cs.dot, { backgroundColor: col }]} />)}
+              {!!notes[k] && !firstOfRegional && <View style={[cs.dot, { backgroundColor: c.textTertiary, width: 4, height: 4 }]} />}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+});
+
+const cs = StyleSheet.create({
+  dateCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  date: { fontSize: 15, fontWeight: '600' },
+  dotRow: { height: 9, flexDirection: 'row', gap: 3, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  dot: { width: 5, height: 5, borderRadius: 3 },
+  regional: { fontSize: 8.5, fontWeight: '800' },
+});
+
+// Month pager: pages are indexed by months since year 0.
+const PAGE_SPAN = 120;
+
+const hm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
 function fmt12(h: number, m: number): string {
   const ap = h >= 12 ? 'PM' : 'AM';
@@ -139,44 +275,9 @@ export default function CalendarScreen() {
     return days;
   }, [year, month]);
 
-  // One pass per month (was: full panchang for every day on EVERY render).
-  const monthInfo = useMemo(() => {
-    const map: Record<number, DayInfo> = {};
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    let solar: Record<number, RegionalDay> = {};
-    try { solar = regionInfo.solar ? solarMonthDays(year, month, region, lat, lon, language) : {}; } catch {}
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(year, month, d);
-      try {
-        const p = calculatePanchang(date, lat, lon);
-        const g = getDailyGroomingAdvice(date, profile?.gender || 'male', profile?.marriageStatus || 'unmarried', p.tithi.name);
-        const tn = (p.tithi.name || '').toLowerCase();
-        // Only day-precise festivals mark the grid: an entry must carry a tithi
-        // (or be a fixed Gregorian date). Month-wide observances without a tithi
-        // were matching EVERY day and gold-washing half the calendar.
-        const dayFestivals = [
-          ...lunarFestivalsOn(date, lat, lon),
-          ...getFixedFestivals(month + 1, d),
-        ].filter(f => f.type === 'major' || f.type === 'minor' || f.type === 'sankranti');
-        map[d] = {
-          status: g.overallStatus,
-          isPurnima: tn.includes('purnima'),
-          isAmavasya: tn.includes('amavasya'),
-          isEkadashi: tn.includes('ekadashi'),
-          festivals: dayFestivals,
-          holidays: holidaysOn(date),
-          regional: solar[d],
-          regionalFests: (() => { try { return regionalFestivals(region, date, lat, lon, solar[d]); } catch { return []; } })(),
-          tithiNo: ((p.tithi.number - 1) % 15) + 1,
-          paksha: p.tithi.paksha,
-          month: lunarMonth(region, p.hinduMonth.name, p.tithi.paksha),
-        };
-      } catch {
-        map[d] = { status: 'allowed', isPurnima: false, isAmavasya: false, isEkadashi: false, festivals: [], holidays: holidaysOn(date), regionalFests: [], tithiNo: 0, paksha: 'shukla', month: { en: '', hi: '' } };
-      }
-    }
-    return map;
-  }, [year, month, lat, lon, profile?.gender, profile?.marriageStatus, region, language]);
+  const ctx: MonthCtx = useMemo(() => ({ lat, lon, gender: profile?.gender || 'male', marriage: profile?.marriageStatus || 'unmarried', region, language, solar: !!regionInfo.solar }),
+    [lat, lon, profile?.gender, profile?.marriageStatus, region, language, regionInfo.solar]);
+  const monthInfo = useMemo(() => buildMonthInfo(year, month, ctx), [year, month, ctx]);
 
   // Festivals, fasts and holidays of the visible month, in date order.
   const monthAgenda = useMemo(() => {
@@ -184,6 +285,12 @@ export default function CalendarScreen() {
     Object.entries(monthInfo).forEach(([d, i]) => {
       const day = Number(d);
       i.regionalFests.forEach((f) => out.push({ key: `r${d}${f.name}`, day, title: language === 'bn' || language === 'as' ? (f.bn || native(f.name, f.hi)) : native(f.name, f.hi), sub: tx(f.note), tone: tones.saffron }));
+      i.grahan.forEach((g, gi) => out.push({
+        key: `g${d}${gi}`, day,
+        title: tx(g.kind === 'solar' ? 'Surya grahan (solar eclipse)' : 'Chandra grahan (lunar eclipse)'),
+        sub: g.visible ? `${hm(g.start)} – ${hm(g.end)}${g.sutak ? ` · ${tx('Sutak from')} ${hm(g.sutak)}` : ''}` : tx('Not visible from your place'),
+        tone: { bg: colors.grahanBg, fg: colors.grahan },
+      }));
       i.festivals.forEach((f) => out.push({ key: `f${d}${f.id}`, day, title: native(f.name, f.nameHi), sub: f.fasting ? tx('Fast') : undefined, tone: tones.kumkum }));
       if (i.isEkadashi && !i.festivals.some((f) => /ekadashi/i.test(f.name))) out.push({ key: `e${d}`, day, title: native('Ekadashi', 'एकादशी'), sub: tx('Fast'), tone: tones.plum });
       if (i.isPurnima && !i.festivals.some((f) => /purnima/i.test(f.name))) out.push({ key: `p${d}`, day, title: native('Purnima', 'पूर्णिमा'), tone: tones.haldi });
@@ -233,28 +340,46 @@ export default function CalendarScreen() {
   const isSelected = (day: number) =>
     day === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear();
 
-  // Month change with a short slide so a swipe feels like turning a page.
-  const slide = useRef(new Animated.Value(0)).current;
-  const shiftMonth = (dir: 1 | -1) => {
-    Animated.timing(slide, { toValue: -dir * 40, duration: 110, useNativeDriver: true }).start(() => {
-      setCurrentDate((c) => new Date(c.getFullYear(), c.getMonth() + dir, 1));
-      slide.setValue(dir * 40);
-      Animated.spring(slide, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 4 }).start();
-    });
+  // ── Month pager: follows the finger, snaps to a month, native scrolling ──
+  const nowIdx = useMemo(() => { const n = new Date(); return n.getFullYear() * 12 + n.getMonth(); }, []);
+  const pages = useMemo(() => Array.from({ length: PAGE_SPAN * 2 + 1 }, (_, i) => nowIdx - PAGE_SPAN + i), [nowIdx]);
+  const pagerRef = useRef<FlatList<number>>(null);
+  const [pageW, setPageW] = useState(0);
+  const curIdx = year * 12 + month;
+  const lastScrolled = useRef(curIdx);
+  useEffect(() => {
+    // Arrows, Today and the month picker move the pager too.
+    if (!pageW || lastScrolled.current === curIdx) return;
+    lastScrolled.current = curIdx;
+    const i = curIdx - (nowIdx - PAGE_SPAN);
+    if (i >= 0 && i < pages.length) pagerRef.current?.scrollToIndex({ index: i, animated: true });
+  }, [curIdx, pageW]);
+  const onPageEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!pageW) return;
+    const i = Math.round(e.nativeEvent.contentOffset.x / pageW);
+    const idx = pages[i];
+    if (idx == null || idx === curIdx) return;
+    lastScrolled.current = idx;
+    setCurrentDate(new Date(Math.floor(idx / 12), idx % 12, 1));
   };
+  // Build next and previous months in the background so swiping never waits.
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      buildMonthInfo(month === 11 ? year + 1 : year, (month + 1) % 12, ctx);
+      buildMonthInfo(month === 0 ? year - 1 : year, (month + 11) % 12, ctx);
+    });
+    return () => task.cancel();
+  }, [year, month, ctx]);
+  const shiftMonth = (dir: 1 | -1) => setCurrentDate((c) => new Date(c.getFullYear(), c.getMonth() + dir, 1));
   const goToPrevMonth = () => shiftMonth(-1);
   const goToNextMonth = () => shiftMonth(1);
-  const swipe = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
-    onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
-    onPanResponderMove: (_, g) => slide.setValue(g.dx * 0.35),
-    onPanResponderRelease: (_, g) => {
-      if (g.dx < -50 || g.vx < -0.5) shiftMonth(1);
-      else if (g.dx > 50 || g.vx > 0.5) shiftMonth(-1);
-      else Animated.spring(slide, { toValue: 0, useNativeDriver: true }).start();
-    },
-    onPanResponderTerminate: () => Animated.spring(slide, { toValue: 0, useNativeDriver: true }).start(),
-  }), []);
+  const todayKey = useMemo(() => { const n = new Date(); return dKey(n.getFullYear(), n.getMonth(), n.getDate()); }, []);
+  const selKey = dKey(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+  const gridColors: GridColors = useMemo(() => ({
+    text: colors.text, textTertiary: colors.textTertiary, primary: colors.primary, festival: colors.festival, info: colors.info,
+    purnima: colors.purnima, ekadashi: colors.ekadashi, amavasya: colors.amavasya, kumkum: tones.kumkum.fg, saffron: tones.saffron.fg, grahan: colors.grahan,
+  }), [colors, tones]);
+  const onSelectDay = useCallback((d: Date) => setSelectedDate(d), []);
   const goToToday = () => { setCurrentDate(new Date()); setSelectedDate(new Date()); };
 
   const addNote = () => {
@@ -343,6 +468,40 @@ export default function CalendarScreen() {
   }, [selectedDate.toDateString(), selectedPanchang?.sunrise, tx]);
 
 
+  // Times for the selected day: muhurtas, tithi and nakshatra changes, sun and moon, grahan.
+  const isSelToday = selectedDate.toDateString() === new Date().toDateString();
+  const dayTimeline = useMemo(() => {
+    const p = selectedPanchang;
+    const at = (hhmm?: string, nextDay = false) => {
+      if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
+      const [h, m] = hhmm.split(':').map(Number);
+      return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + (nextDay ? 1 : 0), h, m);
+    };
+    const rise = at(p.sunrise);
+    const list: { at: Date; end?: Date; label: string; color?: string }[] = [];
+    const push = (a: Date | null, label: string, color?: string, end?: Date | null) => { if (a) list.push({ at: a, end: end || undefined, label, color }); };
+    push(at(p.brahmaMuhurta.start), t('mu.brahma'), colors.success, at(p.brahmaMuhurta.end));
+    push(rise, t('ui.sunrise'), tones.saffron.fg);
+    push(at(p.yamaghanta.start), t('mu.yama'), colors.festival, at(p.yamaghanta.end));
+    push(at(p.gulikaKaal.start), t('mu.gulika'), colors.festival, at(p.gulikaKaal.end));
+    push(at(p.abhijitMuhurta.start), t('mu.abhijit'), colors.success, at(p.abhijitMuhurta.end));
+    push(at(p.rahuKaal.start), t('ui.rahuKaal'), colors.festival, at(p.rahuKaal.end));
+    push(at(p.sunset), t('ui.sunset'), tones.plum.fg);
+    if (p.moonrise && p.moonrise !== '--:--') push(at(p.moonrise), t('ui.moonrise'), tones.neel.fg);
+    // A tithi or nakshatra that ends before sunrise ends on the next morning.
+    const endAt = (hhmm: string) => { const d = at(hhmm); return d && rise && d < rise ? at(hhmm, true) : d; };
+    const tEnd = p.tithi.endTime !== '--:--' ? endAt(p.tithi.endTime) : null;
+    if (tEnd) push(tEnd, `${native(p.tithi.name, p.tithi.nameHi)} ${tx('ends')}`);
+    const nEnd = p.nakshatra.endTime !== '--:--' ? endAt(p.nakshatra.endTime) : null;
+    if (nEnd) push(nEnd, `${native(p.nakshatra.name, p.nakshatra.nameHi)} ${tx('ends')}`);
+    (selectedInfo?.grahan || []).filter((g) => g.visible).forEach((g) => {
+      if (g.sutak) push(g.sutak, tx('Sutak begins'), colors.grahan);
+      push(g.start, tx(g.kind === 'solar' ? 'Surya grahan' : 'Chandra grahan'), colors.grahan, g.end);
+    });
+    return list.sort((x, y) => +x.at - +y.at);
+  }, [selectedPanchang, selectedInfo, language, colors]);
+  const nowIndex = isSelToday ? dayTimeline.findIndex((e) => e.at.getTime() > Date.now()) : -1;
+
   const groomingColor = getGroomingStatusColor(selectedGrooming.overallStatus);
   const hasNote = !!notes[selectedDateKey];
   const selFestivals = selectedInfo?.festivals || [];
@@ -364,6 +523,14 @@ export default function CalendarScreen() {
     title: holidayName(h),
     tag: h.kind === 'day' ? tx('Important day') : tx('Public holiday'),
     icon: h.kind === 'day' ? 'flag-outline' : 'flag', tone: tones.neel,
+  }));
+  (selectedInfo?.grahan || []).forEach((g) => dayEvents.unshift({
+    title: tx(g.kind === 'solar' ? 'Surya grahan (solar eclipse)' : 'Chandra grahan (lunar eclipse)'),
+    line: g.visible
+      ? `${tx(g.type === 'total' ? 'Total' : g.type === 'annular' ? 'Annular' : g.type === 'partial' ? 'Partial' : 'Penumbral')}: ${hm(g.start)} – ${hm(g.end)}${g.sutak ? `. ${tx('Sutak from')} ${hm(g.sutak)}${g.sutak.getDate() !== g.start.getDate() ? ` (${g.sutak.toLocaleDateString(locale, { day: 'numeric', month: 'short' })})` : ''}.` : '.'}`
+      : tx('Not visible from your place, so no sutak.'),
+    tag: g.visible ? tx('Visible') : undefined,
+    icon: g.kind === 'solar' ? 'weather-sunny-off' : 'moon-full', tone: { bg: colors.grahanBg, fg: colors.grahan },
   }));
   const covered = (n: string) => selFestivals.some((f) => f.name.toLowerCase().includes(n));
   if (selectedInfo?.isEkadashi && !covered('ekadashi')) dayEvents.push({ title: native('Ekadashi', 'एकादशी'), line: tx('Fasting day dedicated to Lord Vishnu.'), tag: tx('Fast'), icon: 'moon-waxing-crescent', tone: tones.plum });
@@ -424,91 +591,50 @@ export default function CalendarScreen() {
           <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
         </TouchableOpacity>
 
-        {/* ═══ Calendar grid — clean by default, markers only when meaningful ═══ */}
-        <View style={[st.calendarCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} {...swipe.panHandlers}>
+        {/* ═══ Calendar grid: dates first, small dots for what's on ═══ */}
+        <View style={[st.calendarCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={st.dayHeaders}>
             {dayNames.map((d, i) => (
-              <View key={i} style={{ width: CELL, alignItems: 'center', paddingVertical: 8 }}>
+              <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}>
                 <Text style={[st.dayHeaderText, { color: i === 0 ? colors.festival : colors.textTertiary }, noTrack]}>{d}</Text>
               </View>
             ))}
           </View>
-
-          <Animated.View style={[st.grid, { transform: [{ translateX: slide }], opacity: slide.interpolate({ inputRange: [-60, 0, 60], outputRange: [0.4, 1, 0.4] }) }]}>
-            {calendarDays.map((item, idx) => {
-              if (!item.isCurrentMonth) {
-                return (
-                  <View key={idx} style={[st.cell, { width: CELL }]}>
-                    <Text style={[st.cellDay, { color: colors.textTertiary, opacity: 0.25 }]}>{item.day}</Text>
-                  </View>
-                );
-              }
-              const day = item.day;
-              const info = monthInfo[day];
-              const today = isToday(day);
-              const selected = isSelected(day);
-              const isSunday = new Date(year, month, day).getDay() === 0;
-              const hasFestival = (info?.festivals.length || 0) + (info?.regionalFests.length || 0) > 0;
-              const dayHasNote = !!notes[getDateKey(new Date(year, month, day))];
-              const holiday = !!info?.holidays.some(isPublicHoliday);
-              const fest = tones.kumkum;
-
-              return (
-                <TouchableOpacity
-                  key={idx}
-                  style={[st.cell, { width: CELL }]}
-                  onPress={() => setSelectedDate(new Date(year, month, day))}
-                  activeOpacity={0.6}
-                  accessibilityLabel={`${day}${hasFestival ? ', ' + info!.festivals.map((f) => f.name).join(', ') : ''}`}
-                >
-                  <View
-                    style={[
-                      st.cellInner,
-                      hasFestival && !selected && { backgroundColor: fest.fg + '2B', borderWidth: 1.5, borderColor: fest.fg + '99' },
-                      today && !selected && { borderColor: colors.primary, borderWidth: 2 },
-                      selected && { backgroundColor: colors.primary },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        st.cellDay,
-                        { color: isSunday || holiday ? colors.festival : colors.text },
-                        hasFestival && !selected && { color: fest.fg, fontWeight: '800' },
-                        today && !selected && { color: colors.primary, fontWeight: '800' },
-                        selected && { color: '#FFF', fontWeight: '800' },
-                      ]}
-                    >
-                      {day}
-                    </Text>
-                    {!!info && (
-                      <Text style={[st.cellSub, { color: selected ? 'rgba(255,255,255,0.85)' : colors.textTertiary }]} numberOfLines={1}>
-                        {info.regional ? (info.regional.day === 1 ? info.regional.monthName.slice(0, 4) : info.regional.day) : `${info.paksha === 'shukla' ? '' : ''}${info.tithiNo}`}
-                      </Text>
-                    )}
-                    {(info?.isPurnima || info?.isAmavasya || info?.isEkadashi) && (
-                      <View style={[st.tithiDot, {
-                        backgroundColor: info.isPurnima ? colors.purnima : info.isEkadashi ? colors.ekadashi : colors.amavasya,
-                        borderColor: selected ? '#FFF' : info.isAmavasya ? colors.textTertiary : 'transparent',
-                      }]} />
-                    )}
-                    {holiday && <View style={[st.holidayBar, { backgroundColor: selected ? '#FFF' : colors.info }]} />}
-                    {dayHasNote && <View style={[st.noteMark, { backgroundColor: selected ? '#FFD700' : colors.info || '#1565C0' }]} />}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </Animated.View>
+          <View onLayout={(e) => setPageW(Math.floor(e.nativeEvent.layout.width))} style={{ height: ROW_H * 6 }}>
+            {pageW > 0 && (
+              <FlatList
+                ref={pagerRef}
+                data={pages}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(i) => String(i)}
+                initialScrollIndex={curIdx - (nowIdx - PAGE_SPAN)}
+                getItemLayout={(_, i) => ({ length: pageW, offset: pageW * i, index: i })}
+                windowSize={3}
+                initialNumToRender={1}
+                maxToRenderPerBatch={1}
+                onMomentumScrollEnd={onPageEnd}
+                renderItem={({ item }) => (
+                  <MonthPage year={Math.floor(item / 12)} month={item % 12} width={pageW} ctx={ctx}
+                    selected={selKey} today={todayKey} notes={notes} onSelect={onSelectDay} c={gridColors} />
+                )}
+                extraData={`${selKey}|${Object.keys(notes).length}|${gridColors.text}`}
+              />
+            )}
+          </View>
 
           <View style={[st.legend, { borderTopColor: colors.divider }]}>
             {[
-              { swatch: <View style={[st.legendDot, { backgroundColor: colors.purnima }]} />, label: t('cal.purnima') },
-              { swatch: <View style={[st.legendDot, { backgroundColor: colors.amavasya, borderWidth: 1, borderColor: colors.textTertiary }]} />, label: t('cal.amavasya') },
-              { swatch: <View style={[st.legendDot, { backgroundColor: colors.ekadashi }]} />, label: t('cal.ekadashi') },
-              { swatch: <View style={[st.legendSquare, { backgroundColor: tones.kumkum.fg + '2B', borderWidth: 1.5, borderColor: tones.kumkum.fg + '99' }]} />, label: t('cal.festival') },
-              { swatch: <View style={[st.legendBar, { backgroundColor: colors.info }]} />, label: 'Holiday' },
+              { col: tones.kumkum.fg, label: t('cal.festival') },
+              { col: colors.ekadashi, label: t('cal.ekadashi') },
+              { col: colors.purnima, label: t('cal.purnima') },
+              { col: colors.amavasya, label: t('cal.amavasya') },
+              { col: colors.grahan, label: 'Grahan' },
+              { col: colors.info, label: 'Holiday' },
             ].map((item, idx) => (
               <View key={idx} style={st.legendItem}>
-                {item.swatch}
+                <View style={[st.legendDot, { backgroundColor: item.col }]} />
                 <Text style={[st.legendText, { color: colors.textTertiary }]}>{tx(item.label)}</Text>
               </View>
             ))}
@@ -561,33 +687,36 @@ export default function CalendarScreen() {
             <Text style={[st.quietDay, { color: colors.textTertiary }]}>{tx('No festival or holiday on this day.')}</Text>
           )}
 
-          {/* Timings */}
-          <View style={[st.timingsRow, { backgroundColor: colors.surfaceSecondary, borderColor: colors.divider }]}>
-            <View style={st.timing}>
-              <MaterialCommunityIcons name="weather-sunset-up" size={15} color="#FF8C00" />
-              <Text style={[st.timingLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.sunrise')}</Text>
-              <Text style={[st.timingValue, { color: colors.text }]}>{selectedPanchang.sunrise}</Text>
-            </View>
-            <View style={[st.timingDivider, { backgroundColor: colors.divider }]} />
-            <View style={st.timing}>
-              <MaterialCommunityIcons name="weather-sunset-down" size={15} color="#7C3AED" />
-              <Text style={[st.timingLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.sunset')}</Text>
-              <Text style={[st.timingValue, { color: colors.text }]}>{selectedPanchang.sunset}</Text>
-            </View>
-            <View style={[st.timingDivider, { backgroundColor: colors.divider }]} />
-            <View style={st.timing}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={15} color={colors.festival} />
-              <Text style={[st.timingLabel, { color: colors.textTertiary }, noTrack]}>{t('ui.rahuKaal')}</Text>
-              <Text style={[st.timingValue, { color: colors.festival }]}>{selectedPanchang.rahuKaal.start}–{selectedPanchang.rahuKaal.end}</Text>
-            </View>
+          {/* Day timeline: everything that has a time, in order */}
+          <View style={[st.timeline, { borderColor: colors.divider }]}>
+            {dayTimeline.map((ev, i) => {
+              const past = isSelToday && ev.at.getTime() < Date.now();
+              const nowHere = isSelToday && i === nowIndex;
+              return (
+                <View key={i}>
+                  {nowHere && (
+                    <View style={st.nowLine}>
+                      <View style={[st.nowDot, { backgroundColor: colors.primary }]} />
+                      <View style={[st.nowRule, { backgroundColor: colors.primary }]} />
+                      <Text style={{ color: colors.primary, fontSize: 10.5, fontWeight: '900', letterSpacing: 0.6 }}>{tx('NOW')}</Text>
+                    </View>
+                  )}
+                  <View style={[st.tlRow, past && { opacity: 0.45 }]}>
+                    <Text style={[st.tlTime, { color: ev.color || colors.text }]}>{ev.end ? `${hm(ev.at)}–${hm(ev.end)}` : hm(ev.at)}</Text>
+                    <View style={[st.tlBar, { backgroundColor: ev.color || colors.divider }]} />
+                    <Text style={[st.tlLabel, { color: colors.text }]} numberOfLines={2}>{ev.label}</Text>
+                  </View>
+                </View>
+              );
+            })}
           </View>
 
           {/* One grooming line; tap for the reason */}
           <TouchableOpacity onPress={() => setGroomOpen((v) => !v)} activeOpacity={0.75} style={[st.groomRow, { backgroundColor: groomingColor + '12', borderColor: groomingColor + '33' }]}>
             <MaterialCommunityIcons name="content-cut" size={15} color={groomingColor} />
-            <Text style={[st.groomText, { color: colors.text }]}>{t('home.grooming')}</Text>
+            <Text style={[st.groomText, { color: colors.text }]}>{tx('Grooming')}</Text>
             <Text style={[st.groomWord, { color: groomingColor }]}>
-              {t(selectedGrooming.overallStatus === 'allowed' ? 'grooming.ok' : selectedGrooming.overallStatus === 'avoid' ? 'grooming.caution' : 'grooming.avoid')}
+              {tx(selectedGrooming.overallStatus === 'allowed' ? 'Good day' : selectedGrooming.overallStatus === 'avoid' ? 'Better to skip' : 'Avoid today')}
             </Text>
             <View style={{ flex: 1 }} />
             <Ionicons name={groomOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
@@ -850,6 +979,14 @@ const st = StyleSheet.create({
 
   // Grid
   calendarCard: { marginTop: 14, borderRadius: 20, padding: GRID_PAD, borderWidth: 1 },
+  timeline: { marginTop: 14, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8 },
+  tlRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
+  tlTime: { width: 92, fontSize: 12.5, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  tlBar: { width: 3, height: 18, borderRadius: 2 },
+  tlLabel: { flex: 1, fontSize: 13.5 },
+  nowLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 2 },
+  nowDot: { width: 8, height: 8, borderRadius: 4 },
+  nowRule: { flex: 1, height: 1.5 },
   dayHeaders: { flexDirection: 'row' },
   dayHeaderText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },

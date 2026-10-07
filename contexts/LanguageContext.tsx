@@ -72,6 +72,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const setLanguage = async (lang: LanguageCode) => {
     setLanguageState(lang);
     await AsyncStorage.setItem('language', lang);
+    // Notifications are written in the app language: rewrite the queued ones.
+    import('../services/notifications')
+      .then((m) => m.scheduleHourlyNotifications().then(() => m.scheduleObservanceAlerts()))
+      .catch(() => {});
   };
 
   // Fallback chain: selected → English. (It used to fall back to Hindi, which

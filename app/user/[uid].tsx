@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Header, Button } from '../../components/ui';
-import { ProfileHead, PostGrid, PostSort } from '../../components/community/ProfileHead';
+import { ProfileHead, PostGrid, PostSort, type ProfileSort } from '../../components/community/ProfileHead';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,7 +27,7 @@ export default function PublicProfile() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [sort, setSort] = useState<'hot' | 'new' | 'top'>('new');
+  const [sort, setSort] = useState<ProfileSort>('new');
   const ordered = useMemo(() => withPinnedFirst(rankPosts(posts, sort, 'all')), [posts, sort]);
 
   useEffect(() => { if (uid && uid === user?.uid) router.replace('/(tabs)/profile'); }, [uid, user?.uid]);

@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import type { Kundli, BirthInput } from './jyotish';
 import { grahaFlags, analyse, saturnPeriods, antardashas, extraBirthDetails, fmtDeg, SIGNS } from './jyotishExtras';
 import { saveToDownloads, notifySaved } from './downloads';
+import { shareFile } from './shareApp';
 
 const esc = (s: any) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
 const ABBR: Record<string, string> = { Sun: 'Su', Moon: 'Mo', Mars: 'Ma', Mercury: 'Me', Jupiter: 'Ju', Venus: 'Ve', Saturn: 'Sa', Rahu: 'Ra', Ketu: 'Ke' };
@@ -146,13 +147,11 @@ export async function buildKundliPdf(k: Kundli, birth: BirthInput | null, name?:
 export async function downloadKundliPdf(k: Kundli, birth: BirthInput | null, name?: string): Promise<{ saved: boolean; uri: string; fileName: string; savedUri?: string }> {
   const { uri, fileName } = await buildKundliPdf(k, birth, name);
   const savedUri = await saveToDownloads(uri, fileName, 'application/pdf');
-  if (savedUri) await notifySaved('Kundli saved to Downloads', `${fileName} · tap to open`, savedUri, 'application/pdf');
+  if (savedUri) await notifySaved('Kundli saved', `${fileName} · tap to open`, savedUri, 'application/pdf');
   return { saved: !!savedUri, uri, fileName, savedUri: savedUri || undefined };
 }
 
 export async function shareKundliPdf(k: Kundli, birth: BirthInput | null, name?: string) {
   const { uri, fileName } = await buildKundliPdf(k, birth, name);
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: fileName, UTI: 'com.adobe.pdf' });
-  }
+  await shareFile(uri, 'application/pdf', `Kundli of ${name || 'my birth chart'}`, fileName);
 }
