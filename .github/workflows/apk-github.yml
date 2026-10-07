@@ -3,7 +3,8 @@
 # keeps for us, so the APK installs over earlier versions without data loss.
 # The APK is attached to a GitHub pre-release with a direct download link.
 #
-# Default way to make an APK. "Build APK (EAS)" stays as a manual fallback.
+# Default way to make an APK. "Build APK (EAS)" runs at the same time in
+# Expo's cloud; use whichever APK arrives first.
 # Last triggered for 1.16.0 (versionCode 18).
 name: Build APK (GitHub)
 
@@ -26,24 +27,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      # The release build (R8 + Hermes + two ABIs) needs room: drop unused
-      # toolchains and add swap so the runner never runs out of memory.
+      # The repo is public, so this is the 4-core / 16 GB runner. Swap stays as
+      # a safety net for the release build (R8 + Hermes).
       - name: Free disk and add swap
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL || true
           sudo swapoff -a || true
-          sudo fallocate -l 6G /swapfile2 && sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2 && sudo swapon /swapfile2
+          sudo fallocate -l 4G /swapfile2 && sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2 && sudo swapon /swapfile2
           free -h; df -h /
       - name: Gradle settings for CI
         run: |
           mkdir -p ~/.gradle
           cat > ~/.gradle/gradle.properties <<'PROPS'
-          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
-          org.gradle.workers.max=2
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
+          org.gradle.workers.max=4
           reactNativeArchitectures=arm64-v8a
-          org.gradle.parallel=false
+          org.gradle.parallel=true
           org.gradle.daemon=false
-          kotlin.daemon.jvmargs=-Xmx2g
+          kotlin.daemon.jvmargs=-Xmx3g
           kotlin.compiler.execution.strategy=in-process
           PROPS
       - uses: actions/checkout@v4
