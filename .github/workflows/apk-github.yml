@@ -4,6 +4,7 @@
 # The APK is attached to a GitHub pre-release with a direct download link.
 #
 # Default way to make an APK. "Build APK (EAS)" stays as a manual fallback.
+# Last triggered for 1.15.0 (versionCode 17).
 name: Build APK (GitHub)
 
 on:
