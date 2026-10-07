@@ -5,3 +5,8 @@ export { default as Section } from './Section';
 export { default as Header } from './Header';
 export { default as SettingsRow } from './SettingsRow';
 export { default as Diya } from './Diya';
+export { default as Icon, fromMaterial } from './Icon';
+export { default as AppBar } from './AppBar';
+export { ToolTile, ToolRow, ToolGlyph } from './ToolTile';
+export { LanguageChip, ThemeToggle, useQuickSettings } from './QuickSettings';
+export { default as ActionSheet } from './ActionSheet';

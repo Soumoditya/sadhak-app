@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { DS } from '../../constants/ds';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface Props {
   title: string;
@@ -22,6 +23,7 @@ export default function Button({
   icon, disabled, loading, fullWidth = true, style,
 }: Props) {
   const { colors } = useTheme();
+  const { tx } = useLanguage();
   const height = size === 'lg' ? DS.layout.buttonHeightLg : DS.layout.buttonHeightMd;
 
   const content = (fg: string) => (
@@ -31,7 +33,7 @@ export default function Button({
       ) : (
         <>
           {icon && <MaterialCommunityIcons name={icon as any} size={size === 'lg' ? 20 : 18} color={fg} />}
-          <Text style={[styles.text, { color: fg, fontSize: DS.type.button.size }]}>{title}</Text>
+          <Text style={[styles.text, { color: fg, fontSize: DS.type.button.size }]}>{tx(title)}</Text>
         </>
       )}
     </View>
@@ -48,7 +50,7 @@ export default function Button({
   if (variant === 'primary') {
     return (
       <TouchableOpacity disabled={disabled || loading} onPress={onPress} activeOpacity={0.85} style={[wrap, style]}>
-        <LinearGradient colors={['#D94F00', '#F07830']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fill}>
+        <LinearGradient colors={['#C2410C', '#E8743B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fill}>
           {content('#FFF')}
         </LinearGradient>
       </TouchableOpacity>

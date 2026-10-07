@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
   FlatList, Modal, Alert, ActivityIndicator, Linking, Platform, Dimensions,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,12 +18,22 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useLayoutInsets } from '../../constants/layout';
+import { AppBar, Icon } from '../../components/ui';
+import { myRating, rateBook, average, ratingScore } from '../../services/ratings';
+import { increment } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import BookCover from '../../components/library/BookCover';
+import { DOWNLOADS_DIR, listDownloads } from '../../services/downloads';
+import { shareFile } from '../../services/shareApp';
+
+const LAST_READ = 'sadhak_last_read';
+type LastRead = { id: string; title: string; author: string; url: string; category: string; at: number };
 
 const CATEGORIES = [
-  { id: 'all', name: 'All', icon: 'bookshelf', color: '#D94F00' },
+  { id: 'all', name: 'All', icon: 'bookshelf', color: '#C2410C' },
   { id: 'vedas', name: 'Vedas & Upanishads', icon: 'book-open-page-variant', color: '#FF6B00' },
   { id: 'puranas', name: 'Puranas', icon: 'book-multiple', color: '#8B0000' },
-  { id: 'gita', name: 'Bhagavad Gita', icon: 'book-cross', color: '#1565C0' },
+  { id: 'gita', name: 'Bhagavad Gita', icon: 'om', color: '#1565C0' },
   { id: 'epics', name: 'Ramayana & Mahabharata', icon: 'sword-cross', color: '#2D6A4F' },
   { id: 'stotras', name: 'Stotras & Mantras', icon: 'music-note', color: '#9C27B0' },
   { id: 'dharma', name: 'Dharmashastra', icon: 'scale-balance', color: '#D32F2F' },
@@ -31,7 +42,7 @@ const CATEGORIES = [
 ];
 
 type ViewMode = 'grid' | 'list';
-type SortMode = 'newest' | 'title' | 'popular';
+type SortMode = 'newest' | 'top' | 'popular' | 'title';
 
 interface LibraryItem {
   id: string;
@@ -46,13 +57,15 @@ interface LibraryItem {
   uploadedAt: any;
   downloadCount: number;
   status?: string;
+  ratingSum?: number;
+  ratingCount?: number;
 }
 
 export default function LibraryScreen() {
   const { user, isAdmin } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, tone } = useTheme();
   const dialog = useDialog();
-  const { t } = useLanguage();
+  const { t, tx, display } = useLanguage();
   const { headerPaddingTop, tabContentPadding, bottomInset } = useLayoutInsets();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,6 +81,50 @@ export default function LibraryScreen() {
   const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [showReviewQueue, setShowReviewQueue] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [rateFor, setRateFor] = useState<LibraryItem | null>(null);
+  const [myStars, setMyStars] = useState(0);
+  const [savingRate, setSavingRate] = useState(false);
+  const [lastRead, setLastRead] = useState<LastRead | null>(null);
+  const [offline, setOffline] = useState<{ name: string; uri: string }[]>([]);
+  useEffect(() => { listDownloads().then(setOffline); }, []);
+  useEffect(() => {
+    AsyncStorage.getItem(LAST_READ).then((v) => { if (v) setLastRead(JSON.parse(v)); }).catch(() => {});
+  }, []);
+
+  const openRate = async (book: LibraryItem) => {
+    if (!user) return;
+    setRateFor(book); setMyStars(0);
+    setMyStars(await myRating(book.id, user.uid));
+  };
+
+  const submitRate = async (stars: number) => {
+    if (!user || !rateFor) return;
+    setSavingRate(true);
+    const prev = await myRating(rateFor.id, user.uid);
+    try {
+      await rateBook(rateFor.id, user.uid, stars, prev);
+      setBooks((list) => list.map((b) => b.id === rateFor.id
+        ? { ...b, ratingSum: (b.ratingSum || 0) + stars - prev, ratingCount: (b.ratingCount || 0) + (prev ? 0 : 1) }
+        : b));
+      setMyStars(stars);
+      setTimeout(() => setRateFor(null), 350);
+    } catch (e: any) {
+      dialog.alert('Could not save rating', String(e?.message || e).slice(0, 200));
+    } finally { setSavingRate(false); }
+  };
+
+  const Stars = ({ book, size = 12 }: { book: LibraryItem; size?: number }) => {
+    const avg = average(book.ratingSum, book.ratingCount);
+    return (
+      <TouchableOpacity onPress={() => openRate(book)} hitSlop={8} style={st.starsRow} accessibilityLabel={tx('Rate this book')}>
+        <MaterialCommunityIcons name={avg ? 'star' : 'star-outline'} size={size + 2} color="#E8A317" />
+        <Text style={[st.starsText, { color: avg ? colors.text : colors.textTertiary }]}>
+          {avg ? `${avg.toFixed(1)}` : tx('Rate')}
+        </Text>
+        {!!book.ratingCount && <Text style={[st.starsCount, { color: colors.textTertiary }]}>({book.ratingCount})</Text>}
+      </TouchableOpacity>
+    );
+  };
 
   useEffect(() => { fetchBooks(); if (isAdmin) fetchSubmissions(); }, []);
 
@@ -124,8 +181,11 @@ export default function LibraryScreen() {
     .sort((a, b) => {
       if (sortMode === 'title') return (a.title || '').localeCompare(b.title || '');
       if (sortMode === 'popular') return (b.downloadCount || 0) - (a.downloadCount || 0);
+      if (sortMode === 'top') return ratingScore(b.ratingSum, b.ratingCount) - ratingScore(a.ratingSum, a.ratingCount);
       return 0; // newest is already the default order
     });
+
+  const browsing = !searchQuery && selectedCategory === 'all';
 
   const pickDocument = async () => {
     try {
@@ -192,20 +252,36 @@ export default function LibraryScreen() {
   // Read inside the app (pdf.js reader) instead of kicking users to an external app.
   const openPDF = (url: string, title?: string) =>
     router.push({ pathname: '/reader', params: { url, title: title || '' } });
+  const openBook = (book: LibraryItem) => {
+    const lr: LastRead = { id: book.id, title: book.title, author: book.author, url: book.cloudinaryUrl, category: book.category, at: Date.now() };
+    setLastRead(lr);
+    AsyncStorage.setItem(LAST_READ, JSON.stringify(lr)).catch(() => {});
+    openPDF(book.cloudinaryUrl, book.title);
+  };
+
+  // Preset categories resolve to their entry; a custom category (any string not
+  // in CATEGORIES) keeps its own label with a plain book glyph.
+  const catOf = (category: string) => {
+    const preset = CATEGORIES.find(c => c.id === category);
+    const other = CATEGORIES[CATEGORIES.length - 1];
+    return preset || { ...other, name: category || other.name, icon: 'book-outline' };
+  };
 
   const downloadPDF = async (book: LibraryItem) => {
     try {
       setDownloadingId(book.id);
       const fileName = `${book.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-      const fileUri = FileSystem.documentDirectory + fileName;
+      await FileSystem.makeDirectoryAsync(DOWNLOADS_DIR, { intermediates: true }).catch(() => {});
+      const fileUri = DOWNLOADS_DIR + fileName;
       const download = await FileSystem.downloadAsync(book.cloudinaryUrl, fileUri);
       if (download.status !== 200) throw new Error(`Server replied HTTP ${download.status}.`);
-      try { await updateDoc(doc(db, 'library', book.id), { downloadCount: (book.downloadCount || 0) + 1 }); } catch (e) {}
-      dialog.alert('Downloaded', `"${book.title}" is saved offline. What next?`, [
-        { text: 'Read now', onPress: () => openPDF(download.uri, book.title) },
-        { text: 'Share / save', onPress: async () => { try { await Sharing.shareAsync(download.uri); } catch {} } },
-        { text: 'Done', style: 'cancel' },
-      ]);
+      try { await updateDoc(doc(db, 'library', book.id), { downloadCount: increment(1) }); } catch (e) {}
+      setOffline(await listDownloads());
+      dialog.alert(tx('Saved offline'), `"${book.title}"`, [
+        { text: tx('Read now'), onPress: () => openPDF(download.uri, book.title) },
+        { text: tx('Share'), onPress: () => shareFile(download.uri, 'application/pdf', `"${book.title}" from the Sadhak library`) },
+        { text: tx('Done'), style: 'cancel' },
+      ], { tone: 'success' });
     } catch (error: any) {
       // Real reason instead of a generic guess — debuggable from a screenshot.
       dialog.alert('Download failed', String(error?.message || error).slice(0, 200));
@@ -237,24 +313,19 @@ export default function LibraryScreen() {
   };
 
   const renderBookCard = ({ item }: { item: LibraryItem }) => {
-    // Preset categories resolve to their chip; a custom category (any string not
-    // in CATEGORIES) keeps its own label but shows a proper book glyph (not the
-    // "···" dots that read as an unfinished placeholder).
-    const preset = CATEGORIES.find(c => c.id === item.category);
-    const other = CATEGORIES[CATEGORIES.length - 1];
-    const cat = preset || { ...other, name: item.category || other.name, icon: 'book-outline' };
+    const cat = catOf(item.category);
     const isDownloading = downloadingId === item.id;
 
     if (viewMode === 'grid') {
       return (
-        <TouchableOpacity style={[st.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
-          <View style={[st.gridIcon, { backgroundColor: cat.color + '12' }]}>
-            <MaterialCommunityIcons name={cat.icon as any} size={32} color={cat.color} />
+        <TouchableOpacity style={[st.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openBook(item)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
+          <View style={{ alignItems: 'center', marginBottom: 10 }}>
+            <BookCover title={item.title} color={cat.color} icon={cat.icon} width={GRID_W - 56} />
           </View>
           <Text style={[st.gridTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
           <Text style={[st.gridAuthor, { color: colors.textSecondary }]} numberOfLines={1}>{item.author}</Text>
           <View style={st.gridMeta}>
-            <Text style={[st.gridSize, { color: colors.textTertiary }]}>{formatFileSize(item.fileSize)}</Text>
+            <Stars book={item} />
             <TouchableOpacity onPress={() => downloadPDF(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               {isDownloading ? <ActivityIndicator size="small" color={colors.primary} /> :
                 <MaterialCommunityIcons name="download" size={18} color={colors.primary} />}
@@ -265,23 +336,21 @@ export default function LibraryScreen() {
     }
 
     return (
-      <TouchableOpacity style={[st.bookCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
-        <View style={[st.bookIcon, { backgroundColor: cat.color + '12' }]}>
-          <MaterialCommunityIcons name={cat.icon as any} size={28} color={cat.color} />
-        </View>
+      <TouchableOpacity style={[st.bookCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openBook(item)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
+        <BookCover title={item.title} color={cat.color} icon={cat.icon} width={50} />
         <View style={st.bookInfo}>
           <Text style={[st.bookTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
           <Text style={[st.bookAuthor, { color: colors.textSecondary }]}>{item.author}</Text>
           {item.description ? <Text style={[st.bookDesc, { color: colors.textTertiary }]} numberOfLines={1}>{item.description}</Text> : null}
           <View style={st.bookMeta}>
-            <Text style={[st.bookSize, { color: colors.textTertiary }]}>{formatFileSize(item.fileSize)}</Text>
+            <Stars book={item} />
             {(item.downloadCount || 0) > 0 && (
               <View style={st.downloadBadge}>
                 <MaterialCommunityIcons name="download" size={10} color={colors.textTertiary} />
                 <Text style={[st.downloadCount, { color: colors.textTertiary }]}>{item.downloadCount}</Text>
               </View>
             )}
-            <Text style={[st.bookCategory, { color: cat.color, backgroundColor: cat.color + '10' }]}>{cat.name}</Text>
+            <Text style={[st.bookCategory, { color: tone(cat.color).fg, backgroundColor: tone(cat.color).bg }]}>{tx(cat.name)}</Text>
           </View>
         </View>
         <TouchableOpacity style={[st.dlBtn, { backgroundColor: colors.primary + '12' }]} onPress={() => downloadPDF(item)}>
@@ -295,70 +364,38 @@ export default function LibraryScreen() {
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#B33D00']} style={[st.header, { paddingTop: headerPaddingTop }]}>
-        <View style={st.headerRow}>
-          <View>
-            <Text style={st.headerTitle}>{t('lib.title')}</Text>
-            <Text style={st.headerSub}>{books.length} texts available</Text>
-          </View>
-          <View style={st.headerActions}>
-            {isAdmin && submissions.length > 0 && (
-              <TouchableOpacity style={[st.reviewBadge, { backgroundColor: '#EF444420' }]} onPress={() => setShowReviewQueue(true)}>
-                <MaterialCommunityIcons name="file-clock-outline" size={18} color="#EF4444" />
-                <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{submissions.length}</Text>
+      <View style={[st.header, { paddingTop: headerPaddingTop + 4 }]}>
+        <AppBar
+          title={t('f.library')}
+          subtitle={`${books.length} · ${t('lib.sub')}`}
+          right={
+            <>
+              {isAdmin && submissions.length > 0 && (
+                <TouchableOpacity style={[st.reviewBadge, { backgroundColor: '#EF444418' }]} onPress={() => setShowReviewQueue(true)}>
+                  <MaterialCommunityIcons name="file-clock-outline" size={18} color="#EF4444" />
+                  <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{submissions.length}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} style={[st.headerBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+                <Icon name={viewMode === 'grid' ? 'list-bullets' : 'squares-four'} size={19} color={colors.text} weight="regular" />
               </TouchableOpacity>
-            )}
-            <TouchableOpacity onPress={() => router.push('/wiki')} style={st.headerBtn}>
-              <MaterialCommunityIcons name="book-education-outline" size={20} color="#FFF" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} style={st.headerBtn}>
-              <MaterialCommunityIcons name={viewMode === 'grid' ? 'view-list-outline' : 'view-grid-outline'} size={20} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </LinearGradient>
+            </>
+          }
+        />
+      </View>
 
       {/* Search */}
       <View style={[st.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Ionicons name="search" size={18} color={colors.textTertiary} />
-        <TextInput style={[st.searchInput, { color: colors.text }]} placeholder="Search books, authors..." placeholderTextColor={colors.textTertiary} value={searchQuery} onChangeText={setSearchQuery} />
+        <Icon name="magnifying-glass" size={18} color={colors.textTertiary} weight="regular" />
+        <TextInput style={[st.searchInput, { color: colors.text }]} placeholder={t('lib.search')} placeholderTextColor={colors.textTertiary} value={searchQuery} onChangeText={setSearchQuery} />
         {searchQuery ? <TouchableOpacity onPress={() => setSearchQuery('')}><Ionicons name="close-circle" size={18} color={colors.textTertiary} /></TouchableOpacity> : null}
       </View>
-
-      {/* Sort */}
-      <View style={st.sortRow}>
-        {([
-          { mode: 'newest' as SortMode, label: 'Newest', icon: 'clock-outline' },
-          { mode: 'title' as SortMode, label: 'A-Z', icon: 'sort-alphabetical-ascending' },
-          { mode: 'popular' as SortMode, label: 'Popular', icon: 'fire' },
-        ]).map(({ mode, label, icon }) => {
-          const active = sortMode === mode;
-          return (
-            <TouchableOpacity key={mode} style={[st.sortChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]} onPress={() => setSortMode(mode)}>
-              <MaterialCommunityIcons name={icon as any} size={14} color={active ? '#FFF' : colors.textSecondary} />
-              <Text style={[st.sortText, { color: active ? '#FFF' : colors.textSecondary }]}>{label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Categories */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.catScroll} contentContainerStyle={st.catRow}>
-        {CATEGORIES.map(cat => (
-          <TouchableOpacity key={cat.id}
-            style={[st.catChip, { backgroundColor: selectedCategory === cat.id ? cat.color : colors.surface, borderColor: selectedCategory === cat.id ? cat.color : colors.border }]}
-            onPress={() => setSelectedCategory(cat.id)}>
-            <MaterialCommunityIcons name={cat.icon as any} size={14} color={selectedCategory === cat.id ? '#FFF' : cat.color} />
-            <Text style={[st.catText, { color: selectedCategory === cat.id ? '#FFF' : colors.text }]}>{cat.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
 
       {/* Books */}
       {loading ? (
         <View style={st.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Loading library...</Text>
+          <Text style={{ color: colors.textSecondary, marginTop: 8 }}>{tx('Loading library...')}</Text>
         </View>
       ) : (
         <FlatList
@@ -367,17 +404,119 @@ export default function LibraryScreen() {
           keyExtractor={item => item.id}
           numColumns={viewMode === 'grid' ? 2 : 1}
           key={viewMode}
-          contentContainerStyle={[viewMode === 'grid' ? st.gridList : st.booksList, { paddingBottom: tabContentPadding }]}
+          contentContainerStyle={[viewMode === 'grid' ? st.gridList : st.booksList, { paddingBottom: tabContentPadding + 70 }]}
           columnWrapperStyle={viewMode === 'grid' ? { gap: 10 } : undefined}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View>
+              {browsing ? (
+                <>
+                  {lastRead && (
+                    <TouchableOpacity activeOpacity={0.85} onPress={() => openPDF(lastRead.url, lastRead.title)} style={[st.continue, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                      <BookCover title={lastRead.title} color={catOf(lastRead.category).color} icon={catOf(lastRead.category).icon} width={46} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[st.kicker, { color: colors.primary }]}>{tx('Continue reading').toUpperCase()}</Text>
+                        <Text style={[st.bookTitle, { color: colors.text }]} numberOfLines={1}>{lastRead.title}</Text>
+                        <Text style={[st.bookAuthor, { color: colors.textSecondary }]} numberOfLines={1}>{lastRead.author}</Text>
+                      </View>
+                      <View style={[st.playBtn, { backgroundColor: colors.primary }]}>
+                        <Ionicons name="book-outline" size={18} color="#FFF" />
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {offline.length > 0 && (
+                    <>
+                      <Text style={[st.section, { color: colors.text }, display]}>{tx('Downloaded')}</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 20 }} style={{ marginHorizontal: -20, paddingLeft: 20 }}>
+                        {offline.map((f) => (
+                          <TouchableOpacity key={f.uri} onPress={() => openPDF(f.uri, f.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' '))} style={[st.offline, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} activeOpacity={0.8}>
+                            <MaterialCommunityIcons name="file-pdf-box" size={22} color={colors.primary} />
+                            <Text style={{ color: colors.text, fontSize: 12.5, fontWeight: '700', maxWidth: 140 }} numberOfLines={2}>{f.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ')}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </>
+                  )}
+
+                  <Text style={[st.section, { color: colors.text }, display]}>{tx('Browse by category')}</Text>
+                  <View style={st.catGrid}>
+                    {CATEGORIES.filter((c) => c.id !== 'all').map((cat) => {
+                      const n = books.filter((b) => b.category === cat.id).length;
+                      return (
+                        <TouchableOpacity key={cat.id} style={[st.catTile, { backgroundColor: tone(cat.color).bg }]} onPress={() => setSelectedCategory(cat.id)} activeOpacity={0.8}>
+                          <MaterialCommunityIcons name={cat.icon as any} size={24} color={tone(cat.color).fg} />
+                          <Text style={[st.catTileName, { color: colors.text }]} numberOfLines={2}>{tx(cat.name)}</Text>
+                          <Text style={[st.catTileCount, { color: tone(cat.color).fg }]}>{n}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {[
+                    { key: 'top', title: tx('Top rated'), list: books.filter((b) => b.ratingCount).sort((a, b) => ratingScore(b.ratingSum, b.ratingCount) - ratingScore(a.ratingSum, a.ratingCount)).slice(0, 10) },
+                    { key: 'new', title: tx('New arrivals'), list: books.slice(0, 10) },
+                  ].filter((sh) => sh.list.length >= 2).map((sh) => (
+                    <View key={sh.key}>
+                      <Text style={[st.section, { color: colors.text }, display]}>{sh.title}</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: 20 }} style={{ marginHorizontal: -20, paddingLeft: 20 }}>
+                        {sh.list.map((b) => {
+                          const c = catOf(b.category);
+                          return (
+                            <TouchableOpacity key={b.id} style={{ width: 104 }} onPress={() => openBook(b)} activeOpacity={0.8}>
+                              <BookCover title={b.title} color={c.color} icon={c.icon} width={104} />
+                              <Text style={[st.shelfTitle, { color: colors.text }]} numberOfLines={2}>{b.title}</Text>
+                              <Stars book={b} size={11} />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  ))}
+                  <Text style={[st.section, { color: colors.text }, display]}>{tx('All books')}</Text>
+                </>
+              ) : (
+                <View style={st.filterHead}>
+                  {selectedCategory !== 'all' && (
+                    <TouchableOpacity onPress={() => setSelectedCategory('all')} style={[st.backChip, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                      <Ionicons name="chevron-back" size={15} color={colors.text} />
+                      <Text style={{ color: colors.text, fontSize: 12.5, fontWeight: '700' }}>{tx('All')}</Text>
+                    </TouchableOpacity>
+                  )}
+                  <Text style={[st.filterTitle, { color: colors.text }, display]} numberOfLines={1}>
+                    {selectedCategory !== 'all' ? tx(catOf(selectedCategory).name) : tx('Results')}
+                  </Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: 13 }}>{filteredBooks.length}</Text>
+                </View>
+              )}
+              {books.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingRight: 20 }} style={{ marginHorizontal: -20, paddingLeft: 20, marginBottom: 10, flexGrow: 0 }}>
+                  {([
+                    { mode: 'newest' as SortMode, label: 'Newest', icon: 'clock-outline' },
+                    { mode: 'top' as SortMode, label: 'Top rated', icon: 'star' },
+                    { mode: 'popular' as SortMode, label: 'Popular', icon: 'fire' },
+                    { mode: 'title' as SortMode, label: 'A-Z', icon: 'sort-alphabetical-ascending' },
+                  ]).map(({ mode, label, icon }) => {
+                    const active = sortMode === mode;
+                    return (
+                      <TouchableOpacity key={mode} style={[st.sortChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]} onPress={() => setSortMode(mode)}>
+                        <MaterialCommunityIcons name={icon as any} size={14} color={active ? '#FFF' : colors.textSecondary} />
+                        <Text style={[st.sortText, { color: active ? '#FFF' : colors.textSecondary }]}>{tx(label)}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
+          }
           ListEmptyComponent={
             <View style={st.emptyState}>
-              <MaterialCommunityIcons name="book-open-blank-variant" size={60} color={colors.textTertiary} />
+              <MaterialCommunityIcons name="book-open-blank-variant" size={48} color={colors.textTertiary} />
               <Text style={[st.emptyTitle, { color: colors.text }]}>
-                {searchQuery ? 'No Results' : 'Library is Empty'}
+                {tx(searchQuery ? 'No Results' : browsing ? 'Library is Empty' : 'Nothing here yet')}
               </Text>
               <Text style={[st.emptyText, { color: colors.textSecondary }]}>
-                {searchQuery ? `No books matching "${searchQuery}"` : 'Upload a PDF to get started'}
+                {searchQuery ? `${tx('No books match')} "${searchQuery}"` : tx('Upload a PDF to get started')}
               </Text>
             </View>
           }
@@ -385,15 +524,35 @@ export default function LibraryScreen() {
       )}
 
       {/* Upload FAB — sits above the floating tab bar */}
-      <TouchableOpacity style={[st.fab, { bottom: tabContentPadding }]} onPress={() => setUploadModal(true)} activeOpacity={0.8}>
-        <LinearGradient colors={['#D94F00', '#FF8C00']} style={st.fabGrad}>
+      <TouchableOpacity style={[st.fab, { bottom: 20 }]} onPress={() => setUploadModal(true)} activeOpacity={0.8}>
+        <LinearGradient colors={['#C2410C', '#E8743B']} style={st.fabGrad}>
           <MaterialCommunityIcons name="plus" size={28} color="#FFF" />
         </LinearGradient>
       </TouchableOpacity>
 
+      {/* Rating sheet */}
+      <Modal visible={!!rateFor} transparent animationType="fade" onRequestClose={() => setRateFor(null)} statusBarTranslucent navigationBarTranslucent>
+        <TouchableOpacity style={st.rateOverlay} activeOpacity={1} onPress={() => setRateFor(null)}>
+          <View style={[st.rateCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Text style={[st.rateTitle, { color: colors.text }]} numberOfLines={2}>{rateFor?.title}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
+              {rateFor && rateFor.ratingCount ? `${average(rateFor.ratingSum, rateFor.ratingCount).toFixed(1)} ★ · ${rateFor.ratingCount} ${tx('ratings')}` : tx('Be the first to rate this book.')}
+            </Text>
+            <View style={st.rateStars}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <TouchableOpacity key={n} onPress={() => submitRate(n)} disabled={savingRate} hitSlop={6} accessibilityLabel={`${n}`}>
+                  <MaterialCommunityIcons name={n <= myStars ? 'star' : 'star-outline'} size={40} color="#E8A317" />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={{ color: colors.textTertiary, fontSize: 12.5 }}>{savingRate ? tx('Saving…') : myStars ? tx('Your rating. Tap to change.') : tx('Tap a star to rate.')}</Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Upload Modal */}
       <Modal visible={uploadModal} transparent animationType="slide">
-        <View style={st.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={st.modalOverlay}>
           <View style={[st.modalContent, { backgroundColor: colors.surface, paddingBottom: 24 + bottomInset }]}>
             <View style={st.modalHeader}>
               <Text style={[st.modalTitle, { color: colors.text }]}>{isAdmin ? 'Upload PDF' : 'Submit PDF for Review'}</Text>
@@ -406,7 +565,7 @@ export default function LibraryScreen() {
             {uploading && (
               <View style={[st.uploadStatus, { backgroundColor: colors.primary + '10' }]}>
                 <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Uploading...</Text>
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>{tx('Uploading...')}</Text>
               </View>
             )}
 
@@ -416,25 +575,25 @@ export default function LibraryScreen() {
               {selectedFile && <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{formatFileSize(selectedFile.size || 0)}</Text>}
             </TouchableOpacity>
 
-            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]} placeholder="Book Title *" placeholderTextColor={colors.textTertiary} value={uploadData.title} onChangeText={t => setUploadData({ ...uploadData, title: t })} />
-            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]} placeholder="Author" placeholderTextColor={colors.textTertiary} value={uploadData.author} onChangeText={t => setUploadData({ ...uploadData, author: t })} />
+            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]} placeholder={tx('Book Title *')} placeholderTextColor={colors.textTertiary} value={uploadData.title} onChangeText={t => setUploadData({ ...uploadData, title: t })} />
+            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]} placeholder={tx('Author')} placeholderTextColor={colors.textTertiary} value={uploadData.author} onChangeText={t => setUploadData({ ...uploadData, author: t })} />
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
                 <TouchableOpacity key={cat.id} style={[st.catSelect, { backgroundColor: uploadData.category === cat.id ? cat.color : colors.background, borderColor: cat.color }]} onPress={() => { setCustomCat(''); setUploadData({ ...uploadData, category: cat.id }); }}>
-                  <Text style={[st.catSelectText, { color: uploadData.category === cat.id ? '#FFF' : cat.color }]}>{cat.name}</Text>
+                  <Text style={[st.catSelectText, { color: uploadData.category === cat.id ? '#FFF' : cat.color }]}>{tx(cat.name)}</Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity style={[st.catSelect, { backgroundColor: customCat.trim() ? colors.primary : colors.background, borderColor: colors.primary }]} onPress={() => setUploadData({ ...uploadData, category: 'custom' })}>
                 <MaterialCommunityIcons name="plus" size={13} color={customCat.trim() ? '#FFF' : colors.primary} />
-                <Text style={[st.catSelectText, { color: customCat.trim() ? '#FFF' : colors.primary }]}>Custom</Text>
+                <Text style={[st.catSelectText, { color: customCat.trim() ? '#FFF' : colors.primary }]}>{tx('Custom')}</Text>
               </TouchableOpacity>
             </ScrollView>
 
             {uploadData.category === 'custom' && (
               <TextInput
                 style={[st.modalInput, { color: colors.text, borderColor: colors.primary, backgroundColor: colors.background }]}
-                placeholder="Custom category name (e.g. Sant Sahitya)"
+                placeholder={tx('Custom category name (e.g. Sant Sahitya)')}
                 placeholderTextColor={colors.textTertiary}
                 value={customCat}
                 onChangeText={setCustomCat}
@@ -442,10 +601,10 @@ export default function LibraryScreen() {
               />
             )}
 
-            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, height: 80, textAlignVertical: 'top' }]} placeholder="Description (optional)" placeholderTextColor={colors.textTertiary} value={uploadData.description} onChangeText={t => setUploadData({ ...uploadData, description: t })} multiline numberOfLines={3} />
+            <TextInput style={[st.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, height: 80, textAlignVertical: 'top' }]} placeholder={tx('Description (optional)')} placeholderTextColor={colors.textTertiary} value={uploadData.description} onChangeText={t => setUploadData({ ...uploadData, description: t })} multiline numberOfLines={3} />
 
             <TouchableOpacity onPress={handleUpload} disabled={uploading} activeOpacity={0.8}>
-              <LinearGradient colors={isAdmin ? ['#D94F00', '#FF8C00'] : ['#2D6A4F', '#4CAF50']} style={st.uploadBtn}>
+              <LinearGradient colors={isAdmin ? ['#C2410C', '#E8743B'] : ['#2D6A4F', '#4CAF50']} style={st.uploadBtn}>
                 {uploading ? <ActivityIndicator color="#FFF" /> : (
                   <>
                     <MaterialCommunityIcons name={isAdmin ? 'upload' : 'send-check'} size={20} color="#FFF" />
@@ -455,7 +614,7 @@ export default function LibraryScreen() {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Admin Review Queue Modal */}
@@ -463,7 +622,7 @@ export default function LibraryScreen() {
         <View style={st.modalOverlay}>
           <View style={[st.modalContent, { backgroundColor: colors.surface, maxHeight: '80%' }]}>
             <View style={st.modalHeader}>
-              <Text style={[st.modalTitle, { color: colors.text }]}>Review Queue ({submissions.length})</Text>
+              <Text style={[st.modalTitle, { color: colors.text }]}>{tx('Review Queue (')}{submissions.length})</Text>
               <TouchableOpacity onPress={() => setShowReviewQueue(false)}>
                 <Ionicons name="close" size={24} color={colors.textTertiary} />
               </TouchableOpacity>
@@ -472,8 +631,8 @@ export default function LibraryScreen() {
               {submissions.length === 0 ? (
                 <View style={{ alignItems: 'center', padding: 40 }}>
                   <MaterialCommunityIcons name="check-decagram" size={48} color="#4ADE80" />
-                  <Text style={[st.emptyTitle, { color: colors.text, marginTop: 12 }]}>All clear!</Text>
-                  <Text style={{ color: colors.textSecondary }}>No pending submissions</Text>
+                  <Text style={[st.emptyTitle, { color: colors.text, marginTop: 12 }]}>{tx('All clear!')}</Text>
+                  <Text style={{ color: colors.textSecondary }}>{tx('No pending submissions')}</Text>
                 </View>
               ) : submissions.map(item => (
                 <View key={item.id} style={[st.reviewCard, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
@@ -504,30 +663,49 @@ const GRID_W = (Dimensions.get('window').width - 48 - 10) / 2;
 
 const st = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 18, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  header: { paddingBottom: 6, paddingHorizontal: 20 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  headerTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
+  headerSub: { fontSize: 13, marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: 8 },
-  headerBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  headerBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   reviewBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
 
-  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 14, paddingHorizontal: 14, height: 44, borderRadius: 12, borderWidth: 1, gap: 8 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 12, paddingHorizontal: 14, height: 44, borderRadius: 12, borderWidth: 1, gap: 8 },
   searchInput: { flex: 1, fontSize: 14 },
 
-  sortRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 10, gap: 6 },
+  starsRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  starsText: { fontSize: 12, fontWeight: '800' },
+  starsCount: { fontSize: 11 },
+  rateOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 28 },
+  rateCard: { borderRadius: 24, borderWidth: 1, padding: 22, alignItems: 'center' },
+  rateTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  rateStars: { flexDirection: 'row', gap: 6, marginVertical: 18 },
+  continue: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12, borderRadius: 18, borderWidth: 1, marginTop: 4 },
+  kicker: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1 },
+  playBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  section: { fontSize: 18, fontWeight: '800', marginTop: 20, marginBottom: 10 },
+  offline: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, borderWidth: 1 },
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  catTile: { width: '22%', flexGrow: 1, borderRadius: 14, padding: 10, minHeight: 96, gap: 6 },
+  catTileName: { fontSize: 11.5, fontWeight: '700', lineHeight: 15 },
+  catTileCount: { fontSize: 11, fontWeight: '800', marginTop: 'auto' },
+  shelfTitle: { fontSize: 12.5, fontWeight: '700', marginTop: 8, marginBottom: 2, lineHeight: 16 },
+  filterHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, marginBottom: 10 },
+  backChip: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 10, height: 32, borderRadius: 16, borderWidth: 1 },
+  filterTitle: { flex: 1, fontSize: 18, fontWeight: '800' },
   sortChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   sortText: { fontSize: 12, fontWeight: '600' },
 
   // flexGrow:0 + capped height — without it the horizontal ScrollView stretches
   // in the flex column and the category chips render as giant full-height cards.
-  catScroll: { flexGrow: 0, maxHeight: 50 },
-  catRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  catScroll: { flexGrow: 0, flexShrink: 0, height: 52 },
+  catRow: { paddingHorizontal: 20, paddingVertical: 8, gap: 8, alignItems: 'center' },
   catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 34, borderRadius: 17, borderWidth: 1, gap: 5 },
   catText: { fontSize: 11, fontWeight: '600' },
 
   // List view
-  booksList: { paddingHorizontal: 16, paddingBottom: 100, gap: 8 },
+  booksList: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 100, gap: 8 },
   bookCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16, borderWidth: 1, gap: 12 },
   bookIcon: { width: 52, height: 60, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   bookInfo: { flex: 1 },
@@ -542,7 +720,7 @@ const st = StyleSheet.create({
   dlBtn: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 
   // Grid view
-  gridList: { paddingHorizontal: 16, paddingBottom: 100, gap: 10 },
+  gridList: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 100, gap: 10 },
   gridCard: { width: GRID_W, borderRadius: 16, padding: 14, borderWidth: 1 },
   gridIcon: { width: '100%' as any, height: 80, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
   gridTitle: { fontSize: 14, fontWeight: '700', lineHeight: 18 },
@@ -556,7 +734,7 @@ const st = StyleSheet.create({
   emptyText: { fontSize: 14, textAlign: 'center' },
 
   fab: { position: 'absolute', bottom: 90, right: 20 },
-  fabGrad: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#D94F00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+  fabGrad: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#C2410C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },

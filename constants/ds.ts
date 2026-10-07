@@ -3,6 +3,14 @@
 // this, not inline magic numbers.
 
 export const DS = {
+  // ─── FONTS ───
+  // Loaded in app/_layout. Custom faces carry one weight each, so styles that
+  // use them must not also set a bold fontWeight (Android would fake-bold or
+  // drop the face). Use useLanguage().display for script-aware titles.
+  font: {
+    display: 'Fraunces_600SemiBold',
+    deva: 'TiroDevanagariHindi_400Regular',
+  },
   // ─── SPACING (4pt base) ───
   space: {
     xs: 4, sm: 8, md: 12, lg: 16, xl: 20, '2xl': 24, '3xl': 32, '4xl': 40, '5xl': 56,
@@ -62,13 +70,11 @@ export const DS = {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export function useDsInsets() {
   const insets = useSafeAreaInsets();
-  const TAB = DS.layout.tabBarHeight + DS.layout.tabBarFloatingGap;
   return {
     insets,
     headerTop: insets.top + 12,
-    tabBarBottom: insets.bottom + DS.layout.tabBarFloatingGap,
-    // Bottom padding for tab-nested screens (never behind the floating tab bar).
-    tabScrollBottom: insets.bottom + TAB + 24,
+    // Bottom padding for tab screens; the docked tab bar sits outside them.
+    tabScrollBottom: 28,
     // Bottom padding for non-tab screens.
     screenBottom: insets.bottom + DS.space['3xl'],
   };

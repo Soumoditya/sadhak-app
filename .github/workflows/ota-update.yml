@@ -1,0 +1,89 @@
+# Publishes an over-the-air (OTA) update to installed Sadhak apps.
+#
+# One-time setup: create an access token at https://expo.dev/settings/access-tokens
+# and add it to this repo as a secret named EXPO_TOKEN
+# (GitHub → Settings → Secrets and variables → Actions → New repository secret).
+#
+# Runs on every push to main (and to the redesign branch until it is merged),
+# or by hand from the Actions tab once this file is on main
+# ("Publish OTA update" → Run workflow).
+#
+# OTA only carries JavaScript and images. Phones accept an update only if it
+# was published with the same app "version" (app.json) as the APK they run,
+# so leave the version alone for OTA releases and bump it only together with
+# a new APK build.
+name: Publish OTA update
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: What changed (shown in the Expo dashboard)
+        required: false
+        default: Sadhak update
+  push:
+    branches: [main, ccr-5f48682a-w1d2yg]
+    paths-ignore:
+      - '**.md'
+
+concurrency:
+  group: ota-update
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Without the secret, skip (green, with a warning) instead of failing
+      # every push before the token is set up.
+      - name: Check token
+        id: token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::warning::No EXPO_TOKEN repository secret yet, so nothing was published (see the top of this file)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        if: steps.token.outputs.ok == 'true'
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+        if: steps.token.outputs.ok == 'true'
+
+      # The phones only accept updates from the project in app.json, so the
+      # token must belong to its owner (or a member with publish rights).
+      - name: Check the token's account can publish this project
+        id: project
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          echo "Token account: $(eas whoami 2>&1 | head -1)"
+          echo "Project owner in app.json: $(node -p "require('./app.json').expo.owner")"
+          if eas project:info --non-interactive; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::This token's account can't access the project in app.json (owner above), so nothing was published. Use a token from that account, or move the app to the token's account (needs one new APK)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to the production channel
+        if: steps.token.outputs.ok == 'true' && steps.project.outputs.ok == 'true'
+        env:
+          MESSAGE: ${{ github.event.inputs.message || github.event.head_commit.message || 'Sadhak update' }}
+        run: eas update --channel production --platform android --message "$MESSAGE" --non-interactive

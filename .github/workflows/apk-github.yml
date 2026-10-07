@@ -1,0 +1,105 @@
+# Builds the Android APK right here on a GitHub runner (no Expo build queue).
+# Uses "eas build --local": same project config and the same release key Expo
+# keeps for us, so the APK installs over earlier versions without data loss.
+# The APK is attached to a GitHub pre-release with a direct download link.
+#
+# Default way to make an APK. "Build APK (EAS)" runs at the same time in
+# Expo's cloud; use whichever APK arrives first.
+# Last triggered for 1.17.0 (versionCode 19).
+name: Build APK (GitHub)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ccr-5f48682a-w1d2yg, main]
+    paths:
+      - .github/workflows/apk-github.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-github-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      # The repo is public, so this is the 4-core / 16 GB runner. Swap stays as
+      # a safety net for the release build (R8 + Hermes).
+      - name: Free disk and add swap
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL || true
+          sudo swapoff -a || true
+          sudo fallocate -l 4G /swapfile2 && sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2 && sudo swapon /swapfile2
+          free -h; df -h /
+      - name: Gradle settings for CI
+        run: |
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/gradle.properties <<'PROPS'
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
+          org.gradle.workers.max=4
+          reactNativeArchitectures=arm64-v8a
+          org.gradle.parallel=true
+          org.gradle.daemon=false
+          kotlin.daemon.jvmargs=-Xmx3g
+          kotlin.compiler.execution.strategy=in-process
+          PROPS
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+      - run: npm ci
+      # Print memory and disk every minute so a dying runner leaves a trace.
+      - name: Resource log
+        run: |
+          cat > /tmp/res.sh <<'SH'
+          while true; do echo "$(date +%T) $(free -m | sed -n 2p) | $(df -m / | sed -n 2p)"; sleep 60; done
+          SH
+          nohup bash /tmp/res.sh > /tmp/res.log 2>&1 &
+      - name: Build APK on this runner
+        timeout-minutes: 60
+        env:
+          EAS_LOCAL_BUILD_SKIP_CLEANUP: '1'
+        run: eas build --platform android --profile preview --local --non-interactive --output sadhak.apk 2>&1 | tee build.log; test -s sadhak.apk
+      - name: Build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            build.log
+            /tmp/res.log
+          if-no-files-found: ignore
+      - name: Version
+        id: v
+        run: echo "version=$(node -p "require('./app.json').expo.version")" >> "$GITHUB_OUTPUT"
+      - name: Publish APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-v${{ steps.v.outputs.version }}-${{ github.run_number }}
+          name: Sadhak ${{ steps.v.outputs.version }} (build ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          files: sadhak.apk
+          body: Installable APK built from ${{ github.sha }}. Download sadhak.apk below and open it on the phone.
+      - name: Download link
+        run: echo "APK=https://github.com/${{ github.repository }}/releases/download/apk-v${{ steps.v.outputs.version }}-${{ github.run_number }}/sadhak.apk"

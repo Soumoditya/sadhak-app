@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Modal, Alert, Dimensions, Platform, Animated, KeyboardAvoidingView,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Modal, Alert, Dimensions, Platform, Animated,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +11,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from "../contexts/DialogContext";
 import { useLanguage } from '../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { Header } from '../components/ui';
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, serverTimestamp } from '../config/firebase';
@@ -28,7 +29,7 @@ const NOTE_COLORS = [
   { id: 'coral', color: '#FBE9E7', dark: '#3E2420', label: 'Coral' },
 ];
 
-const TEXT_COLORS = ['default', '#D94F00', '#DC2626', '#2D6A4F', '#1565C0', '#7C3AED', '#9C27B0', '#F59E0B'];
+const TEXT_COLORS = ['default', '#C2410C', '#DC2626', '#2D6A4F', '#1565C0', '#7C3AED', '#9C27B0', '#F59E0B'];
 const HIGHLIGHT_COLORS = ['transparent', '#FFEB3B80', '#A5D6A780', '#81D4FA80', '#CE93D880', '#FFCC8080'];
 const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28];
 
@@ -91,8 +92,9 @@ export default function NotesScreen() {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardInset();
   const dialog = useDialog();
-  const { t } = useLanguage();
+  const { t, tx } = useLanguage();
   const [notes, setNotes] = useState<Note[]>([]);
   const [showEditor, setShowEditor] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
@@ -379,27 +381,22 @@ export default function NotesScreen() {
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
       {/* ── Header ── */}
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-        style={st.header}
-      >
-        <View style={st.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={st.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
+      <Header
+        title={t('feat.notes')}
+        subtitle={tx('Personal notes, folders & reminders')}
+        right={
+          <TouchableOpacity onPress={() => setIsGridView(!isGridView)} style={[st.viewToggle, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+            <MaterialCommunityIcons name={isGridView ? 'view-agenda-outline' : 'view-grid-outline'} size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={st.headerTitle}>{t('feat.notes')}</Text>
-          <TouchableOpacity onPress={() => setIsGridView(!isGridView)} style={st.viewToggle}>
-            <MaterialCommunityIcons name={isGridView ? 'view-agenda-outline' : 'view-grid-outline'} size={22} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+        }
+      />
 
       {/* ── Search ── */}
       <View style={[st.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Ionicons name="search" size={18} color={colors.textTertiary} />
         <TextInput
           style={[st.searchInput, { color: colors.text }]}
-          placeholder="Search notes..."
+          placeholder={tx('Search notes...')}
           placeholderTextColor={colors.textTertiary}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -415,7 +412,7 @@ export default function NotesScreen() {
           return (
             <TouchableOpacity key={folder} style={[st.folderChip, { backgroundColor: isActive ? colors.primary : colors.surface, borderColor: isActive ? colors.primary : colors.border }]} onPress={() => setActiveFolder(folder)}>
               <MaterialCommunityIcons name={icon as any} size={14} color={isActive ? '#FFF' : colors.textSecondary} />
-              <Text style={[st.folderText, { color: isActive ? '#FFF' : colors.text }]}>{folder}</Text>
+              <Text style={[st.folderText, { color: isActive ? '#FFF' : colors.text }]}>{tx(folder)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -441,10 +438,10 @@ export default function NotesScreen() {
           <View style={st.empty}>
             <MaterialCommunityIcons name={activeFolder === 'Trash' ? 'delete-empty-outline' : activeFolder === 'Archive' ? 'archive-off-outline' : 'note-off-outline'} size={56} color={colors.textTertiary} />
             <Text style={[st.emptyTitle, { color: colors.text }]}>
-              {activeFolder === 'Trash' ? 'Trash is empty' : activeFolder === 'Archive' ? 'No archived notes' : 'No notes yet'}
+              {tx(activeFolder === 'Trash' ? 'Trash is empty' : activeFolder === 'Archive' ? 'No archived notes' : 'No notes yet')}
             </Text>
             <Text style={[st.emptyText, { color: colors.textSecondary }]}>
-              {activeFolder === 'Trash' ? 'Deleted notes appear here' : activeFolder === 'Archive' ? 'Archived notes appear here' : 'Tap + to create your first note'}
+              {tx(activeFolder === 'Trash' ? 'Deleted notes appear here' : activeFolder === 'Archive' ? 'Archived notes appear here' : 'Tap + to create your first note')}
             </Text>
           </View>
         )}
@@ -453,8 +450,8 @@ export default function NotesScreen() {
 
       {/* ── FAB ── */}
       {activeFolder !== 'Trash' && (
-        <TouchableOpacity style={st.fab} onPress={() => openEditor()} activeOpacity={0.8}>
-          <LinearGradient colors={['#D94F00', '#FF8C00']} style={st.fabGrad}>
+        <TouchableOpacity style={[st.fab, { bottom: 24 + insets.bottom }]} onPress={() => openEditor()} activeOpacity={0.8}>
+          <LinearGradient colors={['#C2410C', '#E8743B']} style={st.fabGrad}>
             <MaterialCommunityIcons name="plus" size={28} color="#FFF" />
           </LinearGradient>
         </TouchableOpacity>
@@ -591,11 +588,11 @@ export default function NotesScreen() {
           )}
 
           {/* Editor body */}
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
             <ScrollView style={st.editorBody} keyboardShouldPersistTaps="handled">
               <TextInput
                 style={[st.editorTitle, { color: colors.text }]}
-                placeholder="Title"
+                placeholder={tx('Title')}
                 placeholderTextColor={colors.textTertiary}
                 value={title}
                 onChangeText={setTitle}
@@ -617,7 +614,7 @@ export default function NotesScreen() {
                   ))}
                   <View style={st.addCheckRow}>
                     <MaterialCommunityIcons name="plus" size={22} color={colors.textTertiary} />
-                    <TextInput style={[st.addCheckInput, { color: colors.text }]} placeholder="Add item..." placeholderTextColor={colors.textTertiary} value={newCheckItem} onChangeText={setNewCheckItem} onSubmitEditing={addCheckItem} returnKeyType="done" />
+                    <TextInput style={[st.addCheckInput, { color: colors.text }]} placeholder={tx('Add item...')} placeholderTextColor={colors.textTertiary} value={newCheckItem} onChangeText={setNewCheckItem} onSubmitEditing={addCheckItem} returnKeyType="done" />
                   </View>
                 </View>
               ) : (
@@ -630,7 +627,7 @@ export default function NotesScreen() {
                     textDecorationLine: isUnderline && isStrikethrough ? 'underline line-through' : isUnderline ? 'underline' : isStrikethrough ? 'line-through' : 'none',
                     backgroundColor: highlightColor,
                   }]}
-                  placeholder="Write your note..."
+                  placeholder={tx('Write your note...')}
                   placeholderTextColor={colors.textTertiary}
                   value={content}
                   onChangeText={handleContentChange}
@@ -660,7 +657,7 @@ export default function NotesScreen() {
           <View style={[st.remSheet, { backgroundColor: colors.surface }]}>
             <View style={[st.remHandle, { backgroundColor: colors.divider }]} />
             <View style={st.remHeader}>
-              <Text style={[st.remTitle, { color: colors.text }]}>Remind me</Text>
+              <Text style={[st.remTitle, { color: colors.text }]}>{tx('Remind me')}</Text>
               <TouchableOpacity onPress={() => setShowReminderSheet(false)} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textTertiary} />
               </TouchableOpacity>
@@ -675,7 +672,7 @@ export default function NotesScreen() {
               onPress={() => setPickStage('date')}
             >
               <MaterialCommunityIcons name="calendar-clock" size={18} color={colors.primary} />
-              <Text style={[st.remDialText, { color: colors.primary }]}>Pick exact date & time</Text>
+              <Text style={[st.remDialText, { color: colors.primary }]}>{tx('Pick exact date & time')}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.primary} />
             </TouchableOpacity>
             {pickStage === 'date' && (
@@ -756,9 +753,9 @@ export default function NotesScreen() {
             </View>
 
             <TouchableOpacity onPress={scheduleNoteReminder} activeOpacity={0.85}>
-              <LinearGradient colors={['#D94F00', '#F07830']} style={st.remSubmit}>
+              <LinearGradient colors={['#C2410C', '#E8743B']} style={st.remSubmit}>
                 <MaterialCommunityIcons name="bell-check-outline" size={19} color="#FFF" />
-                <Text style={st.remSubmitText}>Set reminder</Text>
+                <Text style={st.remSubmitText}>{tx('Set reminder')}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -775,7 +772,7 @@ export default function NotesScreen() {
             ].map((item, idx) => (
               <TouchableOpacity key={idx} style={st.moreItem} onPress={item.action}>
                 <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color || colors.text} />
-                <Text style={[st.moreItemText, { color: item.color || colors.text }]}>{item.label}</Text>
+                <Text style={[st.moreItemText, { color: item.color || colors.text }]}>{tx(item.label)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -791,19 +788,19 @@ const st = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: '#FFF' },
-  viewToggle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  viewToggle: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
 
-  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, paddingHorizontal: 14, height: 42, borderRadius: 12, borderWidth: 1, gap: 8 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 0, paddingHorizontal: 14, height: 42, borderRadius: 12, borderWidth: 1, gap: 8 },
   searchInput: { flex: 1, fontSize: 14 },
 
   // flexGrow:0 + height cap — unconstrained horizontal ScrollViews stretch
   // their chips to fill the column (same bug the library had).
-  folderScroll: { flexGrow: 0, maxHeight: 50 },
-  folderRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  folderScroll: { flexGrow: 0, flexShrink: 0, height: 52 },
+  folderRow: { paddingHorizontal: 20, paddingVertical: 8, gap: 8, alignItems: 'center' },
   folderChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, height: 34, borderRadius: 17, borderWidth: 1 },
   folderText: { fontSize: 12, fontWeight: '600' },
 
-  scrollContent: { paddingHorizontal: 16 },
+  scrollContent: { paddingHorizontal: 20 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   notesGrid: { gap: 8 },
@@ -824,7 +821,7 @@ const st = StyleSheet.create({
   emptyText: { fontSize: 14 },
 
   fab: { position: 'absolute', bottom: 30, right: 20 },
-  fabGrad: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#D94F00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+  fabGrad: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#C2410C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
 
   // Editor
   editorContainer: { flex: 1 },

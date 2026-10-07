@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,7 +10,11 @@ import { useDialog } from "../../contexts/DialogContext";
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 
+import { useLanguage } from '../../contexts/LanguageContext';
+
 export default function ProfileSetupScreen() {
+  const { tx } = useLanguage();
+
   const { updateProfile } = useAuth();
   const { colors } = useTheme();
   const dialog = useDialog();
@@ -88,44 +92,34 @@ export default function ProfileSetupScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={['#D94F00', '#F07830']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <MaterialCommunityIcons name="account-cog-outline" size={40} color="#FFFFFF" />
-          <Text style={styles.headerTitle}>Personalize Sadhak</Text>
-          <Text style={styles.headerSub}>For accurate spiritual guidance</Text>
-        </LinearGradient>
+        <View style={styles.header}>
+          <Image source={require('../../assets/images/emblem.png')} style={styles.emblem} />
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{tx('Personalize Sadhak')}</Text>
+          <Text style={[styles.headerSub, { color: colors.textSecondary }]}>{tx('A few details for accurate Panchang and guidance')}</Text>
+        </View>
 
         <View style={styles.content}>
           {/* Gender */}
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            <MaterialCommunityIcons name="gender-male-female" size={18} color={colors.primary} /> Gender
-          </Text>
+            <MaterialCommunityIcons name="gender-male-female" size={18} color={colors.primary} /> {tx('Gender')}</Text>
           <View style={styles.selectionRow}>
-            <SelectionButton selected={gender === 'male'} onPress={() => setGender('male')} icon="human-male" label="Male / पुरुष" iconLib="mci" />
-            <SelectionButton selected={gender === 'female'} onPress={() => setGender('female')} icon="human-female" label="Female / स्त्री" iconLib="mci" />
+            <SelectionButton selected={gender === 'male'} onPress={() => setGender('male')} icon="human-male" label={tx('Male / पुरुष')} iconLib="mci" />
+            <SelectionButton selected={gender === 'female'} onPress={() => setGender('female')} icon="human-female" label={tx('Female / स्त्री')} iconLib="mci" />
           </View>
 
           {/* Marriage Status */}
           <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>
-            <MaterialCommunityIcons name="ring" size={18} color={colors.primary} /> Marriage Status
-          </Text>
+            <MaterialCommunityIcons name="ring" size={18} color={colors.primary} /> {tx('Marriage Status')}</Text>
           <View style={styles.selectionColumn}>
-            <SelectionButton selected={marriageStatus === 'unmarried'} onPress={() => setMarriageStatus('unmarried')} icon="heart-outline" label="Unmarried / अविवाहित" iconLib="ion" />
-            <SelectionButton selected={marriageStatus === 'married'} onPress={() => setMarriageStatus('married')} icon="heart" label="Married / विवाहित" iconLib="ion" />
-            <SelectionButton selected={marriageStatus === 'widowed'} onPress={() => setMarriageStatus('widowed')} icon="heart-dislike-outline" label="Widowed / विधवा/विधुर" iconLib="ion" />
+            <SelectionButton selected={marriageStatus === 'unmarried'} onPress={() => setMarriageStatus('unmarried')} icon="heart-outline" label={tx('Unmarried / अविवाहित')} iconLib="ion" />
+            <SelectionButton selected={marriageStatus === 'married'} onPress={() => setMarriageStatus('married')} icon="heart" label={tx('Married / विवाहित')} iconLib="ion" />
+            <SelectionButton selected={marriageStatus === 'widowed'} onPress={() => setMarriageStatus('widowed')} icon="heart-dislike-outline" label={tx('Widowed / विधवा/विधुर')} iconLib="ion" />
           </View>
 
           {/* Location */}
           <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>
-            <Ionicons name="location-outline" size={18} color={colors.primary} /> Location
-          </Text>
-          <Text style={[styles.locationHint, { color: colors.textSecondary }]}>
-            For accurate sunrise/sunset, festival timings, and nearby temples
-          </Text>
+            <Ionicons name="location-outline" size={18} color={colors.primary} /> {tx('Location')}</Text>
+          <Text style={[styles.locationHint, { color: colors.textSecondary }]}>{tx('For accurate sunrise/sunset, festival timings, and nearby temples')}</Text>
           {location ? (
             <View style={[styles.locationCard, { backgroundColor: `${colors.tulsiGreen}15`, borderColor: colors.tulsiGreen }]}>
               <Ionicons name="location" size={22} color={colors.tulsiGreen} />
@@ -145,7 +139,7 @@ export default function ProfileSetupScreen() {
               ) : (
                 <>
                   <Ionicons name="navigate-outline" size={20} color={colors.primary} />
-                  <Text style={[styles.locationBtnText, { color: colors.primary }]}>Detect My Location</Text>
+                  <Text style={[styles.locationBtnText, { color: colors.primary }]}>{tx('Detect My Location')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -153,11 +147,11 @@ export default function ProfileSetupScreen() {
 
           {/* Complete Button */}
           <TouchableOpacity onPress={handleComplete} disabled={loading} activeOpacity={0.8} style={{ marginTop: 32 }}>
-            <LinearGradient colors={['#D94F00', '#FF8C00']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.completeBtn}>
+            <LinearGradient colors={['#C2410C', '#E8743B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.completeBtn}>
               {loading ? <ActivityIndicator color="#FFFFFF" /> : (
                 <>
                   <MaterialCommunityIcons name="check-all" size={22} color="#FFFFFF" />
-                  <Text style={styles.completeBtnText}>Start My Journey</Text>
+                  <Text style={styles.completeBtnText}>{tx('Start My Journey')}</Text>
                 </>
               )}
             </LinearGradient>
@@ -165,7 +159,7 @@ export default function ProfileSetupScreen() {
 
           {/* Skip */}
           <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.skipBtn}>
-            <Text style={[styles.skipText, { color: colors.textTertiary }]}>Skip for now</Text>
+            <Text style={[styles.skipText, { color: colors.textTertiary }]}>{tx('Skip for now')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -176,9 +170,10 @@ export default function ProfileSetupScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { flexGrow: 1 },
-  header: { paddingTop: 70, paddingBottom: 40, alignItems: 'center', borderBottomLeftRadius: 40, borderBottomRightRadius: 40 },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', marginTop: 10, letterSpacing: 1 },
-  headerSub: { fontSize: 14, color: 'rgba(255,255,255,0.85)', marginTop: 4 },
+  header: { paddingTop: 64, paddingBottom: 12, alignItems: 'center', paddingHorizontal: 24 },
+  emblem: { width: 84, height: 84, marginBottom: 6 },
+  headerTitle: { fontSize: 26, fontWeight: '800', marginTop: 10 },
+  headerSub: { fontSize: 14, marginTop: 4, textAlign: 'center' },
   content: { paddingHorizontal: 20, paddingTop: 24 },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 12 },
   selectionRow: { flexDirection: 'row', gap: 12 },

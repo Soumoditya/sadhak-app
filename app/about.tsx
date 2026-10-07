@@ -1,15 +1,17 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Linking, Platform } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { Header } from '../components/ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { APP_NAME, APP_VERSION, APP_TAGLINE, DEVELOPER_NAME, SUPPORT_EMAIL, SOCIAL_LINKS, CHANGELOG } from '../constants/appInfo';
+import { updateLabel } from '../services/appUpdates';
 
 export default function AboutScreen() {
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { t, tx } = useLanguage();
 
   const links = [
     { label: t('settings.privacyPolicy'), icon: 'shield-lock-outline', route: '/privacy' },
@@ -23,25 +25,20 @@ export default function AboutScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Header */}
-        <LinearGradient
-          colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-          style={styles.header}
-        >
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Image source={require('../assets/images/icon.png')} style={styles.appIcon} />
-          <Text style={styles.appName}>{APP_NAME}</Text>
-          <Text style={styles.tagline}>{APP_TAGLINE}</Text>
-          <View style={styles.versionBadge}>
-            <Text style={styles.versionText}>{t('about.version')} {APP_VERSION}</Text>
+        <Header title={t('about.title') || 'About'} />
+        <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+          <Image source={require('../assets/images/emblem.png')} style={styles.appIcon} />
+          <Text style={[styles.appName, { color: colors.text }]}>{APP_NAME}</Text>
+          <Text style={[styles.tagline, { color: colors.textSecondary }]}>{APP_TAGLINE}</Text>
+          <View style={[styles.versionBadge, { backgroundColor: colors.primary + '14' }]}>
+            <Text style={[styles.versionText, { color: colors.primary }]}>{t('about.version')} {APP_VERSION}{updateLabel() ? ` · ${updateLabel()}` : ''}</Text>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Mission */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={styles.cardHeader}>
-            <MaterialCommunityIcons name="heart-outline" size={22} color="#D94F00" />
+            <MaterialCommunityIcons name="heart-outline" size={22} color="#C2410C" />
             <Text style={[styles.cardTitle, { color: colors.text }]}>{t('about.mission')}</Text>
           </View>
           <Text style={[styles.cardBody, { color: colors.textSecondary }]}>
@@ -53,12 +50,12 @@ export default function AboutScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={styles.cardHeader}>
             <MaterialCommunityIcons name="code-tags" size={22} color="#4ADE80" />
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Developer</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{tx('Developer')}</Text>
           </View>
           <Text style={[styles.cardBody, { color: colors.textSecondary }]}>{DEVELOPER_NAME}</Text>
           <TouchableOpacity onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} style={styles.emailRow}>
-            <MaterialCommunityIcons name="email-outline" size={16} color="#D94F00" />
-            <Text style={[styles.emailText, { color: '#D94F00' }]}>{SUPPORT_EMAIL}</Text>
+            <MaterialCommunityIcons name="email-outline" size={16} color="#C2410C" />
+            <Text style={[styles.emailText, { color: '#C2410C' }]}>{SUPPORT_EMAIL}</Text>
           </TouchableOpacity>
         </View>
 
@@ -111,10 +108,11 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 30, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   backBtn: { position: 'absolute', top: Platform.OS === 'ios' ? 56 : 44, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   appIcon: { width: 80, height: 80, borderRadius: 20, marginBottom: 12 },
-  appName: { fontSize: 28, fontWeight: '800', color: '#FFF', letterSpacing: 2 },
-  tagline: { fontSize: 14, color: 'rgba(255,255,255,0.85)', marginTop: 4 },
-  versionBadge: { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 12 },
-  versionText: { fontSize: 12, fontWeight: '600', color: '#FFF' },
+  hero: { alignItems: 'center', marginHorizontal: 20, paddingVertical: 24, borderRadius: 20, borderWidth: 1 },
+  appName: { fontSize: 26, fontWeight: '800', letterSpacing: 1 },
+  tagline: { fontSize: 14, marginTop: 4 },
+  versionBadge: { marginTop: 12, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 12 },
+  versionText: { fontSize: 12, fontWeight: '700' },
   card: { marginHorizontal: 20, marginTop: 16, borderRadius: 16, padding: 16, borderWidth: 1 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   cardTitle: { fontSize: 16, fontWeight: '700' },

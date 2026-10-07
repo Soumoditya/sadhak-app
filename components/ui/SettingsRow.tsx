@@ -1,8 +1,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet } from 'react-native';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { DS } from '../../constants/ds';
+import Icon, { fromMaterial } from './Icon';
+import { useLanguage } from '../../contexts/LanguageContext';
+
+// Rows pass Material icon names; show the Phosphor glyph when one maps.
 
 interface Props {
   icon: string;
@@ -21,6 +25,7 @@ export default function SettingsRow({
   switchValue, onSwitchChange, danger, iconColor,
 }: Props) {
   const { colors } = useTheme();
+  const { tx } = useLanguage();
   const Wrap: any = onPress ? TouchableOpacity : View;
   const wrapProps = onPress ? { onPress, activeOpacity: 0.7 } : {};
   const tint = danger ? '#EF4444' : iconColor || colors.textSecondary;
@@ -28,16 +33,18 @@ export default function SettingsRow({
   return (
     <Wrap {...wrapProps} style={styles.row}>
       <View style={[styles.iconWrap, { backgroundColor: (iconColor || colors.textTertiary) + '18' }]}>
-        <MaterialCommunityIcons name={icon as any} size={18} color={tint} />
+        {fromMaterial(icon)
+          ? <Icon name={fromMaterial(icon)!} size={20} color={tint} />
+          : <MaterialCommunityIcons name={icon as any} size={18} color={tint} />}
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.label, { color: danger ? '#EF4444' : colors.text }]}>{label}</Text>
-        {detail && <Text style={[styles.detail, { color: colors.textTertiary }]}>{detail}</Text>}
+        <Text style={[styles.label, { color: danger ? '#EF4444' : colors.text }]}>{tx(label)}</Text>
+        {detail && <Text style={[styles.detail, { color: colors.textTertiary }]}>{typeof detail === 'string' ? tx(detail) : detail}</Text>}
       </View>
       {right === 'switch' ? (
         <Switch value={!!switchValue} onValueChange={onSwitchChange} trackColor={{ true: colors.primary + '80', false: colors.cardBorder }} thumbColor={switchValue ? colors.primary : '#F3F4F6'} />
       ) : right === 'chevron' ? (
-        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        <Icon name="caret-right" size={17} color={colors.textTertiary} weight="regular" />
       ) : right}
     </Wrap>
   );

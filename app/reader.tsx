@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import { saveToDownloads, notifySaved } from '../services/downloads';
 import { WebView } from 'react-native-webview';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,6 +8,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { sanitizeCloudinaryPdfUrl } from '../services/cloudinary';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLayoutInsets } from '../constants/layout';
+
+import { useLanguage } from '../contexts/LanguageContext';
 
 // In-app PDF reader.
 // The PDF is downloaded natively, then base64-embedded into a data-URL HTML so
@@ -70,6 +73,8 @@ const VIEWER_HTML = (bg: string, fg: string, pdfBase64: string) => `<!DOCTYPE ht
 </script></body></html>`;
 
 export default function ReaderScreen() {
+  const { tx } = useLanguage();
+
   const { url, title } = useLocalSearchParams<{ url: string; title?: string }>();
   const { colors, isDark } = useTheme();
   const { headerPaddingTop, bottomInset } = useLayoutInsets();
@@ -78,6 +83,14 @@ export default function ReaderScreen() {
   const [failed, setFailed] = useState<string | null>(null);
   const [phase, setPhase] = useState<'download' | 'render' | 'ready'>('download');
   const [html, setHtml] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  // The book is already on the phone (downloaded to read it): keep a copy.
+  const saveOffline = async () => {
+    const src = FileSystem.cacheDirectory + 'reader/sadhak-doc.pdf';
+    const name = `${String(title || 'Book').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').slice(0, 48) || 'Book'}.pdf`;
+    const uri = await saveToDownloads(src, name, 'application/pdf');
+    if (uri) { setSavedAt(uri); notifySaved(tx('Saved for offline reading'), `${name} · ${tx('tap to open')}`, uri, 'application/pdf'); }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -102,7 +115,7 @@ export default function ReaderScreen() {
         // Read the PDF as base64 — embedded into the HTML, no file:// origin needed.
         const b64 = await FileSystem.readAsStringAsync(pdfPath, { encoding: FileSystem.EncodingType.Base64 });
         if (!cancelled) {
-          setHtml(VIEWER_HTML(isDark ? '#0B0E13' : '#F5F3F0', isDark ? '#8b8e94' : '#6b6b6b', b64));
+          setHtml(VIEWER_HTML(isDark ? '#13110F' : '#F5F3F0', isDark ? '#8b8e94' : '#6b6b6b', b64));
           setPhase('render');
         }
       } catch (e: any) {
@@ -120,11 +133,11 @@ export default function ReaderScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[st.title, { color: colors.text }]} numberOfLines={1}>{title || 'Reading'}</Text>
-          {pages > 0 && <Text style={[st.pageInfo, { color: colors.textTertiary }]}>Page {page} of {pages}</Text>}
+          {pages > 0 && <Text style={[st.pageInfo, { color: colors.textTertiary }]}>{tx('Page')} {page}of {pages}</Text>}
         </View>
-        {!String(url || '').startsWith('file://') && (
-          <TouchableOpacity onPress={() => Linking.openURL(String(url))} style={[st.iconBtn, { backgroundColor: colors.background }]} hitSlop={8}>
-            <MaterialCommunityIcons name="open-in-new" size={18} color={colors.textSecondary} />
+        {phase !== 'download' && !failed && (
+          <TouchableOpacity onPress={saveOffline} style={[st.iconBtn, { backgroundColor: colors.background }]} hitSlop={8} accessibilityLabel={tx('Save offline')}>
+            <MaterialCommunityIcons name={savedAt ? 'check-circle' : 'download'} size={19} color={savedAt ? colors.success || '#1B7A42' : colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -151,14 +164,14 @@ export default function ReaderScreen() {
               onPress={() => { setFailed(null); setPhase('download'); setHtml(null); }}
             >
               <MaterialCommunityIcons name="refresh" size={16} color="#FFF" />
-              <Text style={st.errorBtnPrimaryText}>Try again</Text>
+              <Text style={st.errorBtnPrimaryText}>{tx('Try again')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[st.errorBtnGhost, { borderColor: colors.cardBorder }]}
               onPress={() => Linking.openURL(sanitizeCloudinaryPdfUrl(String(url)))}
             >
               <MaterialCommunityIcons name="open-in-new" size={16} color={colors.textSecondary} />
-              <Text style={[st.errorBtnGhostText, { color: colors.textSecondary }]}>Open externally</Text>
+              <Text style={[st.errorBtnGhostText, { color: colors.textSecondary }]}>{tx('Open externally')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -166,7 +179,7 @@ export default function ReaderScreen() {
         <View style={{ flex: 1 }}>
           <WebView
             source={{ html, baseUrl: 'https://sadhak.local/' }}
-            style={{ flex: 1, backgroundColor: isDark ? '#0B0E13' : '#F5F3F0' }}
+            style={{ flex: 1, backgroundColor: isDark ? '#13110F' : '#F5F3F0' }}
             originWhitelist={['*']}
             javaScriptEnabled
             domStorageEnabled
@@ -185,14 +198,14 @@ export default function ReaderScreen() {
           {phase !== 'ready' && (
             <View style={[StyleSheet.absoluteFill, st.center, { backgroundColor: colors.background }]}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>Preparing pages…</Text>
+              <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>{tx('Preparing pages…')}</Text>
             </View>
           )}
         </View>
       ) : (
         <View style={st.center}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>Downloading document…</Text>
+          <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>{tx('Downloading document…')}</Text>
         </View>
       )}
       <View style={{ height: bottomInset }} />

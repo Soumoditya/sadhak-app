@@ -2,7 +2,7 @@ import {
   db, collection, doc, getDoc, updateDoc, deleteDoc,
   query, where, orderBy, limit, getDocs, onSnapshot, addDoc, serverTimestamp,
 } from '../config/firebase';
-import { increment, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { increment, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 
 // ─── Instagram-style community feed ─────────────────────────────────────────
 // Posts live in the top-level `posts` collection; comments in a subcollection.
@@ -23,6 +23,9 @@ export interface Post {
   commentCount: number;
   likedBy: string[];
   createdAt: any;
+  pinned?: boolean;
+  pinnedAt?: number | null;
+  editedAt?: number | null;
 }
 
 export interface PostComment {
@@ -32,7 +35,17 @@ export interface PostComment {
   authorPfp: string | null;
   text: string;
   createdAt: any;
+  /** Reply threads: the comment this answers (null for a top-level comment). */
+  parentId?: string | null;
+  imageUrl?: string | null;
+  /** uid -> +1 / -1 */
+  votes?: Record<string, number>;
+  editedAt?: number | null;
+  /** Removed by its author but kept so the replies under it still make sense. */
+  deleted?: boolean;
 }
+
+export const commentScore = (c: PostComment) => Object.values(c.votes || {}).reduce((a, v) => a + (v > 0 ? 1 : v < 0 ? -1 : 0), 0);
 
 export interface UserResult {
   uid: string;
@@ -63,6 +76,9 @@ function toPost(d: any): Post {
     commentCount: v.commentCount ?? 0,
     likedBy: Array.isArray(v.likedBy) ? v.likedBy : [],
     createdAt: v.createdAt ?? null,
+    pinned: !!v.pinned,
+    pinnedAt: v.pinnedAt ?? null,
+    editedAt: v.editedAt ?? null,
   };
 }
 
@@ -91,7 +107,7 @@ export async function createPost(input: {
 }
 
 /** Live explore feed (newest first). */
-export function subscribeFeed(cb: (posts: Post[]) => void, max = 60): () => void {
+export function subscribeFeed(cb: (posts: Post[]) => void, max = 150): () => void {
   const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(max));
   return onSnapshot(
     q,
@@ -127,7 +143,7 @@ export async function deletePost(postId: string): Promise<void> {
 
 // ─── Comments ────────────────────────────────────────────────────────────────
 export function subscribeComments(postId: string, cb: (c: PostComment[]) => void): () => void {
-  const q = query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(200));
+  const q = query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(500));
   return onSnapshot(
     q,
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }))),
@@ -135,15 +151,40 @@ export function subscribeComments(postId: string, cb: (c: PostComment[]) => void
   );
 }
 
-export async function addComment(postId: string, author: { uid: string; displayName: string; profilePicUrl: string | null }, text: string): Promise<void> {
+export async function addComment(
+  postId: string,
+  author: { uid: string; displayName: string; profilePicUrl: string | null },
+  text: string,
+  opts: { parentId?: string | null; imageUrl?: string | null } = {},
+): Promise<void> {
   await addDoc(collection(db, 'posts', postId, 'comments'), {
     authorId: author.uid,
     authorName: author.displayName || 'Sadhak',
     authorPfp: author.profilePicUrl || null,
     text: text.trim(),
+    parentId: opts.parentId || null,
+    imageUrl: opts.imageUrl || null,
+    votes: {},
     createdAt: serverTimestamp(),
   });
   await updateDoc(doc(db, 'posts', postId), { commentCount: increment(1) });
+}
+
+export async function editComment(postId: string, id: string, text: string): Promise<void> {
+  await updateDoc(doc(db, 'posts', postId, 'comments', id), { text: text.trim(), editedAt: Date.now() });
+}
+
+/** A comment with replies is blanked (so the thread keeps its shape); one without is removed. */
+export async function deleteComment(postId: string, id: string, hasReplies: boolean): Promise<void> {
+  const ref = doc(db, 'posts', postId, 'comments', id);
+  if (hasReplies) await updateDoc(ref, { deleted: true, text: '', imageUrl: null });
+  else await deleteDoc(ref);
+  await updateDoc(doc(db, 'posts', postId), { commentCount: increment(-1) }).catch(() => {});
+}
+
+/** Up (+1), down (-1) or clear (0) my vote on a comment. */
+export async function voteComment(postId: string, id: string, uid: string, v: 1 | -1 | 0): Promise<void> {
+  await updateDoc(doc(db, 'posts', postId, 'comments', id), { [`votes.${uid}`]: v === 0 ? deleteField() : v });
 }
 
 // ─── Search ──────────────────────────────────────────────────────────────────
@@ -178,4 +219,82 @@ export async function searchPosts(term: string): Promise<Post[]> {
   return snap.docs
     .map(toPost)
     .filter((p) => p.text.toLowerCase().includes(t) || p.hashtags.some((h) => h.includes(t)));
+}
+
+/** Latest few comments for the inline preview under a post. */
+export async function getLatestComments(postId: string, n = 2): Promise<PostComment[]> {
+  const snap = await getDocs(query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'desc'), limit(n)));
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })).reverse();
+}
+
+// ─── Ranking (Reddit-style) ──────────────────────────────────────────────────
+export type FeedSort = 'hot' | 'new' | 'top' | 'old';
+export type TopPeriod = 'day' | 'week' | 'all';
+
+export const postMillis = (p: Post) => p.createdAt?.toMillis?.() ?? (typeof p.createdAt === 'number' ? p.createdAt : Date.now());
+
+/** Engagement decayed by age: newer posts with activity float up. */
+export function hotScore(p: Post, now = Date.now()): number {
+  const hours = Math.max(0, (now - postMillis(p)) / 3600_000);
+  const points = 1 + (p.likeCount || 0) + 2 * (p.commentCount || 0);
+  return points / Math.pow(hours + 2, 1.5);
+}
+
+export function rankPosts(posts: Post[], sort: FeedSort, period: TopPeriod = 'week'): Post[] {
+  const now = Date.now();
+  const arr = [...posts];
+  if (sort === 'new') return arr.sort((a, b) => postMillis(b) - postMillis(a));
+  if (sort === 'old') return arr.sort((a, b) => postMillis(a) - postMillis(b));
+  if (sort === 'hot') return arr.sort((a, b) => hotScore(b, now) - hotScore(a, now));
+  const span = period === 'day' ? 86400_000 : period === 'week' ? 7 * 86400_000 : Infinity;
+  return arr
+    .filter((p) => now - postMillis(p) <= span)
+    .sort((a, b) => (b.likeCount + b.commentCount) - (a.likeCount + a.commentCount) || postMillis(b) - postMillis(a));
+}
+
+export function timeAgo(createdAt: any): string {
+  const ms = createdAt?.toMillis?.() ?? (typeof createdAt === 'number' ? createdAt : 0);
+  if (!ms) return 'now';
+  const s = Math.max(1, Math.floor((Date.now() - ms) / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  return `${Math.floor(d / 7)}w`;
+}
+
+/** Keep the name and photo on a person's own posts in step with their profile. */
+export async function syncAuthorOnPosts(uid: string, a: { displayName: string; username: string; profilePicUrl: string | null }) {
+  const snap = await getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), limit(200)));
+  await Promise.all(snap.docs.map((d) => {
+    const v: any = d.data();
+    if (v.authorName === a.displayName && v.authorUsername === a.username && v.authorPfp === a.profilePicUrl) return null;
+    return updateDoc(d.ref, { authorName: a.displayName || 'Sadhak', authorUsername: a.username || '', authorPfp: a.profilePicUrl || null }).catch(() => {});
+  }));
+}
+
+/** Author edits the caption (hashtags re-extracted). */
+export async function updatePostText(postId: string, text: string): Promise<void> {
+  const t = text.trim();
+  await updateDoc(doc(db, 'posts', postId), { text: t, hashtags: extractHashtags(t), editedAt: Date.now() });
+}
+
+/** Author pins a post to the top of their profile (or unpins it). */
+export async function setPostPinned(postId: string, pinned: boolean): Promise<void> {
+  await updateDoc(doc(db, 'posts', postId), { pinned, pinnedAt: pinned ? Date.now() : null });
+}
+
+// A grid hands its posts to the post viewer so it opens instantly, already
+// at the tapped post, instead of loading them again.
+const handoff = new Map<string, Post[]>();
+export const handoffPosts = (uid: string, posts: Post[]) => { handoff.set(uid, posts); };
+export const takeHandoff = (uid: string) => { const p = handoff.get(uid); handoff.delete(uid); return p; };
+
+/** Pinned first (latest pin on top), then the chosen order. */
+export function withPinnedFirst(posts: Post[]): Post[] {
+  const pinned = posts.filter((p) => p.pinned).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0));
+  return [...pinned, ...posts.filter((p) => !p.pinned)];
 }

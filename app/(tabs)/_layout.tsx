@@ -1,11 +1,24 @@
 import { Tabs, Redirect } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, Animated, Pressable } from 'react-native';
-import { useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Pressable, type ColorValue } from 'react-native';
+import React, { useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import Icon from '../../components/ui/Icon';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { BorderRadius, Shadows, Spacing } from '../../constants/theme';
 import { useLayoutInsets, TAB_BAR_HEIGHT } from '../../constants/layout';
+
+// Icon + always-visible label: icon-only tabs made the sections hard to find.
+function TabIcon({ label, color, focused, children }: { label: string; color: ColorValue; focused: boolean; children: React.ReactNode }) {
+  return (
+    <View style={{ alignItems: 'center' }}>
+      {/* Fixed icon box so labels line up across icon families. */}
+      <View style={{ height: 24, justifyContent: 'center' }}>{children}</View>
+      <Text style={[styles.tabLabel, { color, fontWeight: focused ? '800' : '600' }]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
 
 // ─── Animated Tab Button ───────────────────────────────────────────────────
 function TabButton({ children, onPress, accessibilityState, colors }: any) {
@@ -52,31 +65,34 @@ function TabButton({ children, onPress, accessibilityState, colors }: any) {
 
 export default function TabLayout() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useLanguage();
   const { colors, isDark } = useTheme();
-  const { tabBarBottom } = useLayoutInsets();
+  const { insets } = useLayoutInsets();
 
   if (isLoading) return null;
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
 
   return (
     <Tabs
+      // Back returns to the tab you came from (Tools → Calendar → back = Tools).
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
+        // Docked, opaque bar that also fills the Android navigation area.
+        // The old floating pill let content show around and under it and sat
+        // on top of the system buttons on 3-button phones.
         tabBarStyle: {
-          position: 'absolute',
-          bottom: tabBarBottom,
-          left: Spacing.lg,
-          right: Spacing.lg,
-          backgroundColor: isDark ? '#141921' : '#FFFFFF',
-          borderRadius: BorderRadius.xxl,
-          borderTopWidth: 0,
-          borderWidth: 1,
-          borderColor: isDark ? 'rgba(42, 49, 64, 0.6)' : 'rgba(0,0,0,0.06)',
-          height: TAB_BAR_HEIGHT,
-          paddingBottom: 0,
+          backgroundColor: colors.surface,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.cardBorder,
+          height: TAB_BAR_HEIGHT + insets.bottom,
+          paddingBottom: insets.bottom,
           paddingTop: 0,
-          ...Shadows.xl,
+          elevation: 0,
+          shadowOpacity: 0,
         },
+        sceneStyle: { backgroundColor: colors.background },
+        tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.tabIconDefault,
         tabBarShowLabel: false,
@@ -88,11 +104,9 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'home' : 'home-outline'}
-              size={focused ? 26 : 24}
-              color={color}
-            />
+            <TabIcon label={t('nav.home')} color={color} focused={focused}>
+              <Icon name="house" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />
@@ -101,11 +115,20 @@ export default function TabLayout() {
         options={{
           title: 'Calendar',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'calendar-month' : 'calendar-month-outline'}
-              size={focused ? 26 : 24}
-              color={color}
-            />
+            <TabIcon label={t('nav.calendar')} color={color} focused={focused}>
+              <Icon name="calendar-dots" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="tools"
+        options={{
+          title: 'Tools',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon label={t('nav.tools')} color={color} focused={focused}>
+              <Icon name="squares-four" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />
@@ -114,11 +137,9 @@ export default function TabLayout() {
         options={{
           title: 'Library',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'bookshelf' : 'book-outline'}
-              size={focused ? 26 : 24}
-              color={color}
-            />
+            <TabIcon label={t('nav.library')} color={color} focused={focused}>
+              <Icon name="books" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />
@@ -127,24 +148,22 @@ export default function TabLayout() {
         options={{
           title: 'Chat',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
-              size={focused ? 26 : 24}
-              color={color}
-            />
+            <TabIcon label={t('nav.chat')} color={color} focused={focused}>
+              <Icon name="chats-circle" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
+          // Reached from the avatar on Home and Tools; keeps the bar to five.
+          href: null,
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'person' : 'person-outline'}
-              size={focused ? 26 : 24}
-              color={color}
-            />
+            <TabIcon label={t('nav.profile')} color={color} focused={focused}>
+              <Icon name="user-circle" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
+            </TabIcon>
           ),
         }}
       />
@@ -161,12 +180,17 @@ const styles = StyleSheet.create({
   tabButtonInner: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 64,
+    height: 52,
+    borderRadius: 16,
   },
   activeIndicator: {
     ...StyleSheet.absoluteFill,
-    borderRadius: 24,
+    borderRadius: 16,
+  },
+  tabLabel: {
+    fontSize: 10.5,
+    marginTop: 2,
+    letterSpacing: 0.2,
   },
 });

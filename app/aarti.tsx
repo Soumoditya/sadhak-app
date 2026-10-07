@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } fro
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
@@ -11,11 +12,15 @@ import {
   type DevotionalCategory, type DevotionalItem,
 } from '../constants/devotional';
 import { getDeityImage } from '../constants/deityImages';
+import Emblem, { emblemForDeity } from '../components/art/Emblem';
 import { Diya } from '../components/ui';
 import { DS } from '../constants/ds';
+import { Header } from '../components/ui';
+import { toneSolid } from '../constants/theme';
 
 export default function DevotionalScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, tone } = useTheme();
+  const { t: tr, tx, native } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [category, setCategory] = useState<DevotionalCategory>('aarti');
   const [selected, setSelected] = useState<DevotionalItem | null>(null);
@@ -55,31 +60,23 @@ export default function DevotionalScreen() {
             {/* Emblem: dark ambient panel with a soft radial glow behind
                 the deity painting (or the candle fallback if no image). */}
             <View style={st.emblemWrap}>
-              <View style={[st.emblemGlow, { backgroundColor: selected.color, opacity: 0.18 }]} />
-              <View style={[st.emblemRing, { borderColor: selected.color + '66' }]} />
-              <View style={[st.emblemCore, { backgroundColor: colors.surfaceElevated, borderColor: selected.color + '55' }]}>
-                {deityImg ? (
-                  <ExpoImage
-                    source={deityImg.local ?? { uri: deityImg.url }}
-                    placeholder={{ blurhash: deityImg.blurhash }}
-                    style={st.emblemImage}
-                    contentFit="cover"
-                    transition={280}
-                    cachePolicy="disk"
-                  />
+              <View style={[st.emblemGlow, { backgroundColor: toneSolid(selected.color), opacity: 0.18 }]} />
+              <View style={[st.emblemRing, { borderColor: tone(selected.color).fg + '66' }]} />
+              <View style={[st.emblemCore, { backgroundColor: colors.surfaceElevated, borderColor: tone(selected.color).fg + '55' }]}>
+                {deityImg?.local ? (
+                  <ExpoImage source={deityImg.local} style={st.emblemImage} contentFit="cover" transition={280} />
                 ) : (
-                  <Diya size={40} color={selected.color} />
+                  <Emblem name={emblemForDeity(selected.deity)} size={88} color={toneSolid(selected.color)} />
                 )}
               </View>
             </View>
 
-            <Text style={[st.detailTitle, { color: colors.text }]}>{selected.title}</Text>
-            <Text style={[st.detailTitleHi, { color: selected.color }]}>{selected.titleHi}</Text>
-            <Text style={[st.detailDeity, { color: colors.textTertiary }]}>{selected.deity}</Text>
+            <Text style={[st.detailTitle, { color: colors.text }]}>{native(selected.title, selected.titleHi)}</Text>
+            <Text style={[st.detailDeity, { color: colors.textTertiary }]}>{tx(selected.deity)}</Text>
 
-            <TouchableOpacity style={[st.listenBtn, { backgroundColor: selected.color }]} onPress={() => openPlayer(selected)} activeOpacity={0.85}>
+            <TouchableOpacity style={[st.listenBtn, { backgroundColor: toneSolid(selected.color) }]} onPress={() => openPlayer(selected)} activeOpacity={0.85}>
               <MaterialCommunityIcons name="play-circle" size={19} color="#FFF" />
-              <Text style={st.listenBtnText}>Listen / Watch</Text>
+              <Text style={st.listenBtnText}>{tx('Listen / Watch')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -104,41 +101,23 @@ export default function DevotionalScreen() {
   // ─── List view ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-        style={[st.header, { paddingTop: headerPaddingTop }]}
-      >
-        <View style={st.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={st.headerBack} hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color="#FFF" />
-          </TouchableOpacity>
-          <View>
-            <Text style={st.headerTitle}>Devotional Library</Text>
-            <Text style={st.headerSub}>Aarti · Chalisa · Mantra · Stotra</Text>
-          </View>
-        </View>
-
-        {/* Category tabs */}
-        <View style={st.tabs}>
-          {DEVOTIONAL_CATEGORIES.map((cat) => {
-            const active = category === cat.key;
-            return (
-              <TouchableOpacity
-                key={cat.key}
-                style={[st.tab, active && st.tabActive]}
-                onPress={() => setCategory(cat.key)}
-              >
-                {cat.icon === 'candle' ? (
-                  <Diya size={16} color={active ? '#D94F00' : 'rgba(255,255,255,0.8)'} />
-                ) : (
-                  <MaterialCommunityIcons name={cat.icon as any} size={15} color={active ? '#D94F00' : 'rgba(255,255,255,0.8)'} />
-                )}
-                <Text style={[st.tabText, { color: active ? '#D94F00' : 'rgba(255,255,255,0.9)' }]}>{cat.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </LinearGradient>
+      <Header title={tr('t.devotional')} subtitle={tx('Aarti · Chalisa · Mantra · Stotra')} />
+      <View style={st.tabs}>
+        {DEVOTIONAL_CATEGORIES.map((cat) => {
+          const active = category === cat.key;
+          const fg = active ? '#FFF' : colors.textSecondary;
+          return (
+            <TouchableOpacity
+              key={cat.key}
+              style={[st.tab, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.cardBorder }]}
+              onPress={() => setCategory(cat.key)}
+            >
+              {cat.icon === 'candle' ? <Diya size={16} color={fg} /> : <MaterialCommunityIcons name={cat.icon as any} size={15} color={fg} />}
+              <Text style={[st.tabText, { color: fg }]}>{tx(cat.label)}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.list, { paddingBottom: screenBottomPadding }]}>
         {items.map((item) => {
@@ -151,32 +130,26 @@ export default function DevotionalScreen() {
             activeOpacity={0.7}
           >
             {/* Deity avatar with a thin colored ring, or the category icon fallback */}
-            <View style={[st.cardIcon, { backgroundColor: item.color + '18', borderColor: item.color + '55', borderWidth: 1 }]}>
-              {img ? (
-                <ExpoImage
-                  source={img.local ?? { uri: img.url }}
-                  placeholder={{ blurhash: img.blurhash }}
-                  style={st.cardIconImage}
-                  contentFit="cover"
-                  transition={220}
-                  cachePolicy="disk"
-                />
+            <View style={[st.cardIcon, { backgroundColor: tone(item.color).bg, borderColor: tone(item.color).fg + '55', borderWidth: 1 }]}>
+              {img?.local ? (
+                <ExpoImage source={img.local} style={st.cardIconImage} contentFit="cover" transition={220} />
+              ) : item.deity ? (
+                <Emblem name={emblemForDeity(item.deity)} size={48} color={toneSolid(item.color)} />
               ) : item.category === 'aarti' ? (
-                <Diya size={26} color={item.color} />
+                <Diya size={26} color={tone(item.color).fg} />
               ) : (
                 <MaterialCommunityIcons
                   name={DEVOTIONAL_CATEGORIES.find(c => c.key === item.category)?.icon as any}
-                  size={22} color={item.color}
+                  size={22} color={tone(item.color).fg}
                 />
               )}
             </View>
             <View style={st.cardInfo}>
-              <Text style={[st.cardTitle, { color: colors.text }]}>{item.title}</Text>
-              <Text style={[st.cardTitleHi, { color: colors.primary }]} numberOfLines={1}>{item.titleHi}</Text>
-              <Text style={[st.cardDeity, { color: colors.textSecondary }]}>{item.deity}</Text>
+              <Text style={[st.cardTitle, { color: colors.text }]}>{native(item.title, item.titleHi)}</Text>
+              <Text style={[st.cardDeity, { color: colors.textSecondary }]}>{tx(item.deity)}</Text>
             </View>
-            <TouchableOpacity onPress={() => openPlayer(item)} hitSlop={8} style={[st.playBtn, { backgroundColor: item.color + '14' }]}>
-              <MaterialCommunityIcons name="play" size={20} color={item.color} />
+            <TouchableOpacity onPress={() => openPlayer(item)} hitSlop={8} style={[st.playBtn, { backgroundColor: tone(item.color).bg }]}>
+              <MaterialCommunityIcons name="play" size={20} color={tone(item.color).fg} />
             </TouchableOpacity>
           </TouchableOpacity>
           );
@@ -193,9 +166,8 @@ const st = StyleSheet.create({
   headerBack: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 21, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  tabs: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.14)' },
-  tabActive: { backgroundColor: '#FFF' },
+  tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginBottom: 4 },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 12, borderWidth: 1 },
   tabText: { fontSize: 12, fontWeight: '700' },
 
   list: { padding: 16, gap: 8 },

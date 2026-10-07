@@ -8,6 +8,8 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { remote, IMAGE_HEADERS } from '../constants/remoteImage';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { Header } from '../components/ui';
@@ -22,6 +24,7 @@ const COL_W = (width - 20 * 2 - GAP) / 2;
 
 export default function WallpapersScreen() {
   const { colors } = useTheme();
+  const { t: tr, tx } = useLanguage();
   const dialog = useDialog();
   const { screenBottom } = useDsInsets();
   const [cat, setCat] = useState<'all' | Wallpaper['category']>('all');
@@ -45,7 +48,7 @@ export default function WallpapersScreen() {
     }
     const target = `${FileSystem.cacheDirectory}wallpaper-${w.id}.jpg`;
     const res = await FileSystem.downloadAsync(w.url, target, {
-      headers: { 'User-Agent': 'SadhakApp/1.6 (Hindu companion app; soumodityapramanik@gmail.com)' },
+      headers: IMAGE_HEADERS,
     });
     if (res.status !== 200) throw new Error(`Download failed (HTTP ${res.status}).`);
     return res.uri;
@@ -113,7 +116,7 @@ export default function WallpapersScreen() {
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <Header title="Wallpapers" subtitle="Gods, temples & sacred nature" />
+      <Header title={tr('f.wallpapers')} subtitle={tx('Gods, temples & sacred nature')} />
 
       {/* Category chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.catScroll} contentContainerStyle={st.catRow}>
@@ -126,7 +129,7 @@ export default function WallpapersScreen() {
               style={[st.catChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.cardBorder }]}
             >
               <MaterialCommunityIcons name={c.icon as any} size={14} color={active ? '#FFF' : colors.textSecondary} />
-              <Text style={[st.catText, { color: active ? '#FFF' : colors.textSecondary }]}>{c.label}</Text>
+              <Text style={[st.catText, { color: active ? '#FFF' : colors.textSecondary }]}>{tx(c.label)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -137,7 +140,7 @@ export default function WallpapersScreen() {
         {list.map(w => (
           <TouchableOpacity key={w.id} activeOpacity={0.85} onPress={() => setPreview(w)} style={st.tile}>
             <ExpoImage
-              source={w.local ?? { uri: w.thumb }}
+              source={w.local ?? remote(w.thumb)}
               placeholder={{ blurhash: w.blurhash }}
               style={st.tileImg}
               contentFit="cover"
@@ -157,7 +160,7 @@ export default function WallpapersScreen() {
         <View style={st.previewWrap}>
           {preview && (
             <ExpoImage
-              source={preview.local ?? { uri: preview.url }}
+              source={preview.local ?? remote(preview.url)}
               placeholder={{ blurhash: preview.blurhash }}
               style={StyleSheet.absoluteFill}
               // 'contain' so the whole painting is visible in preview (deity not
@@ -174,7 +177,7 @@ export default function WallpapersScreen() {
           </TouchableOpacity>
 
           {preview && (
-            <View style={st.previewFooter}>
+            <View style={[st.previewFooter, { paddingBottom: screenBottom + 8 }]}>
               <Text style={st.previewTitle}>{preview.title}</Text>
               <Text style={st.previewCredit}>{preview.credit}</Text>
               <View style={st.previewActions}>
@@ -184,7 +187,7 @@ export default function WallpapersScreen() {
                   disabled={busy !== null}
                 >
                   {busy === 'save' ? <ActivityIndicator size="small" color="#FFF" /> : <MaterialCommunityIcons name="download" size={18} color="#FFF" />}
-                  <Text style={st.pBtnText}>Save</Text>
+                  <Text style={st.pBtnText}>{tx('Save')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[st.pBtn, { backgroundColor: colors.primary }]}
@@ -192,7 +195,7 @@ export default function WallpapersScreen() {
                   disabled={busy !== null}
                 >
                   {busy === 'set' ? <ActivityIndicator size="small" color="#FFF" /> : <MaterialCommunityIcons name="wallpaper" size={18} color="#FFF" />}
-                  <Text style={st.pBtnText}>Set as wallpaper</Text>
+                  <Text style={st.pBtnText}>{tx('Set as wallpaper')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -205,7 +208,8 @@ export default function WallpapersScreen() {
 
 const st = StyleSheet.create({
   container: { flex: 1 },
-  catScroll: { maxHeight: 44, marginTop: 4 },
+  // Fixed, non-shrinking height: maxHeight alone let the grid below squeeze the chips in half.
+  catScroll: { height: 50, flexGrow: 0, flexShrink: 0, marginTop: 4 },
   catRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 34, borderRadius: 100, borderWidth: 1 },
   catText: { fontSize: 12.5, fontWeight: '700' },

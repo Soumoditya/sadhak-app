@@ -1,132 +1,171 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Platform } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Animated, useWindowDimensions } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useTheme } from '../contexts/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDialog } from '../contexts/DialogContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { goBackOrHome } from '../components/ui/Header';
 
-const { width } = Dimensions.get('window');
+const STORE_KEY = 'sadhak_japa_state';
+const GOLD = '#F5B841';
+const SAFFRON = '#E8650A';
+const TARGETS = [27, 54, 108] as const;
 
 export default function JapaScreen() {
+  const dialog = useDialog();
   const { colors, isDark } = useTheme();
+  const { t: tr, tx } = useLanguage();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const [count, setCount] = useState(0);
-  const [targetMala, setTargetMala] = useState(108);
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
+  const [target, setTarget] = useState<number>(108);
+  const [loaded, setLoaded] = useState(false);
+  const scale = useRef(new Animated.Value(1)).current;
+  const glow = useRef(new Animated.Value(0)).current;
+
+  // Keep the count if the user leaves mid-japa (it used to reset to 0).
+  useEffect(() => {
+    AsyncStorage.getItem(STORE_KEY).then((v) => {
+      if (v) { try { const s = JSON.parse(v); setCount(s.count || 0); setTarget(s.target || 108); } catch {} }
+    }).catch(() => {}).finally(() => setLoaded(true));
+  }, []);
+  useEffect(() => {
+    if (loaded) AsyncStorage.setItem(STORE_KEY, JSON.stringify({ count, target })).catch(() => {});
+  }, [count, target, loaded]);
 
   const increment = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Bounce animation on tap
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     Animated.sequence([
-      Animated.spring(scaleAnim, { toValue: 0.92, friction: 3, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 0.95, duration: 70, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, friction: 4, useNativeDriver: true }),
     ]).start();
-    
-    const newCount = count + 1;
-    setCount(newCount);
-    
-    // Celebration on mala completion
-    if (newCount % targetMala === 0) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const next = count + 1;
+    setCount(next);
+    if (next % target === 0) {
+      // Mala complete: stronger haptic + a soft golden flash.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(glowAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 900, useNativeDriver: true }),
       ]).start();
     }
   };
 
   const reset = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    setCount(0);
+    if (count === 0) return;
+    dialog.alert('Reset count?', `This clears your ${count} chants.`, [
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Reset', style: 'destructive', onPress: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {}); setCount(0); } },
+    ]);
   };
 
-  const malaComplete = Math.floor(count / targetMala);
-  const currentInMala = count % targetMala;
-  const progress = currentInMala / targetMala;
+  const malas = Math.floor(count / target);
+  const inMala = count % target;
+  const progress = inMala / target;
+
+  const size = Math.min(width * 0.72, 300);
+  // Follows the app theme: parchment + saffron in light, charcoal + gold in dark.
+  const pal = isDark
+    ? { bg: ['#16100A', colors.background] as const, fg: '#FFF', muted: 'rgba(255,255,255,0.55)', faint: 'rgba(255,255,255,0.4)', line: 'rgba(255,255,255,0.12)', panel: 'rgba(255,255,255,0.05)', track: 'rgba(255,255,255,0.08)', accent: GOLD, onAccent: '#1A1208' }
+    : { bg: [colors.background, colors.surfaceSecondary] as const, fg: colors.text, muted: colors.textSecondary, faint: colors.textTertiary, line: colors.cardBorder, panel: colors.surface, track: colors.primary + '1A', accent: colors.primary, onAccent: '#FFF' };
+  const stroke = 10;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient colors={isDark ? [colors.surfaceElevated, colors.surface] : ['#4A148C', '#7B1FA2', '#9C27B0']} style={styles.gradient}>
-        {/* Back button */}
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
+    <LinearGradient colors={pal.bg} style={{ flex: 1 }}>
+      {/* Top bar */}
+      <View style={[st.top, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity style={[st.iconBtn, { backgroundColor: pal.panel, borderColor: pal.line }]} onPress={goBackOrHome} hitSlop={8}>
+          <Ionicons name="chevron-back" size={22} color={pal.fg} />
         </TouchableOpacity>
+        <Text style={[st.title, { color: pal.fg }]}>{tr('t.japa')}</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
-        {/* Mala Counter */}
-        <View style={styles.malaInfo}>
-          <View style={styles.malaItem}>
-            <Text style={styles.malaLabel}>Mala</Text>
-            <Text style={styles.malaValue}>{malaComplete}</Text>
-          </View>
-          <View style={styles.malaDivider} />
-          <View style={styles.malaItem}>
-            <Text style={styles.malaLabel}>Total</Text>
-            <Text style={styles.malaValue}>{count}</Text>
-          </View>
-        </View>
+      {/* Stats */}
+      <View style={[st.stats, { backgroundColor: pal.panel, borderColor: pal.line }]}>
+        <Stat label={tx('Malas')} value={malas} pal={pal} />
+        <View style={[st.statDivider, { backgroundColor: pal.line }]} />
+        <Stat label={tx('Total chants')} value={count} pal={pal} />
+      </View>
 
-        {/* Main Counter Circle */}
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <TouchableOpacity style={styles.counterOuter} onPress={increment} activeOpacity={0.7}>
-          <View style={styles.counterProgressBg}>
-            <View style={styles.counterInner}>
-              <Animated.Text style={[styles.counterNumber, { opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.3] }) }]}>{currentInMala}</Animated.Text>
-              <Text style={styles.counterOf}>of {targetMala}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+      {/* The whole middle area is the tap target, not just the circle. */}
+      <Pressable onPress={increment} style={st.tapArea} accessibilityRole="button" accessibilityLabel={`Count chant, ${inMala} of ${target}`}>
+        <Animated.View style={{ transform: [{ scale }], width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: size / 2, backgroundColor: pal.accent, opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.25] }) }]} />
+          <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+            <Circle cx={size / 2} cy={size / 2} r={r} stroke={pal.track} strokeWidth={stroke} fill={isDark ? 'rgba(255,255,255,0.03)' : colors.surface} />
+            <Circle
+              cx={size / 2} cy={size / 2} r={r}
+              stroke={pal.accent} strokeWidth={stroke} fill="none" strokeLinecap="round"
+              strokeDasharray={`${circ} ${circ}`} strokeDashoffset={circ * (1 - progress)}
+              transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            />
+          </Svg>
+          <Text style={[st.count, { color: pal.fg }]}>{inMala}</Text>
+          <Text style={[st.of, { color: pal.muted }]}>/ {target}</Text>
         </Animated.View>
+        <Text style={[st.hint, { color: pal.faint }]}>{tx('Tap anywhere to count')}</Text>
+      </Pressable>
 
-        <Text style={styles.tapHint}>Tap the circle to count</Text>
-
-        {/* Mala Selector */}
-        <View style={styles.malaSelector}>
-          {[27, 54, 108].map(m => (
-            <TouchableOpacity
-              key={m}
-              style={[styles.malaBtn, targetMala === m && styles.malaBtnActive]}
-              onPress={() => { setTargetMala(m); setCount(0); }}
-            >
-              <Text style={[styles.malaBtnText, targetMala === m && styles.malaBtnTextActive]}>{m}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Reset */}
-        <TouchableOpacity style={styles.resetBtn} onPress={reset}>
-          <MaterialCommunityIcons name="refresh" size={22} color="#FFF" />
-          <Text style={styles.resetText}>Reset</Text>
+      {/* Mala size */}
+      <View style={[st.bottom, { paddingBottom: insets.bottom + 24 }]}>
+        <TouchableOpacity onPress={reset} disabled={!count} hitSlop={8} accessibilityLabel={tx('Reset')}
+          style={[st.resetBtn, { borderColor: pal.line, backgroundColor: pal.panel, opacity: count ? 1 : 0.45 }]}>
+          <MaterialCommunityIcons name="restore" size={17} color={pal.fg} />
+          <Text style={[st.resetText, { color: pal.fg }]}>{tx('Reset')}</Text>
         </TouchableOpacity>
+        <Text style={[st.bottomLabel, { color: pal.faint }]}>{tx('BEADS PER MALA')}</Text>
+        <View style={st.targets}>
+          {TARGETS.map((m) => {
+            const active = target === m;
+            return (
+              <TouchableOpacity key={m} onPress={() => setTarget(m)} style={[st.target, { borderColor: active ? pal.accent : pal.line, backgroundColor: active ? pal.accent : 'transparent' }]}>
+                <Text style={[st.targetText, { color: active ? pal.onAccent : pal.muted }]}>{m}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={[st.om, { color: isDark ? SAFFRON : colors.primary }]}>ॐ</Text>
+      </View>
+    </LinearGradient>
+  );
+}
 
-        {/* Om Symbol */}
-        <Text style={styles.om}>ॐ</Text>
-      </LinearGradient>
+function Stat({ label, value, pal }: { label: string; value: number; pal: { accent: string; muted: string } }) {
+  return (
+    <View style={{ alignItems: 'center', minWidth: 90 }}>
+      <Text style={[st.statValue, { color: pal.accent }]}>{value}</Text>
+      <Text style={[st.statLabel, { color: pal.muted }]}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  gradient: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
-  backBtn: { position: 'absolute', top: Platform.OS === 'ios' ? 56 : 44, left: 20, width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
-  malaInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 40, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 30, paddingVertical: 14, gap: 20 },
-  malaItem: { alignItems: 'center' },
-  malaLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '500' },
-  malaValue: { color: '#FFD700', fontSize: 28, fontWeight: '800' },
-  malaDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.2)' },
-  counterOuter: { width: width * 0.55, height: width * 0.55, borderRadius: width * 0.275, borderWidth: 4, borderColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  counterProgressBg: { width: '90%', height: '90%', borderRadius: width * 0.25, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-  counterInner: { alignItems: 'center' },
-  counterNumber: { fontSize: 64, fontWeight: '800', color: '#FFD700' },
-  counterOf: { fontSize: 16, color: 'rgba(255,255,255,0.6)', marginTop: -4 },
-  tapHint: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 20 },
-  malaSelector: { flexDirection: 'row', gap: 12, marginTop: 30 },
-  malaBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-  malaBtnActive: { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' },
-  malaBtnText: { color: 'rgba(255,255,255,0.6)', fontSize: 16, fontWeight: '600' },
-  malaBtnTextActive: { color: '#FFD700' },
-  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 24, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.1)' },
-  resetText: { color: '#FFF', fontSize: 15, fontWeight: '600' },
-  om: { fontSize: 40, color: 'rgba(255,215,0,0.3)', marginTop: 30 },
+const st = StyleSheet.create({
+  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
+  title: { color: '#FFF', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
+  stats: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', marginTop: 24, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  statValue: { color: GOLD, fontSize: 26, fontWeight: '800' },
+  statLabel: { color: 'rgba(255,255,255,0.55)', fontSize: 11.5, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
+  statDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.12)', marginHorizontal: 8 },
+  tapArea: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  count: { color: '#FFF', fontSize: 72, fontWeight: '800', letterSpacing: -1 },
+  of: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '600', marginTop: -6 },
+  hint: { color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 22 },
+  bottom: { alignItems: 'center' },
+  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, height: 36, borderRadius: 18, borderWidth: 1, marginBottom: 18 },
+  resetText: { fontSize: 13.5, fontWeight: '800' },
+  bottomLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 10 },
+  targets: { flexDirection: 'row', gap: 10 },
+  target: { minWidth: 76, alignItems: 'center', paddingVertical: 10, borderRadius: 100, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  targetActive: { backgroundColor: GOLD, borderColor: GOLD },
+  targetText: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '800' },
+  om: { fontSize: 30, color: SAFFRON, opacity: 0.45, marginTop: 18 },
 });

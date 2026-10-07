@@ -5,12 +5,12 @@
 export const Colors = {
   light: {
     // ── Primary ──
-    primary: '#D94F00',        // Rich saffron-orange
-    primaryLight: '#F07830',
-    primaryDark: '#B33D00',
-    primaryMuted: '#D94F0018', // For tinted backgrounds
-    primaryGradientStart: '#D94F00',
-    primaryGradientEnd: '#F59A3F',
+    primary: '#C2410C',        // Deep kesari saffron (AA on white)
+    primaryLight: '#E8743B',
+    primaryDark: '#9A3412',
+    primaryMuted: '#C2410C16', // For tinted backgrounds
+    primaryGradientStart: '#C2410C',
+    primaryGradientEnd: '#E8743B',
 
     // ── Secondary ──
     secondary: '#8B1A1A',      // Deep temple maroon
@@ -18,7 +18,7 @@ export const Colors = {
     secondaryDark: '#6B0F1A',
 
     // ── Accent ──
-    gold: '#C49A2C',
+    gold: '#B8862B',
     goldLight: '#E8C34A',
     goldMuted: '#C49A2C14',
     vermillion: '#D93025',
@@ -27,17 +27,17 @@ export const Colors = {
     saffron: '#F5A623',
 
     // ── Surfaces ──
-    background: '#FDFAF5',     // Warm ivory
+    background: '#FBF7F1',     // Warm parchment
     surface: '#FFFFFF',
     surfaceElevated: '#FFFFFF',
-    surfaceSecondary: '#F7F3ED', // Subtle warm gray
+    surfaceSecondary: '#F5EFE6', // Subtle warm sand
     card: '#FFFFFF',
-    cardBorder: '#EDE6DB',
+    cardBorder: '#ECE3D7',
 
     // ── Text ──
-    text: '#1C1917',           // Rich near-black
-    textSecondary: '#57534E',
-    textTertiary: '#A8A29E',
+    text: '#1F1A16',           // Warm near-black
+    textSecondary: '#5C534B',
+    textTertiary: '#9E948A',
     textOnPrimary: '#FFFFFF',
     textOnDark: '#FFFFFF',
     textMuted: '#D6D3D1',
@@ -56,17 +56,19 @@ export const Colors = {
     festival: '#D93025',
     ekadashi: '#7C3AED',
     purnima: '#E8C34A',
+    grahan: '#0F766E',
+    grahanBg: '#DDF3EF',
     amavasya: '#44403C',
     groomingOk: '#16A34A',
     groomingAvoid: '#DC2626',
     personalNote: '#2563EB',
 
     // ── UI Chrome ──
-    border: '#E7E0D8',
-    divider: '#F0EBE3',
-    tabIconDefault: '#A8A29E',
-    tabIconSelected: '#D94F00',
-    ripple: 'rgba(217, 79, 0, 0.10)',
+    border: '#E6DCCE',
+    divider: '#F1EADF',
+    tabIconDefault: '#9E948A',
+    tabIconSelected: '#C2410C',
+    ripple: 'rgba(194, 65, 12, 0.10)',
     overlay: 'rgba(28, 25, 23, 0.50)',
     overlayHeavy: 'rgba(28, 25, 23, 0.72)',
     shadow: 'rgba(28, 25, 23, 0.08)',
@@ -80,12 +82,12 @@ export const Colors = {
 
   dark: {
     // ── Primary ──
-    primary: '#F07830',        // Brighter saffron for dark bg
-    primaryLight: '#FFB074',
-    primaryDark: '#D94F00',
-    primaryMuted: '#F0783018',
-    primaryGradientStart: '#D94F00',
-    primaryGradientEnd: '#F07830',
+    primary: '#F08A4B',        // Glowing saffron on warm charcoal
+    primaryLight: '#F7B07F',
+    primaryDark: '#C2410C',
+    primaryMuted: '#F08A4B18',
+    primaryGradientStart: '#C2410C',
+    primaryGradientEnd: '#F08A4B',
 
     // ── Secondary ──
     secondary: '#E8899A',
@@ -102,20 +104,20 @@ export const Colors = {
     saffron: '#FBB848',
 
     // ── Surfaces ──
-    background: '#0F1218',     // Deep ink
-    surface: '#171C24',        // Card surface
-    surfaceElevated: '#1E242E', // Elevated card
-    surfaceSecondary: '#141920',
-    card: '#1E242E',
-    cardBorder: '#2A3140',
+    background: '#13110F',     // Warm charcoal (was cold blue-grey)
+    surface: '#1C1916',        // Card surface
+    surfaceElevated: '#25211D', // Elevated card
+    surfaceSecondary: '#191613',
+    card: '#25211D',
+    cardBorder: '#332D27',
 
     // ── Text ──
-    text: '#F1F0EE',           // Warm white
-    textSecondary: '#9CA3AF',
-    textTertiary: '#5C6370',
-    textOnPrimary: '#0F1218',
-    textOnDark: '#F1F0EE',
-    textMuted: '#374151',
+    text: '#F4EEE7',           // Warm white
+    textSecondary: '#B5AA9E',
+    textTertiary: '#7D7268',
+    textOnPrimary: '#13110F',
+    textOnDark: '#F4EEE7',
+    textMuted: '#3D3630',
 
     // ── Status ──
     success: '#4ADE80',
@@ -131,26 +133,28 @@ export const Colors = {
     festival: '#FF7B72',
     ekadashi: '#A78BFA',
     purnima: '#E8C34A',
+    grahan: '#2DD4BF',
+    grahanBg: '#123631',
     amavasya: '#78909C',
     groomingOk: '#4ADE80',
     groomingAvoid: '#F87171',
     personalNote: '#60A5FA',
 
     // ── UI Chrome ──
-    border: '#2A3140',
-    divider: '#1E242E',
-    tabIconDefault: '#5C6370',
-    tabIconSelected: '#F07830',
-    ripple: 'rgba(240, 120, 48, 0.12)',
+    border: '#332D27',
+    divider: '#25211D',
+    tabIconDefault: '#7D7268',
+    tabIconSelected: '#F08A4B',
+    ripple: 'rgba(240, 138, 75, 0.12)',
     overlay: 'rgba(0, 0, 0, 0.60)',
     overlayHeavy: 'rgba(0, 0, 0, 0.82)',
     shadow: 'rgba(0, 0, 0, 0.40)',
-    shimmer: '#1E242E',
-    shimmerHighlight: '#2A3140',
+    shimmer: '#25211D',
+    shimmerHighlight: '#332D27',
 
     // ── Glassmorphism ──
-    glass: 'rgba(23, 28, 36, 0.82)',
-    glassBorder: 'rgba(42, 49, 64, 0.60)',
+    glass: 'rgba(28, 25, 22, 0.85)',
+    glassBorder: 'rgba(51, 45, 39, 0.60)',
   },
 };
 
@@ -363,3 +367,46 @@ export const NAKSHATRAS = [
 
 export const APP_NAME = 'Sadhak';
 export const APP_TAGLINE = 'Your Spiritual Companion';
+
+// ─── Tones ─────────────────────────────────────────────────────────────────
+// One earthy accent family for icons, chips and categories, replacing the old
+// mix of neon purple/blue/green per item. Every tool and category picks one of
+// these, so the whole app reads as one palette in both themes.
+export type ToneName = 'saffron' | 'kumkum' | 'haldi' | 'tulsi' | 'neel' | 'plum';
+export type Tone = { fg: string; bg: string };
+export const Tones: Record<'light' | 'dark', Record<ToneName, Tone>> = {
+  light: {
+    saffron: { fg: '#C2410C', bg: '#FBE8DA' },
+    kumkum: { fg: '#B0263E', bg: '#F8E2E5' },
+    haldi: { fg: '#9A6508', bg: '#F7EBD2' },
+    tulsi: { fg: '#2E7149', bg: '#E1EFE4' },
+    neel: { fg: '#24608A', bg: '#DFEAF3' },
+    plum: { fg: '#7B3F79', bg: '#F0E3EF' },
+  },
+  dark: {
+    saffron: { fg: '#F59A62', bg: '#3A2418' },
+    kumkum: { fg: '#F0909E', bg: '#3A1E24' },
+    haldi: { fg: '#E6B65A', bg: '#372B16' },
+    tulsi: { fg: '#7FC99A', bg: '#1C3125' },
+    neel: { fg: '#86BCE2', bg: '#1A2B39' },
+    plum: { fg: '#D59ED3', bg: '#2F2030' },
+  },
+};
+
+// Older screens and data files carry fixed accent hexes (MUI-style purple,
+// blue, green). Map each to the nearest tone so they theme correctly.
+const LEGACY_TONE: Record<string, ToneName> = {
+  '#C2410C': 'saffron', '#FF6B00': 'saffron', '#FF8C00': 'saffron', '#EA580C': 'saffron', '#EA8C00': 'saffron', '#E8650A': 'saffron', '#F97316': 'saffron', '#FF9933': 'saffron',
+  '#D32F2F': 'kumkum', '#8B0000': 'kumkum', '#DC2626': 'kumkum', '#D93025': 'kumkum', '#B71C1C': 'kumkum', '#E91E63': 'kumkum', '#EF4444': 'kumkum', '#8B1A1A': 'kumkum',
+  '#1565C0': 'neel', '#0EA5E9': 'neel', '#2563EB': 'neel', '#475569': 'neel', '#37474F': 'neel', '#616161': 'neel', '#0D47A1': 'neel', '#1976D2': 'neel', '#00838F': 'neel',
+  '#7C3AED': 'plum', '#9C27B0': 'plum', '#6A1B9A': 'plum', '#8E24AA': 'plum', '#4A148C': 'plum',
+  '#2D6A4F': 'tulsi', '#1B7A42': 'tulsi', '#16A34A': 'tulsi', '#2E7D32': 'tulsi', '#388E3C': 'tulsi', '#43A047': 'tulsi',
+  '#C49A2C': 'haldi', '#F59E0B': 'haldi', '#FFD700': 'haldi', '#E8C34A': 'haldi', '#B8862B': 'haldi', '#F5A623': 'haldi', '#FFA000': 'haldi',
+};
+export function toneNameFor(color?: string): ToneName {
+  if (!color) return 'saffron';
+  if (color in Tones.light) return color as ToneName;
+  return LEGACY_TONE[color.toUpperCase()] || 'saffron';
+}
+/** Strong (light-palette) tone colour for solid fills behind white text. */
+export const toneSolid = (color?: string) => Tones.light[toneNameFor(color)].fg;

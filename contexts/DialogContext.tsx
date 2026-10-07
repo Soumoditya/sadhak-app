@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Modal, Pressable, Animated, Easing } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
+import { useLanguage } from './LanguageContext';
 
 // ─── Public API types ───────────────────────────────────────────────────────
 export type DialogButtonStyle = 'default' | 'cancel' | 'destructive';
@@ -45,6 +46,7 @@ const TONE_ICON: Record<DialogTone, keyof typeof MaterialCommunityIcons.glyphMap
 };
 
 export function DialogProvider({ children }: { children: React.ReactNode }) {
+  const { tx } = useLanguage();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
@@ -143,8 +145,8 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                 <MaterialCommunityIcons name={iconName} size={18} color={toneColor} style={{ marginTop: 3 }} />
               )}
               <View style={{ flex: 1 }}>
-                {!!opts?.title && <Text style={[styles.title, { color: colors.text }]}>{opts.title}</Text>}
-                {!!opts?.message && <Text style={[styles.message, { color: colors.textSecondary }]}>{opts.message}</Text>}
+                {!!opts?.title && <Text style={[styles.title, { color: colors.text }]}>{tx(opts.title)}</Text>}
+                {!!opts?.message && <Text style={[styles.message, { color: colors.textSecondary }]}>{tx(opts.message)}</Text>}
               </View>
             </View>
 
@@ -173,7 +175,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                     ]}
                     android_ripple={{ color: `${fg}22` }}
                   >
-                    <Text style={[styles.btnText, { color: fg }]}>{btn.text}</Text>
+                    <Text style={[styles.btnText, { color: fg }]}>{tx(btn.text)}</Text>
                   </Pressable>
                 );
               })}

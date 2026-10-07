@@ -3,15 +3,20 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } fro
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
 import { PUJA_GUIDES, type PujaGuide } from '../constants/pujaGuides';
 import { Diya } from '../components/ui';
 import { resolveDeityImage } from '../constants/deityImages';
+import Emblem, { emblemForDeity } from '../components/art/Emblem';
+import { Header } from '../components/ui';
+import { toneSolid } from '../constants/theme';
 
 export default function PujaGuideScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, tone } = useTheme();
+  const { t: tr, tx, native, language } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [guide, setGuide] = useState<PujaGuide | null>(null);
 
@@ -27,92 +32,84 @@ export default function PujaGuideScreen() {
     return (
       <View style={[st.container, { backgroundColor: colors.background }]}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottomPadding }}>
-          <LinearGradient colors={[guide.color, guide.color + 'B3']} style={[st.dHeader, { paddingTop: headerPaddingTop }]}>
+          <LinearGradient colors={[toneSolid(guide.color), toneSolid(guide.color) + 'B3']} style={[st.dHeader, { paddingTop: headerPaddingTop }]}>
             <TouchableOpacity style={st.dBack} onPress={() => setGuide(null)} hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color="#FFF" />
             </TouchableOpacity>
-            {heroImg ? (
+            {heroImg?.local ? (
               <View style={st.dHeroImgWrap}>
-                <ExpoImage
-                  source={heroImg.local ?? { uri: heroImg.url }}
-                  placeholder={{ blurhash: heroImg.blurhash }}
-                  style={st.dHeroImg}
-                  contentFit="cover"
-                  transition={280}
-                  cachePolicy="disk"
-                />
+                <ExpoImage source={heroImg.local} style={st.dHeroImg} contentFit="cover" transition={280} />
               </View>
             ) : (
-              <MaterialCommunityIcons name={guide.icon as any} size={36} color="#FFD700" />
+              <Emblem name={emblemForDeity(guide.deity)} size={92} color={toneSolid(guide.color)} />
             )}
-            <Text style={st.dTitle}>{guide.deity}</Text>
-            <Text style={st.dTitleHi}>{guide.deityHi}</Text>
+            <Text style={st.dTitle}>{native(guide.deity, guide.deityHi)}</Text>
             <View style={st.dDayChip}>
               <MaterialCommunityIcons name="calendar-star" size={13} color="#FFF" />
-              <Text style={st.dDayText}>{guide.day}</Text>
+              <Text style={st.dDayText}>{tx(guide.day)}</Text>
             </View>
           </LinearGradient>
 
           {/* Samagri checklist */}
-          <Section title="Samagri — what you need" icon="basket-outline" color={colors.primary} colors={colors}>
+          <Section title={tx('Samagri — what you need')} icon="basket-outline" color={colors.primary} colors={colors}>
             {guide.samagri.map((s, i) => (
-              <Row key={i} icon="checkbox-blank-circle-outline" color={colors.primary} text={s} colors={colors} />
+              <Row key={i} icon="checkbox-blank-circle-outline" color={colors.primary} text={tx(s)} colors={colors} />
             ))}
           </Section>
 
           {/* Offerings */}
-          <Section title="Favourite offerings" icon="flower-outline" color="#2D6A4F" colors={colors}>
+          <Section title={tx('Favourite offerings')} icon="flower-outline" color="#2D6A4F" colors={colors}>
             {guide.offerings.map((s, i) => (
-              <Row key={i} icon="heart-outline" color="#2D6A4F" text={s} colors={colors} />
+              <Row key={i} icon="heart-outline" color="#2D6A4F" text={tx(s)} colors={colors} />
             ))}
           </Section>
 
           {/* Strictly avoid */}
-          <Section title="Strictly avoid" icon="cancel" color={colors.festival} colors={colors} accent>
+          <Section title={tx('Strictly avoid')} icon="cancel" color={colors.festival} colors={colors} accent>
             {guide.strictlyAvoid.map((s, i) => (
-              <Row key={i} icon="close-circle-outline" color={colors.festival} text={s} colors={colors} />
+              <Row key={i} icon="close-circle-outline" color={colors.festival} text={tx(s)} colors={colors} />
             ))}
           </Section>
 
           {/* Vidhi steps */}
-          <Section title="Puja vidhi — step by step" icon="format-list-numbered" color="#7C3AED" colors={colors}>
+          <Section title={tx('Puja vidhi — step by step')} icon="format-list-numbered" color="#7C3AED" colors={colors}>
             {guide.steps.map((s, i) => (
               <View key={i} style={st.stepRow}>
                 <View style={[st.stepNo, { backgroundColor: '#7C3AED18' }]}>
                   <Text style={{ color: '#7C3AED', fontWeight: '800', fontSize: 11 }}>{i + 1}</Text>
                 </View>
-                <Text style={[st.rowText, { color: colors.textSecondary }]}>{s}</Text>
+                <Text style={[st.rowText, { color: colors.textSecondary }]}>{tx(s)}</Text>
               </View>
             ))}
           </Section>
 
           {/* Mantra */}
-          <View style={[st.mantraCard, { backgroundColor: guide.color + '0E', borderColor: guide.color + '35' }]}>
-            <Text style={[st.mantraLabel, { color: guide.color }]}>MOOL MANTRA</Text>
+          <View style={[st.mantraCard, { backgroundColor: tone(guide.color).bg, borderColor: tone(guide.color).fg + '35' }]}>
+            <Text style={[st.mantraLabel, { color: tone(guide.color).fg }]}>{tx('MOOL MANTRA')}</Text>
             <Text style={[st.mantraText, { color: colors.text }]}>{guide.mantra}</Text>
           </View>
 
           {/* Actions */}
           <View style={st.actions}>
             <TouchableOpacity
-              style={[st.actionBtn, { backgroundColor: guide.color }]}
+              style={[st.actionBtn, { backgroundColor: toneSolid(guide.color) }]}
               onPress={() => router.push({ pathname: '/play', params: { query: guide.playQuery, title: `${guide.deity} Puja` } })}
             >
               <MaterialCommunityIcons name="play-circle-outline" size={18} color="#FFF" />
-              <Text style={st.actionBtnText}>Watch vidhi</Text>
+              <Text style={st.actionBtnText}>{tx('Watch vidhi')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[st.actionBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.cardBorder }]}
               onPress={() => router.push('/aarti')}
             >
               <Diya size={20} color={colors.primary} />
-              <Text style={[st.actionBtnText, { color: colors.text }]}>Aarti & mantra</Text>
+              <Text style={[st.actionBtnText, { color: colors.text }]}>{tx('Aarti & mantra')}</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={[st.note, { color: colors.textTertiary }]}>
-            Traditions vary by region and family — your kula-parampara comes first. 🙏
-          </Text>
+          <Text style={[st.note, { color: colors.textTertiary }]}>{tx(
+            'Traditions vary by region and family — your kula-parampara comes first. 🙏'
+          )}</Text>
         </ScrollView>
       </View>
     );
@@ -121,20 +118,7 @@ export default function PujaGuideScreen() {
   // ─── Deity grid ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#8B1A1A', '#C62828']}
-        style={[st.header, { paddingTop: headerPaddingTop }]}
-      >
-        <View style={st.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={st.backBtn} hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color="#FFF" />
-          </TouchableOpacity>
-          <View>
-            <Text style={st.headerTitle}>Puja Guide</Text>
-            <Text style={st.headerSub}>किसकी पूजा करनी है? Choose the deity</Text>
-          </View>
-        </View>
-      </LinearGradient>
+      <Header title={tr('f.puja')} subtitle={tx('किसकी पूजा करनी है? Choose the deity')} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.grid, { paddingBottom: screenBottomPadding }]}>
         {PUJA_GUIDES.map((g) => {
@@ -146,23 +130,15 @@ export default function PujaGuideScreen() {
             onPress={() => setGuide(g)}
             activeOpacity={0.75}
           >
-            <View style={[st.cardIcon, { backgroundColor: g.color + '14', borderColor: g.color + '44', borderWidth: img ? 1 : 0 }]}>
-              {img ? (
-                <ExpoImage
-                  source={img.local ?? { uri: img.url }}
-                  placeholder={{ blurhash: img.blurhash }}
-                  style={st.cardIconImg}
-                  contentFit="cover"
-                  transition={220}
-                  cachePolicy="disk"
-                />
+            <View style={[st.cardIcon, { backgroundColor: tone(g.color).bg, borderColor: tone(g.color).fg + '44', borderWidth: img?.local ? 1 : 0 }]}>
+              {img?.local ? (
+                <ExpoImage source={img.local} style={st.cardIconImg} contentFit="cover" transition={220} />
               ) : (
-                <MaterialCommunityIcons name={g.icon as any} size={26} color={g.color} />
+                <Emblem name={emblemForDeity(g.deity)} size={54} color={toneSolid(g.color)} />
               )}
             </View>
-            <Text style={[st.cardTitle, { color: colors.text }]} numberOfLines={1}>{g.deity.replace('Lord ', '').replace('Goddess ', '').replace('Maa ', '')}</Text>
-            <Text style={[st.cardHi, { color: g.color }]}>{g.deityHi}</Text>
-            <Text style={[st.cardDay, { color: colors.textTertiary }]} numberOfLines={1}>{g.day}</Text>
+            <Text style={[st.cardTitle, { color: colors.text }]} numberOfLines={1}>{language === 'en' ? g.deity.replace('Lord ', '').replace('Goddess ', '').replace('Maa ', '') : native(g.deity, g.deityHi)}</Text>
+            <Text style={[st.cardDay, { color: colors.textTertiary }]} numberOfLines={1}>{tx(g.day)}</Text>
           </TouchableOpacity>
           );
         })}

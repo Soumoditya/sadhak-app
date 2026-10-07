@@ -3,17 +3,46 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, BackHa
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { remote } from '../constants/remoteImage';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
-import { BHOG_RECIPES, type BhogRecipe } from '../constants/recipes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BHOG_RECIPES, ALLERGENS, allergensOf, type BhogRecipe, type Allergen } from '../constants/recipes';
 import { getFoodImage } from '../constants/foodImages';
+import { Header } from '../components/ui';
+import { toneSolid } from '../constants/theme';
 
 export default function BhogScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, tone } = useTheme();
+  const { t: tr, tx, native, language } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [query, setQuery] = useState('');
   const [recipe, setRecipe] = useState<BhogRecipe | null>(null);
+  const [avoid, setAvoid] = useState<Allergen[]>([]);
+  useEffect(() => {
+    AsyncStorage.getItem('sadhak_bhog_avoid').then((v) => { if (v) setAvoid(JSON.parse(v)); }).catch(() => {});
+  }, []);
+  const toggleAvoid = (a: Allergen) => setAvoid((cur) => {
+    const next = cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a];
+    AsyncStorage.setItem('sadhak_bhog_avoid', JSON.stringify(next)).catch(() => {});
+    return next;
+  });
+  const allergenLabel = (a: Allergen) => tx(ALLERGENS.find((x) => x.key === a)!.label);
+  // Anything else the user types (e.g. "jaggery", "potato") is matched against ingredients.
+  const [custom, setCustom] = useState<string[]>([]);
+  const [customInput, setCustomInput] = useState('');
+  useEffect(() => {
+    AsyncStorage.getItem('sadhak_bhog_avoid_custom').then((v) => { if (v) setCustom(JSON.parse(v)); }).catch(() => {});
+  }, []);
+  const saveCustom = (next: string[]) => { setCustom(next); AsyncStorage.setItem('sadhak_bhog_avoid_custom', JSON.stringify(next)).catch(() => {}); };
+  const addCustom = () => {
+    const v = customInput.trim().toLowerCase();
+    if (v && !custom.includes(v)) saveCustom([...custom, v]);
+    setCustomInput('');
+  };
+  const hasCustom = (r: BhogRecipe) => custom.some((c) => r.ingredients.some((i) => i.item.toLowerCase().includes(c)));
 
   useEffect(() => {
     if (!recipe) return;
@@ -23,18 +52,20 @@ export default function BhogScreen() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return BHOG_RECIPES;
-    // Match by name, occasion OR ingredient — "what can I make with sabudana?"
-    return BHOG_RECIPES.filter(r =>
+    const safe = BHOG_RECIPES.filter((r) => !allergensOf(r).some((a) => avoid.includes(a)) && !hasCustom(r));
+    if (!q) return safe;
+    // Match by name, occasion OR ingredient: "what can I make with sabudana?"
+    return safe.filter(r =>
       r.name.toLowerCase().includes(q) ||
       r.nameHi.includes(q) ||
       r.occasion.toLowerCase().includes(q) ||
       r.ingredients.some(i => i.item.toLowerCase().includes(q)),
     );
-  }, [query]);
+  }, [query, avoid, custom]);
 
   const surpriseMe = () => {
-    const pick = BHOG_RECIPES[Math.floor(Math.random() * BHOG_RECIPES.length)];
+    const pool = filtered.length ? filtered : BHOG_RECIPES;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
     setRecipe(pick);
   };
 
@@ -44,14 +75,14 @@ export default function BhogScreen() {
     return (
       <View style={[st.container, { backgroundColor: colors.background }]}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottomPadding }}>
-          <LinearGradient colors={[recipe.color, recipe.color + 'B3']} style={[st.dHeader, { paddingTop: headerPaddingTop }]}>
+          <LinearGradient colors={[toneSolid(recipe.color), toneSolid(recipe.color) + 'B3']} style={[st.dHeader, { paddingTop: headerPaddingTop }]}>
             <TouchableOpacity style={st.dBack} onPress={() => setRecipe(null)} hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color="#FFF" />
             </TouchableOpacity>
             {heroImg ? (
               <View style={st.dHeroImgWrap}>
                 <ExpoImage
-                  source={heroImg.local ?? { uri: heroImg.url }}
+                  source={heroImg.local ?? remote(heroImg.url)}
                   placeholder={{ blurhash: heroImg.blurhash }}
                   style={st.dHeroImg}
                   contentFit="cover"
@@ -62,24 +93,32 @@ export default function BhogScreen() {
             ) : (
               <MaterialCommunityIcons name={recipe.icon as any} size={34} color="#FFD700" />
             )}
-            <Text style={st.dTitle}>{recipe.name}</Text>
-            <Text style={st.dTitleHi}>{recipe.nameHi}</Text>
+            <Text style={st.dTitle}>{native(recipe.name, recipe.nameHi)}</Text>
             <View style={st.dMeta}>
               <View style={st.dChip}><MaterialCommunityIcons name="clock-outline" size={12} color="#FFF" /><Text style={st.dChipText}>{recipe.time}</Text></View>
-              <View style={st.dChip}><MaterialCommunityIcons name="leaf" size={12} color="#FFF" /><Text style={st.dChipText}>No onion · No garlic</Text></View>
+              <View style={st.dChip}><MaterialCommunityIcons name="leaf" size={12} color="#FFF" /><Text style={st.dChipText}>{tx('No onion · No garlic')}</Text></View>
             </View>
-            <Text style={st.dOccasion}>{recipe.occasion}</Text>
+            <Text style={st.dOccasion}>{tx(recipe.occasion)}</Text>
           </LinearGradient>
+
+          {allergensOf(recipe).length > 0 && (
+            <View style={[st.allergyNote, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color={colors.warning || '#B7791F'} />
+              <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 12.5, lineHeight: 18 }}>
+                <Text style={{ fontWeight: '800', color: colors.text }}>{tx('Contains')}: </Text>{allergensOf(recipe).map(allergenLabel).join(', ')}
+              </Text>
+            </View>
+          )}
 
           {/* Ingredients */}
           <View style={[st.section, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={st.sectionHead}>
               <MaterialCommunityIcons name="basket-outline" size={17} color={colors.primary} />
-              <Text style={[st.sectionTitle, { color: colors.text }]}>Ingredients</Text>
+              <Text style={[st.sectionTitle, { color: colors.text }]}>{tx('Ingredients')}</Text>
             </View>
             {recipe.ingredients.map((ing, i) => (
               <View key={i} style={[st.ingRow, i > 0 && { borderTopColor: colors.divider, borderTopWidth: 1 }]}>
-                <Text style={[st.ingName, { color: colors.textSecondary }]}>{ing.item}</Text>
+                <Text style={[st.ingName, { color: colors.textSecondary }]}>{tx(ing.item)}</Text>
                 <Text style={[st.ingQty, { color: colors.text }]}>{ing.qty}</Text>
               </View>
             ))}
@@ -89,31 +128,31 @@ export default function BhogScreen() {
           <View style={[st.section, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={st.sectionHead}>
               <MaterialCommunityIcons name="chef-hat" size={17} color="#2D6A4F" />
-              <Text style={[st.sectionTitle, { color: colors.text }]}>Method</Text>
+              <Text style={[st.sectionTitle, { color: colors.text }]}>{tx('Method')}</Text>
             </View>
             {recipe.steps.map((s, i) => (
               <View key={i} style={st.stepRow}>
                 <View style={[st.stepNo, { backgroundColor: '#2D6A4F18' }]}>
                   <Text style={{ color: '#2D6A4F', fontWeight: '800', fontSize: 11 }}>{i + 1}</Text>
                 </View>
-                <Text style={[st.stepText, { color: colors.textSecondary }]}>{s}</Text>
+                <Text style={[st.stepText, { color: colors.textSecondary }]}>{tx(s)}</Text>
               </View>
             ))}
           </View>
 
           {!!recipe.tips && (
-            <View style={[st.tipCard, { backgroundColor: recipe.color + '0E', borderColor: recipe.color + '35' }]}>
-              <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={recipe.color} />
-              <Text style={[st.tipText, { color: colors.textSecondary }]}>{recipe.tips}</Text>
+            <View style={[st.tipCard, { backgroundColor: tone(recipe.color).bg, borderColor: tone(recipe.color).fg + '35' }]}>
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={tone(recipe.color).fg} />
+              <Text style={[st.tipText, { color: colors.textSecondary }]}>{tx(recipe.tips)}</Text>
             </View>
           )}
 
           <TouchableOpacity
-            style={[st.watchBtn, { backgroundColor: recipe.color }]}
+            style={[st.watchBtn, { backgroundColor: toneSolid(recipe.color) }]}
             onPress={() => router.push({ pathname: '/play', params: { query: recipe.playQuery, title: recipe.name } })}
           >
             <MaterialCommunityIcons name="play-circle-outline" size={19} color="#FFF" />
-            <Text style={st.watchBtnText}>Watch it being made</Text>
+            <Text style={st.watchBtnText}>{tx('Watch it being made')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -123,44 +162,69 @@ export default function BhogScreen() {
   // ─── List ───
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#2D6A4F', '#40916C']}
-        style={[st.header, { paddingTop: headerPaddingTop }]}
-      >
-        <View style={st.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={st.backBtn} hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color="#FFF" />
+      <Header
+        title={tr('f.bhog')}
+        subtitle={tx('No onion · No garlic')}
+        right={
+          <TouchableOpacity onPress={surpriseMe} accessibilityLabel={tx('Surprise me')} style={[st.randomBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6}>
+            <MaterialCommunityIcons name="dice-5-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={st.headerTitle}>Satvik Bhog</Text>
-            <Text style={st.headerSub}>सात्विक भोग — no onion, no garlic</Text>
-          </View>
-          <TouchableOpacity onPress={surpriseMe} style={st.randomBtn} hitSlop={6}>
-            <MaterialCommunityIcons name="dice-5-outline" size={18} color="#FFF" />
-            <Text style={st.randomText}>Random</Text>
+        }
+      />
+      <View style={[st.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+        <Ionicons name="search" size={17} color={colors.textTertiary} />
+        <TextInput
+          style={[st.searchInput, { color: colors.text }]}
+          placeholder={tx('Search dish, occasion, ingredient…')}
+          placeholderTextColor={colors.textTertiary}
+          value={query}
+          onChangeText={setQuery}
+        />
+        {!!query && (
+          <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+            <Ionicons name="close-circle" size={17} color={colors.textTertiary} />
           </TouchableOpacity>
-        </View>
-        <View style={st.searchBar}>
-          <Ionicons name="search" size={17} color="rgba(255,255,255,0.85)" />
-          <TextInput
-            style={st.searchInput}
-            placeholder="Search dish, occasion, ingredient…"
-            placeholderTextColor="rgba(255,255,255,0.7)"
-            value={query}
-            onChangeText={setQuery}
-          />
-          {!!query && (
-            <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
-              <Ionicons name="close-circle" size={17} color="rgba(255,255,255,0.85)" />
+        )}
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={st.avoidRow}>
+        <Text style={[st.avoidLabel, { color: colors.textTertiary }]}>{tx('Avoid')}</Text>
+        {ALLERGENS.map((a) => {
+          const on = avoid.includes(a.key);
+          return (
+            <TouchableOpacity key={a.key} onPress={() => toggleAvoid(a.key)} style={[st.avoidChip, { borderColor: on ? colors.error : colors.cardBorder, backgroundColor: on ? colors.error + '14' : colors.surface }]}>
+              {on && <Ionicons name="close" size={13} color={colors.error} />}
+              <Text style={[st.avoidText, { color: on ? colors.error : colors.textSecondary }]}>{tx(a.label)}</Text>
             </TouchableOpacity>
-          )}
-        </View>
-      </LinearGradient>
+          );
+        })}
+        {custom.map((c) => (
+          <TouchableOpacity key={c} onPress={() => saveCustom(custom.filter((x) => x !== c))} style={[st.avoidChip, { borderColor: colors.error, backgroundColor: colors.error + '14' }]}>
+            <Ionicons name="close" size={13} color={colors.error} />
+            <Text style={[st.avoidText, { color: colors.error }]}>{c}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <View style={[st.customRow, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
+        <Ionicons name="remove-circle-outline" size={17} color={colors.textTertiary} />
+        <TextInput
+          style={[st.searchInput, { color: colors.text }]}
+          placeholder={tx('Type something else to avoid (e.g. jaggery)')}
+          placeholderTextColor={colors.textTertiary}
+          value={customInput}
+          onChangeText={setCustomInput}
+          onSubmitEditing={addCustom}
+          returnKeyType="done"
+        />
+        {!!customInput.trim() && (
+          <TouchableOpacity onPress={addCustom} hitSlop={8}><Text style={{ color: colors.primary, fontWeight: '800' }}>{tx('Add')}</Text></TouchableOpacity>
+        )}
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.list, { paddingBottom: screenBottomPadding }]}>
         {filtered.length === 0 && (
-          <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 40, fontSize: 13 }}>
-            Nothing matches "{query}" — try an ingredient like "makhana".
+          <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 40, fontSize: 13, paddingHorizontal: 20 }}>
+            {query ? `${tx('Nothing matches')} "${query}". ${tx('Try an ingredient like makhana.')}` : tx('No recipes without these ingredients yet.')}
           </Text>
         )}
         {filtered.map((r) => {
@@ -172,10 +236,10 @@ export default function BhogScreen() {
             onPress={() => setRecipe(r)}
             activeOpacity={0.75}
           >
-            <View style={[st.cardIcon, { backgroundColor: r.color + '14' }]}>
+            <View style={[st.cardIcon, { backgroundColor: tone(r.color).bg }]}>
               {img ? (
                 <ExpoImage
-                  source={img.local ?? { uri: img.url }}
+                  source={img.local ?? remote(img.url)}
                   placeholder={{ blurhash: img.blurhash }}
                   style={st.cardIconImg}
                   contentFit="cover"
@@ -183,12 +247,15 @@ export default function BhogScreen() {
                   cachePolicy="disk"
                 />
               ) : (
-                <MaterialCommunityIcons name={r.icon as any} size={24} color={r.color} />
+                <MaterialCommunityIcons name={r.icon as any} size={24} color={tone(r.color).fg} />
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[st.cardTitle, { color: colors.text }]}>{r.name} <Text style={{ color: r.color, fontSize: 13 }}>{r.nameHi}</Text></Text>
-              <Text style={[st.cardMeta, { color: colors.textTertiary }]} numberOfLines={1}>{r.occasion}</Text>
+              <Text style={[st.cardTitle, { color: colors.text }]}>{native(r.name, r.nameHi)}</Text>
+              <Text style={[st.cardMeta, { color: colors.textTertiary }]} numberOfLines={1}>{tx(r.occasion)}</Text>
+              {allergensOf(r).length > 0 && (
+                <Text style={[st.cardAllergen, { color: colors.textTertiary }]} numberOfLines={1}>{tx('Contains')}: {allergensOf(r).map(allergenLabel).join(', ')}</Text>
+              )}
             </View>
             <View style={[st.timeChip, { backgroundColor: colors.background }]}>
               <MaterialCommunityIcons name="clock-outline" size={11} color={colors.textTertiary} />
@@ -209,12 +276,19 @@ const st = StyleSheet.create({
   backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 21, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  randomBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 100 },
-  randomText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 13, paddingHorizontal: 12, height: 42, marginTop: 12 },
-  searchInput: { flex: 1, color: '#FFF', fontSize: 13.5 },
+  randomBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 20 },
+  randomText: { fontSize: 12.5, fontWeight: '700' },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 44, marginHorizontal: 20, marginBottom: 4 },
+  searchInput: { flex: 1, fontSize: 14 },
 
   list: { padding: 16, gap: 8 },
+  avoidRow: { paddingHorizontal: 20, paddingTop: 10, gap: 6, alignItems: 'center' },
+  avoidLabel: { fontSize: 11.5, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', marginRight: 2 },
+  avoidChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 11, height: 30, borderRadius: 15, borderWidth: 1 },
+  avoidText: { fontSize: 12, fontWeight: '700' },
+  customRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 42, marginHorizontal: 20, marginTop: 8 },
+  cardAllergen: { fontSize: 11, marginTop: 2, fontStyle: 'italic' },
+  allergyNote: { flexDirection: 'row', gap: 8, alignItems: 'center', marginHorizontal: 16, marginTop: 12, borderRadius: 14, borderWidth: 1, padding: 12 },
   card: { flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, borderWidth: 1, gap: 12 },
   cardIcon: { width: 46, height: 46, borderRadius: 13, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   cardIconImg: { width: '100%', height: '100%', borderRadius: 13 },

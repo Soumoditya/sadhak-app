@@ -488,7 +488,7 @@ export const createStyles = (colors: typeof Colors.light, isDark: boolean) => {
 export const getHeaderGradient = (isDark: boolean): string[] => {
   return isDark
     ? [Colors.dark.surface, Colors.dark.background]
-    : [Colors.light.primary, '#F07830', '#F5A623'];
+    : [Colors.light.primary, '#E8743B', '#F5A623'];
 };
 
 export const getHeaderGradientSubtle = (isDark: boolean): string[] => {

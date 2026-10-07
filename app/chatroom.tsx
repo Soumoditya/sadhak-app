@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList,
-  KeyboardAvoidingView, Platform, Modal, Image, Dimensions, ActivityIndicator,
-  Animated, Alert, Vibration,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Modal, Image, Dimensions, ActivityIndicator, Animated, Vibration, ScrollView,
 } from 'react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
+import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,10 +15,15 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { uploadToCloudinary } from '../services/cloudinary';
 
+import { useLanguage } from '../contexts/LanguageContext';
+import { Header } from '../components/ui';
+import Avatar from '../components/community/Avatar';
+import { touchDm, subscribeDmEntry, isDmRequest, acceptDm, deleteDm, blockUser, unblockUser, type DmEntry } from '../services/social';
+import { QUICK_REACTIONS, EMOJI_GROUPS } from '../constants/emoji';
+
 const GIPHY_API_KEY = 'wAKLYXMGICxFXZ3CZvycYzxk876dQDMM';
 const { width } = Dimensions.get('window');
 
-const REACTIONS = ['🙏', '❤️', '🕉️', '🔥', '👍', '😂'];
 
 interface Message {
   id: string;
@@ -43,11 +47,15 @@ interface GiphyResult {
 }
 
 export default function ChatRoomScreen() {
+  const { tx } = useLanguage();
+
   const { roomId, roomName, roomType } = useLocalSearchParams<{ roomId: string; roomName: string; roomType: string }>();
+  const isDm = roomType === 'dm' || String(roomId || '').startsWith('dm_');
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
   const insets = useSafeAreaInsets();
+  const kbOpen = useKeyboardState((st) => st.isVisible);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [showGiphy, setShowGiphy] = useState(false);
@@ -55,7 +63,9 @@ export default function ChatRoomScreen() {
   const [giphyResults, setGiphyResults] = useState<GiphyResult[]>([]);
   const [giphyLoading, setGiphyLoading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-  const [showReactions, setShowReactions] = useState<string | null>(null);
+  const [actionFor, setActionFor] = useState<Message | null>(null);
+  const [emojiFor, setEmojiFor] = useState<string | null>(null);
+  const [emojiTab, setEmojiTab] = useState(EMOJI_GROUPS[0].key);
   const [isTyping, setIsTyping] = useState(false);
   const [othersTyping, setOthersTyping] = useState<string[]>([]);
   const [viewMedia, setViewMedia] = useState<{ url: string; kind: 'gif' | 'image' } | null>(null);
@@ -63,6 +73,17 @@ export default function ChatRoomScreen() {
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendBtnAnim = useRef(new Animated.Value(0)).current;
+  const me = user ? { uid: user.uid, displayName: profile?.displayName, profilePicUrl: profile?.profilePicUrl } : undefined;
+
+  // DM state: a message request waits for Accept / Delete / Block before the
+  // input appears; a blocked chat offers Unblock.
+  const [dmEntry, setDmEntry] = useState<DmEntry | null>(null);
+  useEffect(() => {
+    if (!isDm || !user?.uid || !roomId) return;
+    return subscribeDmEntry(user.uid, String(roomId), setDmEntry);
+  }, [isDm, user?.uid, roomId]);
+  const isRequest = !!dmEntry && isDmRequest(dmEntry);
+  const isBlocked = !!dmEntry?.blocked;
 
   // Animate send button
   useEffect(() => {
@@ -171,12 +192,11 @@ export default function ChatRoomScreen() {
     try {
       const newMsgRef = push(ref(rtdb, `messages/${roomId}`));
       await set(newMsgRef, pending);
+      if (isDm) touchDm(roomId, pending.text, me);
 
       // Clear typing indicator
       set(ref(rtdb, `typing/${roomId}/${user.uid}`), { isTyping: false, timestamp: Date.now() });
 
-      // Scroll to bottom
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
     } catch (e: any) {
       // Restore the text so the user doesn't lose it, and surface the real reason
       // (most commonly: Realtime Database security rules are not deployed).
@@ -206,8 +226,7 @@ export default function ChatRoomScreen() {
       gifUrl: gif.url,
       timestamp: Date.now(),
     });
-
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
+    if (isDm) touchDm(roomId, 'GIF', me);
   };
 
   // Send image
@@ -237,8 +256,7 @@ export default function ChatRoomScreen() {
         imageUrl: remoteUrl,
         timestamp: Date.now(),
       });
-
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
+      if (isDm) touchDm(roomId, '📷 Photo', me);
     } catch (e: any) {
       dialog.alert('Upload failed', String(e?.message || e).slice(0, 200));
     } finally {
@@ -264,8 +282,9 @@ export default function ChatRoomScreen() {
       reactions[emoji] = [...users, user.uid];
     }
 
+    setActionFor(null);
+    setEmojiFor(null);
     await set(ref(rtdb, `messages/${roomId}/${msgId}/reactions`), reactions);
-    setShowReactions(null);
   };
 
   // Search GIPHY
@@ -290,7 +309,7 @@ export default function ChatRoomScreen() {
   const isMe = (senderId: string) => senderId === user?.uid;
 
   const deleteMessage = (msgId: string) => {
-    setShowReactions(null);
+    setActionFor(null);
     dialog.alert('Delete message', 'Remove this message for everyone?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
@@ -300,7 +319,7 @@ export default function ChatRoomScreen() {
   };
 
   const copyMessage = async (text: string) => {
-    setShowReactions(null);
+    setActionFor(null);
     try { await Clipboard.setStringAsync(text); } catch {}
   };
 
@@ -309,339 +328,386 @@ export default function ChatRoomScreen() {
     const d = new Date(ts);
     const today = new Date();
     const yest = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-    if (d.toDateString() === today.toDateString()) return 'Today';
-    if (d.toDateString() === yest.toDateString()) return 'Yesterday';
+    if (d.toDateString() === today.toDateString()) return tx('Today');
+    if (d.toDateString() === yest.toDateString()) return tx('Yesterday');
     return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
   };
+
+  // Inverted list: newest first, so the latest message sits just above the
+  // input and stays there when the keyboard opens.
+  const data = useMemo(() => [...messages].reverse(), [messages]);
+  const openUser = (uid: string) => { if (uid && uid !== user?.uid) router.push({ pathname: '/user/[uid]', params: { uid } }); };
+  const dmOther = isDm ? String(roomId).replace(/^dm_/, '').split('_').find((u) => u !== user?.uid) : undefined;
+  const otherPfp = isDm ? messages.find((m) => m.senderId === dmOther)?.senderPfp : undefined;
 
   // ─── RENDER MESSAGE ─────────────────────────────────────────────
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const mine = isMe(item.senderId);
-    const showAvatar = !mine && (index === 0 || messages[index - 1]?.senderId !== item.senderId);
-    const reactionEntries = Object.entries(item.reactions || {});
-    const showDay = !!item.timestamp && (index === 0 || dayKey(messages[index - 1]?.timestamp) !== dayKey(item.timestamp));
+    const older = data[index + 1];
+    const newer = data[index - 1];
+    const firstOfRun = !older || older.senderId !== item.senderId || dayKey(older.timestamp) !== dayKey(item.timestamp);
+    const lastOfRun = !newer || newer.senderId !== item.senderId || dayKey(newer.timestamp) !== dayKey(item.timestamp);
+    const reactionEntries = Object.entries(item.reactions || {}).filter(([, u]) => (u as string[]).length);
+    const showDay = !!item.timestamp && (!older || dayKey(older.timestamp) !== dayKey(item.timestamp));
+    const media = item.type === 'gif' ? item.gifUrl : item.type === 'image' ? item.imageUrl : undefined;
 
     return (
-      <>
-      {showDay && (
-        <View style={styles.dayRow}>
-          <View style={[styles.dayChip, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            <Text style={[styles.dayChipText, { color: colors.textTertiary }]}>{dayLabel(item.timestamp)}</Text>
-          </View>
-        </View>
-      )}
-      <View style={[styles.msgRow, mine && styles.msgRowMine]}>
-        {/* Avatar */}
-        {!mine && (
-          <View style={styles.avatarCol}>
-            {showAvatar ? (
-              item.senderPfp ? (
-                <Image source={{ uri: item.senderPfp }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
-                  <Text style={[styles.avatarInitial, { color: colors.primary }]}>
-                    {(item.senderName || 'S')[0].toUpperCase()}
-                  </Text>
-                </View>
-              )
-            ) : <View style={styles.avatarSpacer} />}
+      <View>
+        {showDay && (
+          <View style={styles.dayRow}>
+            <View style={[styles.dayChip, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.dayChipText, { color: colors.textTertiary }]}>{dayLabel(item.timestamp)}</Text>
+            </View>
           </View>
         )}
-
-        <View style={[styles.msgBubbleWrap, mine && styles.msgBubbleWrapMine]}>
-          {/* Sender Name */}
-          {showAvatar && !mine && (
-            <Text style={[styles.senderName, { color: colors.primary }]}>{item.senderName}</Text>
-          )}
-
-          {/* Reply Preview */}
-          {item.replyTo && (
-            <View style={[styles.replyPreview, { backgroundColor: mine ? 'rgba(255,255,255,0.15)' : colors.primary + '10', borderLeftColor: colors.primary }]}>
-              <Text style={[styles.replyName, { color: colors.primary }]}>{item.replyTo.senderName}</Text>
-              <Text style={[styles.replyText, { color: mine ? 'rgba(255,255,255,0.7)' : colors.textSecondary }]} numberOfLines={1}>
-                {item.replyTo.text}
-              </Text>
+        <View style={[styles.msgRow, mine && styles.msgRowMine, { marginTop: firstOfRun ? 8 : 2 }]}>
+          {!mine && !isDm && (
+            <View style={styles.avatarCol}>
+              {lastOfRun ? (
+                <TouchableOpacity onPress={() => openUser(item.senderId)}><Avatar uri={item.senderPfp} name={item.senderName} size={30} /></TouchableOpacity>
+              ) : null}
             </View>
           )}
 
-          {/* Message Bubble */}
-          <TouchableOpacity
-            style={[
-              styles.msgBubble,
-              mine ? [styles.msgBubbleMine, { backgroundColor: colors.primary }]
-                : [styles.msgBubbleOther, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
-            ]}
-            onLongPress={() => setShowReactions(item.id)}
-            onPress={() => {
-              if (showReactions === item.id) { setShowReactions(null); return; }
-              // Tap media to view fullscreen
-              if (item.type === 'gif' && item.gifUrl) setViewMedia({ url: item.gifUrl, kind: 'gif' });
-              else if (item.type === 'image' && item.imageUrl) setViewMedia({ url: item.imageUrl, kind: 'image' });
-            }}
-            activeOpacity={0.8}
-          >
-            {item.type === 'gif' && item.gifUrl ? (
-              <Image source={{ uri: item.gifUrl }} style={styles.gifImage} resizeMode="cover" />
-            ) : item.type === 'image' && item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={styles.chatImage} resizeMode="cover" />
-            ) : (
-              <Text style={[styles.msgText, { color: mine ? '#FFF' : colors.text }]}>{item.text}</Text>
+          <View style={[styles.msgBubbleWrap, mine && styles.msgBubbleWrapMine]}>
+            {firstOfRun && !mine && !isDm && (
+              <Text style={[styles.senderName, { color: colors.primary }]} onPress={() => openUser(item.senderId)}>{item.senderName}</Text>
             )}
 
-            {/* Timestamp */}
-            <Text style={[styles.msgTime, { color: mine ? 'rgba(255,255,255,0.5)' : colors.textTertiary }]}>
-              {item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Reactions Display */}
-          {reactionEntries.length > 0 && (
-            <View style={styles.reactionsRow}>
-              {reactionEntries.map(([emoji, users]) => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={[styles.reactionChip, {
-                    backgroundColor: (users as string[]).includes(user?.uid || '') ? colors.primary + '20' : colors.surface,
-                    borderColor: (users as string[]).includes(user?.uid || '') ? colors.primary : colors.border,
-                  }]}
-                  onPress={() => reactToMessage(item.id, emoji)}
-                >
-                  <Text style={styles.reactionEmoji}>{emoji}</Text>
-                  <Text style={[styles.reactionCount, { color: colors.textSecondary }]}>{(users as string[]).length}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* Reaction Picker */}
-          {showReactions === item.id && (
-            <View style={[styles.reactionPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {REACTIONS.map(emoji => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={styles.reactionPickBtn}
-                  onPress={() => reactToMessage(item.id, emoji)}
-                >
-                  <Text style={styles.reactionPickEmoji}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity style={styles.reactionPickBtn} onPress={() => { setReplyingTo(item); setShowReactions(null); }}>
-                <MaterialCommunityIcons name="reply" size={20} color={colors.primary} />
-              </TouchableOpacity>
-              {item.type === 'text' && !!item.text && (
-                <TouchableOpacity style={styles.reactionPickBtn} onPress={() => copyMessage(item.text)}>
-                  <MaterialCommunityIcons name="content-copy" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.msgBubble,
+                media && styles.mediaBubble,
+                mine ? [styles.msgBubbleMine, { backgroundColor: colors.primary }]
+                  : [styles.msgBubbleOther, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
+                !lastOfRun && (mine ? { borderBottomRightRadius: 18 } : { borderBottomLeftRadius: 18 }),
+              ]}
+              onLongPress={() => { Vibration.vibrate(15); setActionFor(item); }}
+              delayLongPress={250}
+              onPress={() => { if (media) setViewMedia({ url: media, kind: item.type as 'gif' | 'image' }); }}
+              activeOpacity={0.85}
+            >
+              {item.replyTo && (
+                <View style={[styles.replyPreview, { backgroundColor: mine ? 'rgba(255,255,255,0.16)' : colors.primary + '12', borderLeftColor: mine ? '#FFF' : colors.primary }]}>
+                  <Text style={[styles.replyName, { color: mine ? '#FFF' : colors.primary }]}>{item.replyTo.senderName}</Text>
+                  <Text style={[styles.replyText, { color: mine ? 'rgba(255,255,255,0.8)' : colors.textSecondary }]} numberOfLines={2}>{item.replyTo.text}</Text>
+                </View>
               )}
-              {mine && (
-                <TouchableOpacity style={styles.reactionPickBtn} onPress={() => deleteMessage(item.id)}>
-                  <MaterialCommunityIcons name="trash-can-outline" size={19} color={colors.error || '#DC2626'} />
-                </TouchableOpacity>
+              {media ? (
+                <Image source={{ uri: media }} style={item.type === 'gif' ? styles.gifImage : styles.chatImage} resizeMode="cover" />
+              ) : (
+                <Text style={[styles.msgText, { color: mine ? '#FFF' : colors.text }]}>{item.text}</Text>
               )}
-            </View>
-          )}
+              <Text style={[styles.msgTime, media && { paddingHorizontal: 8, paddingBottom: 4 }, { color: mine ? 'rgba(255,255,255,0.65)' : colors.textTertiary }]}>
+                {item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+              </Text>
+            </TouchableOpacity>
+
+            {reactionEntries.length > 0 && (
+              <View style={[styles.reactionsRow, mine && { justifyContent: 'flex-end' }]}>
+                {reactionEntries.map(([emoji, users]) => {
+                  const me = (users as string[]).includes(user?.uid || '');
+                  return (
+                    <TouchableOpacity
+                      key={emoji}
+                      style={[styles.reactionChip, { backgroundColor: me ? colors.primary + '20' : colors.surface, borderColor: me ? colors.primary : colors.cardBorder }]}
+                      onPress={() => reactToMessage(item.id, emoji)}
+                    >
+                      <Text style={styles.reactionEmoji}>{emoji}</Text>
+                      {(users as string[]).length > 1 && <Text style={[styles.reactionCount, { color: colors.textSecondary }]}>{(users as string[]).length}</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
         </View>
       </View>
-      </>
     );
   };
 
+  const subtitle = isDm ? tx('Direct message') : roomType === 'broadcast' ? tx('Channel') : roomType === 'group' ? tx('Group') : tx('Community room');
+  const emojiList = EMOJI_GROUPS.find((g) => g.key === emojiTab)?.list || [];
+
   return (
-    <>
-      <Stack.Screen options={{ title: roomName || 'Chat', headerShown: true }} />
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : insets.top + 56}
-      >
-        {/* Messages */}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header
+        title={roomName ? tx(roomName) : tx('Chat')}
+        subtitle={othersTyping.length ? `${othersTyping.join(', ')} ${tx('typing…')}` : subtitle}
+        quick={false}
+        right={isDm && dmOther ? (
+          <TouchableOpacity onPress={() => openUser(dmOther)} accessibilityLabel={tx('View profile')}>
+            <Avatar uri={otherPfp} name={roomName} size={38} />
+          </TouchableOpacity>
+        ) : undefined}
+      />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <FlatList
           ref={flatListRef}
-          data={messages}
+          inverted
+          data={data}
           renderItem={renderMessage}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         />
-
-        {/* Typing Indicator */}
-        {othersTyping.length > 0 && (
-          <View style={[styles.typingBar, { backgroundColor: colors.surface }]}>
-            <View style={styles.typingDots}>
-              {[0, 1, 2].map(i => (
-                <Animated.View key={i} style={[styles.typingDot, { backgroundColor: colors.primary }]} />
-              ))}
+        {data.length === 0 && (
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }]}>
+            <View style={styles.emptyChat}>
+              <Text style={{ fontSize: 38 }}>🙏</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 14.5, textAlign: 'center' }}>{isDm ? tx('Say namaste to start the conversation.') : tx('No messages yet. Start the satsang.')}</Text>
             </View>
-            <Text style={[styles.typingText, { color: colors.textSecondary }]}>
-              {othersTyping.join(', ')} {othersTyping.length === 1 ? 'is' : 'are'} typing...
-            </Text>
           </View>
         )}
 
-        {/* Reply Preview */}
         {replyingTo && (
-          <View style={[styles.replyBar, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+          <View style={[styles.replyBar, { backgroundColor: colors.surface, borderLeftColor: colors.primary }]}>
             <View style={styles.replyBarContent}>
-              <MaterialCommunityIcons name="reply" size={16} color={colors.primary} />
+              <MaterialCommunityIcons name="reply" size={18} color={colors.primary} />
               <View style={styles.replyBarInfo}>
-                <Text style={[styles.replyBarName, { color: colors.primary }]}>{replyingTo.senderName}</Text>
+                <Text style={[styles.replyBarName, { color: colors.primary }]}>{tx('Replying to')} {replyingTo.senderName}</Text>
                 <Text style={[styles.replyBarText, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {replyingTo.text || (replyingTo.type === 'gif' ? 'GIF' : 'Image')}
+                  {replyingTo.text || (replyingTo.type === 'gif' ? 'GIF' : tx('Photo'))}
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => setReplyingTo(null)}>
+            <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={10}>
               <Ionicons name="close" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Input Bar */}
-        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderColor: colors.border, paddingBottom: 8 + insets.bottom }]}>
-          <TouchableOpacity style={styles.attachBtn} onPress={sendImage} disabled={uploadingImage}>
-            {uploadingImage ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <MaterialCommunityIcons name="image-outline" size={24} color={colors.textTertiary} />
-            )}
+        {(isRequest || isBlocked) && user && dmEntry ? (
+          <View style={[styles.requestBar, { backgroundColor: colors.surface, borderColor: colors.divider, paddingBottom: 12 + insets.bottom }]}>
+            <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15, textAlign: 'center' }}>
+              {isBlocked ? tx('You blocked this person') : `${dmEntry.otherName || roomName} ${tx('wants to message you')}`}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 3 }}>
+              {isBlocked ? tx('They can’t reach you here until you unblock them.') : tx('Accept to reply. They won’t know you’ve seen it until you do.')}
+            </Text>
+            <View style={styles.requestBtns}>
+              {isBlocked ? (
+                <TouchableOpacity style={[styles.requestBtn, { backgroundColor: colors.primary }]} onPress={() => unblockUser(user.uid, dmEntry.otherUid, String(roomId)).catch(() => {})}>
+                  <Text style={styles.requestBtnText}>{tx('Unblock')}</Text>
+                </TouchableOpacity>
+              ) : (<>
+                <TouchableOpacity style={[styles.requestBtn, { borderWidth: 1, borderColor: colors.error }]}
+                  onPress={async () => { if (await dialog.confirm({ title: tx('Block'), message: tx('They won’t be able to message you, and this chat is hidden.'), confirmText: tx('Block'), cancelText: tx('Cancel'), destructive: true })) { await blockUser(user.uid, dmEntry.otherUid, String(roomId)).catch(() => {}); router.back(); } }}>
+                  <Text style={[styles.requestBtnText, { color: colors.error }]}>{tx('Block')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.requestBtn, { borderWidth: 1, borderColor: colors.cardBorder }]} onPress={async () => { await deleteDm(user.uid, String(roomId)).catch(() => {}); router.back(); }}>
+                  <Text style={[styles.requestBtnText, { color: colors.text }]}>{tx('Delete')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.requestBtn, { backgroundColor: colors.primary }]} onPress={() => acceptDm(user.uid, String(roomId)).catch(() => {})}>
+                  <Text style={styles.requestBtnText}>{tx('Accept')}</Text>
+                </TouchableOpacity>
+              </>)}
+            </View>
+          </View>
+        ) : (
+        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderColor: colors.divider, paddingBottom: 8 + (kbOpen ? 0 : insets.bottom) }]}>
+          <TouchableOpacity style={styles.attachBtn} onPress={sendImage} disabled={uploadingImage} accessibilityLabel={tx('Send photo')}>
+            {uploadingImage ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="image-outline" size={24} color={colors.textSecondary} />}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.attachBtn} onPress={() => setShowGiphy(true)}>
-            <View style={[styles.gifBadge, { borderColor: colors.textTertiary }]}>
-              <Text style={[styles.gifBadgeText, { color: colors.textTertiary }]}>GIF</Text>
+          <TouchableOpacity style={styles.attachBtn} onPress={() => setShowGiphy(true)} accessibilityLabel="GIF">
+            <View style={[styles.gifBadge, { borderColor: colors.textSecondary }]}>
+              <Text style={[styles.gifBadgeText, { color: colors.textSecondary }]}>GIF</Text>
             </View>
           </TouchableOpacity>
           <TextInput
-            style={[styles.input, { color: colors.text, backgroundColor: isDark ? colors.surfaceElevated : '#F5F5F5' }]}
-            placeholder="Type a message..."
+            style={[styles.input, { color: colors.text, backgroundColor: colors.background, borderColor: colors.cardBorder }]}
+            placeholder={tx('Message')}
             placeholderTextColor={colors.textTertiary}
             value={inputText}
             onChangeText={handleTyping}
             multiline
             maxLength={2000}
           />
-          <Animated.View style={{
-            transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
-            opacity: sendBtnAnim,
-          }}>
-            <TouchableOpacity
-              style={[styles.sendBtn, { backgroundColor: colors.primary }]}
-              onPress={sendMessage}
-              disabled={!inputText.trim()}
-            >
-              <Ionicons name="send" size={18} color="#FFF" />
+          <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }], opacity: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }) }}>
+            <TouchableOpacity style={[styles.sendBtn, { backgroundColor: colors.primary }]} onPress={sendMessage} disabled={!inputText.trim()} accessibilityLabel={tx('Send')}>
+              <Ionicons name="arrow-up" size={21} color="#FFF" />
             </TouchableOpacity>
           </Animated.View>
         </View>
+        )}
+      </KeyboardAvoidingView>
 
-        {/* GIPHY Modal */}
-        <Modal visible={showGiphy} animationType="slide" presentationStyle="pageSheet">
-          <View style={[styles.giphyContainer, { backgroundColor: colors.background }]}>
-            <View style={[styles.giphyHeader, { borderColor: colors.border }]}>
-              <Text style={[styles.giphyTitle, { color: colors.text }]}>Send a GIF</Text>
-              <TouchableOpacity onPress={() => setShowGiphy(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
+      {/* ═══ Long-press sheet: quick reactions, more emoji, reply/copy/delete ═══ */}
+      <Modal visible={!!actionFor} transparent animationType="fade" onRequestClose={() => setActionFor(null)} statusBarTranslucent navigationBarTranslucent>
+        <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setActionFor(null)}>
+          <View style={[styles.actionSheet, { backgroundColor: colors.surface, paddingBottom: 16 + insets.bottom }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+            <View style={styles.quickRow}>
+              {QUICK_REACTIONS.map((e) => (
+                <TouchableOpacity key={e} style={[styles.quickBtn, { backgroundColor: colors.background }]} onPress={() => actionFor && reactToMessage(actionFor.id, e)}>
+                  <Text style={{ fontSize: 26 }}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={[styles.quickBtn, { backgroundColor: colors.background }]} onPress={() => { const id = actionFor?.id || null; setActionFor(null); setEmojiFor(id); }} accessibilityLabel={tx('More emoji')}>
+                <Ionicons name="add" size={26} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            <View style={[styles.giphySearch, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Ionicons name="search" size={18} color={colors.textTertiary} />
-              <TextInput
-                style={[styles.giphySearchInput, { color: colors.text }]}
-                placeholder="Search GIFs..."
-                placeholderTextColor={colors.textTertiary}
-                value={giphySearch}
-                onChangeText={searchGiphy}
-                autoFocus
-              />
-            </View>
-            {giphyLoading ? (
-              <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
-            ) : (
-              <FlatList
-                data={giphyResults}
-                numColumns={2}
-                renderItem={({ item }) => (
-                  <TouchableOpacity style={styles.giphyItem} onPress={() => sendGif(item)}>
-                    <Image source={{ uri: item.preview || item.url }} style={styles.giphyPreview} />
-                  </TouchableOpacity>
-                )}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.giphyGrid}
-              />
-            )}
-            <Text style={[styles.giphyPowered, { color: colors.textTertiary }]}>Powered by GIPHY</Text>
+            {[
+              { icon: 'arrow-undo-outline', label: tx('Reply'), on: () => { setReplyingTo(actionFor); setActionFor(null); } },
+              ...(actionFor?.type === 'text' && actionFor.text ? [{ icon: 'copy-outline', label: tx('Copy'), on: () => copyMessage(actionFor.text) }] : []),
+              ...(actionFor && !isMe(actionFor.senderId) && !isDm ? [{ icon: 'person-circle-outline', label: tx('View profile'), on: () => { const id = actionFor.senderId; setActionFor(null); openUser(id); } }] : []),
+              ...(actionFor && isMe(actionFor.senderId) ? [{ icon: 'trash-outline', label: tx('Delete'), danger: true, on: () => deleteMessage(actionFor.id) }] : []),
+            ].map((a: any) => (
+              <TouchableOpacity key={a.label} style={styles.actionRow} onPress={a.on}>
+                <Ionicons name={a.icon} size={21} color={a.danger ? colors.error : colors.text} />
+                <Text style={{ fontSize: 16, color: a.danger ? colors.error : colors.text, fontWeight: '600' }}>{a.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        </Modal>
+        </TouchableOpacity>
+      </Modal>
 
-        {/* ═══ Fullscreen media viewer ═══ */}
-        <Modal visible={!!viewMedia} transparent animationType="fade" onRequestClose={() => setViewMedia(null)}>
-          <View style={styles.mediaViewer}>
-            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setViewMedia(null)} />
-            {viewMedia && (
-              <Image source={{ uri: viewMedia.url }} style={styles.mediaViewerImg} resizeMode="contain" />
-            )}
-            <TouchableOpacity style={styles.mediaViewerClose} onPress={() => setViewMedia(null)} hitSlop={10}>
-              <Ionicons name="close" size={26} color="#FFF" />
+      {/* ═══ Full emoji picker ═══ */}
+      <Modal visible={!!emojiFor} transparent animationType="slide" onRequestClose={() => setEmojiFor(null)} statusBarTranslucent navigationBarTranslucent>
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEmojiFor(null)} />
+          <View style={[styles.emojiSheet, { backgroundColor: colors.surface, paddingBottom: 10 + insets.bottom }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiTabs}>
+              {EMOJI_GROUPS.map((g) => {
+                const on = g.key === emojiTab;
+                return (
+                  <TouchableOpacity key={g.key} onPress={() => setEmojiTab(g.key)} style={[styles.emojiTab, { backgroundColor: on ? colors.primary + '18' : 'transparent', borderColor: on ? colors.primary : colors.cardBorder }]}>
+                    <Text style={{ fontSize: 16 }}>{g.icon}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: on ? colors.primary : colors.textSecondary }}>{tx(g.label)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <FlatList
+              key={emojiTab}
+              data={emojiList}
+              numColumns={8}
+              keyExtractor={(e, i) => e + i}
+              style={{ flex: 1 }}
+              renderItem={({ item: e }) => (
+                <TouchableOpacity style={styles.emojiCell} onPress={() => emojiFor && reactToMessage(emojiFor, e)}>
+                  <Text style={{ fontSize: 28 }}>{e}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* GIPHY Modal */}
+      <Modal visible={showGiphy} animationType="slide" onRequestClose={() => setShowGiphy(false)} statusBarTranslucent navigationBarTranslucent>
+        <View style={[styles.giphyContainer, { backgroundColor: colors.background, paddingTop: insets.top + 12, paddingBottom: insets.bottom }]}>
+          <View style={[styles.giphyHeader, { borderColor: colors.divider }]}>
+            <Text style={[styles.giphyTitle, { color: colors.text }]}>{tx('Send a GIF')}</Text>
+            <TouchableOpacity onPress={() => setShowGiphy(false)} hitSlop={10}>
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
-        </Modal>
-      </KeyboardAvoidingView>
-    </>
+          <View style={[styles.giphySearch, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Ionicons name="search" size={18} color={colors.textTertiary} />
+            <TextInput
+              style={[styles.giphySearchInput, { color: colors.text }]}
+              placeholder={tx('Search GIFs...')}
+              placeholderTextColor={colors.textTertiary}
+              value={giphySearch}
+              onChangeText={searchGiphy}
+              autoFocus
+            />
+          </View>
+          {giphyLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              data={giphyResults}
+              numColumns={2}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.giphyItem} onPress={() => sendGif(item)}>
+                  <Image source={{ uri: item.preview || item.url }} style={styles.giphyPreview} />
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.giphyGrid}
+            />
+          )}
+          <Text style={[styles.giphyPowered, { color: colors.textTertiary }]}>{tx('Powered by GIPHY')}</Text>
+        </View>
+      </Modal>
+
+      {/* ═══ Fullscreen media viewer ═══ */}
+      <Modal visible={!!viewMedia} transparent animationType="fade" onRequestClose={() => setViewMedia(null)} statusBarTranslucent navigationBarTranslucent>
+        <View style={styles.mediaViewer}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setViewMedia(null)} />
+          {viewMedia && <Image source={{ uri: viewMedia.url }} style={styles.mediaViewerImg} resizeMode="contain" />}
+          <TouchableOpacity style={[styles.mediaViewerClose, { top: insets.top + 12 }]} onPress={() => setViewMedia(null)} hitSlop={10}>
+            <Ionicons name="close" size={26} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  requestBar: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 14 },
+  requestBtns: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  requestBtn: { flex: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  requestBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14.5 },
   container: { flex: 1 },
-  messagesList: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8 },
+  messagesList: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8, flexGrow: 1 },
+  emptyChat: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 40 },
+  mediaBubble: { paddingHorizontal: 4, paddingVertical: 4 },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 14 },
+  actionSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8 },
+  quickRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  quickBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 6 },
+  emojiSheet: { height: '55%', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 10, paddingTop: 8 },
+  emojiTabs: { gap: 8, paddingHorizontal: 4, paddingBottom: 10 },
+  emojiTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 36, borderRadius: 18, borderWidth: 1 },
+  emojiCell: { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   mediaViewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
   mediaViewerImg: { width: '96%', height: '80%' },
-  mediaViewerClose: { position: 'absolute', top: 50, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  mediaViewerClose: { position: 'absolute', right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   dayRow: { alignItems: 'center', marginVertical: 10 },
   dayChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 100, borderWidth: 1 },
   dayChipText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4 },
-  msgRow: { flexDirection: 'row', marginBottom: 4, alignItems: 'flex-end' },
+  msgRow: { flexDirection: 'row', alignItems: 'flex-end' },
   msgRowMine: { justifyContent: 'flex-end' },
-  avatarCol: { width: 32, marginRight: 6 },
-  avatar: { width: 28, height: 28, borderRadius: 14 },
-  avatarPlaceholder: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  avatarInitial: { fontSize: 13, fontWeight: '700' },
-  avatarSpacer: { width: 28 },
-  msgBubbleWrap: { maxWidth: '75%' },
+  avatarCol: { width: 34, marginRight: 4 },
+  msgBubbleWrap: { maxWidth: '78%' },
   msgBubbleWrapMine: { alignItems: 'flex-end' },
-  senderName: { fontSize: 11, fontWeight: '700', marginBottom: 2, marginLeft: 10 },
-  replyPreview: { marginBottom: 2, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderLeftWidth: 3, marginHorizontal: 4 },
-  replyName: { fontSize: 11, fontWeight: '700' },
-  replyText: { fontSize: 11, marginTop: 1 },
-  msgBubble: { paddingHorizontal: 14, paddingVertical: 8, maxWidth: '100%' },
-  msgBubbleMine: { borderRadius: 18, borderBottomRightRadius: 4 },
-  msgBubbleOther: { borderRadius: 18, borderBottomLeftRadius: 4, borderWidth: 0.5 },
-  msgText: { fontSize: 15, lineHeight: 20 },
-  msgTime: { fontSize: 10, marginTop: 4, textAlign: 'right' },
-  gifImage: { width: 200, height: 150, borderRadius: 12 },
-  chatImage: { width: 200, height: 200, borderRadius: 12 },
-  reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, marginHorizontal: 4 },
-  reactionChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, borderWidth: 1, gap: 2 },
-  reactionEmoji: { fontSize: 14 },
+  senderName: { fontSize: 12, fontWeight: '700', marginBottom: 3, marginLeft: 12 },
+  replyPreview: { marginBottom: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderLeftWidth: 3 },
+  replyName: { fontSize: 12, fontWeight: '700' },
+  replyText: { fontSize: 12.5, marginTop: 1 },
+  msgBubble: { paddingHorizontal: 14, paddingVertical: 9, maxWidth: '100%' },
+  msgBubbleMine: { borderRadius: 18, borderBottomRightRadius: 6 },
+  msgBubbleOther: { borderRadius: 18, borderBottomLeftRadius: 6, borderWidth: 1 },
+  msgText: { fontSize: 15.5, lineHeight: 21.5 },
+  msgTime: { fontSize: 10.5, marginTop: 3, textAlign: 'right' },
+  gifImage: { width: 220, height: 165, borderRadius: 14 },
+  chatImage: { width: 220, height: 220, borderRadius: 14 },
+  reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: -6, marginHorizontal: 8 },
+  reactionChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12, borderWidth: 1, gap: 3 },
+  reactionEmoji: { fontSize: 15 },
   reactionCount: { fontSize: 11, fontWeight: '600' },
-  reactionPicker: { flexDirection: 'row', gap: 4, padding: 6, borderRadius: 20, borderWidth: 1, marginTop: 4, marginHorizontal: 4, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8 },
-  reactionPickBtn: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
-  reactionPickEmoji: { fontSize: 20 },
-  typingBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, gap: 8 },
-  typingDots: { flexDirection: 'row', gap: 3 },
-  typingDot: { width: 6, height: 6, borderRadius: 3, opacity: 0.6 },
-  typingText: { fontSize: 12, fontStyle: 'italic' },
-  replyBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderLeftWidth: 3, marginHorizontal: 8, marginBottom: 4, borderRadius: 8 },
+  replyBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderLeftWidth: 3, marginHorizontal: 8, marginBottom: 6, borderRadius: 10 },
   replyBarContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   replyBarInfo: { flex: 1 },
-  replyBarName: { fontSize: 12, fontWeight: '700' },
-  replyBarText: { fontSize: 12 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 8, paddingVertical: 8, borderTopWidth: 0.5, gap: 4 },
-  attachBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+  replyBarName: { fontSize: 13, fontWeight: '700' },
+  replyBarText: { fontSize: 13 },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, gap: 4 },
+  attachBtn: { width: 40, height: 44, justifyContent: 'center', alignItems: 'center' },
   gifBadge: { borderWidth: 1.5, borderRadius: 5, paddingHorizontal: 4, paddingVertical: 1 },
   gifBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
-  input: { flex: 1, minHeight: 36, maxHeight: 100, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 15 },
-  sendBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  giphyContainer: { flex: 1, paddingTop: 50 },
+  input: { flex: 1, minHeight: 44, maxHeight: 120, borderRadius: 22, borderWidth: 1, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, fontSize: 15.5 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginLeft: 2 },
+  giphyContainer: { flex: 1 },
   giphyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 0.5 },
   giphyTitle: { fontSize: 18, fontWeight: '700' },
   giphySearch: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, paddingHorizontal: 14, height: 42, borderRadius: 21, borderWidth: 1, gap: 8 },

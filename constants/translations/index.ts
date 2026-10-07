@@ -449,3 +449,20 @@ export const ALL_TRANSLATIONS: Record<LanguageCode, TranslationMap> = {
   as: as_lang,
   od,
 };
+
+// Merge the core UI table (en/hi/bn rows + main labels for other languages).
+import { UI, UI_OTHER } from './ui';
+for (const [key, [enS, hiS, bnS]] of Object.entries(UI)) {
+  en[key] = enS; hi[key] = hiS; bn[key] = bnS;
+}
+for (const [key, byLang] of Object.entries(UI_OTHER)) {
+  for (const [lang, str] of Object.entries(byLang || {})) {
+    if (str) ALL_TRANSLATIONS[lang as LanguageCode][key] = str;
+  }
+}
+
+/** BCP-47 locale for dates/numbers in the chosen language. */
+export const LOCALE: Record<LanguageCode, string> = {
+  en: 'en-IN', hi: 'hi-IN', bn: 'bn-IN', mr: 'mr-IN', gu: 'gu-IN', ta: 'ta-IN', te: 'te-IN',
+  kn: 'kn-IN', ml: 'ml-IN', pa: 'pa-IN', as: 'as-IN', od: 'or-IN',
+};
