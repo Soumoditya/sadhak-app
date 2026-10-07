@@ -29,11 +29,12 @@ function northChartSvg(k: Kundli, flags: ReturnType<typeof grahaFlags>): string 
     const occ = k.planets.filter((p) => p.signIndex === sign);
     occ.forEach((p, i) => {
       const f = flags[p.name] || ({} as any);
-      const marks = `${f.retro ? 'R' : ''}${f.combust ? 'C' : ''}${f.vargottama ? 'V' : ''}`;
+      const m = [f.retro && 'R', f.combust && 'C', f.vargottama && 'V'].filter(Boolean);
+      const marks = m.length ? `(${m.join(',')})` : '';
       const cols = occ.length > 2 ? 2 : 1;
       const x = fx * S + (cols === 1 ? 0 : (i % 2 === 0 ? -13 : 13));
       const y = fy * S + 4 + Math.floor(i / cols) * 14 - (Math.ceil(occ.length / cols) - 1) * 7;
-      body += `<text x="${x}" y="${y}" font-size="12" font-weight="700" fill="${p.name === 'Sun' || p.name === 'Moon' ? '#C2410C' : '#1F1A16'}" text-anchor="middle">${ABBR[p.name]}${marks ? `<tspan font-size="7.5" dy="-4" fill="#7a6a5a">${marks}</tspan>` : ''}</text>`;
+      body += `<text x="${x}" y="${y}" font-size="12" font-weight="700" fill="${p.name === 'Sun' || p.name === 'Moon' ? '#C2410C' : '#1F1A16'}" text-anchor="middle">${ABBR[p.name]}${marks ? `<tspan font-size="9" fill="#7a6a5a">${marks}</tspan>` : ''}</text>`;
     });
   }
   const ln = 'stroke="#C2410C" stroke-opacity="0.45" stroke-width="1.2"';
@@ -102,7 +103,7 @@ function buildHtml(k: Kundli, birth: BirthInput | null, name?: string): string {
     <p>Generated ${fmtDate(now)}</p>
   </div></div>
   <div class="two">
-    <div>${northChartSvg(k, flags)}<div class="legend">R retrograde · C combust · V vargottama</div></div>
+    <div>${northChartSvg(k, flags)}<div class="legend">(R) retrograde · (C) combust · (V) vargottama</div></div>
     <div class="grid">
       <div>Lagna: <b>${esc(b.lagna)}</b></div><div>Rashi: <b>${esc(b.rashi)}</b> (lord ${esc(b.rashiLord)})</div>
       <div>Nakshatra: <b>${esc(b.nakshatra)}</b> pada ${b.pada}</div><div>Nakshatra lord: <b>${esc(b.nakLord)}</b></div>

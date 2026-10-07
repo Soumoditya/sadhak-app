@@ -5,8 +5,8 @@ import Svg, { Rect, Line, Polygon, Text as SvgText, TSpan, G, Defs, LinearGradie
 //  • north: houses fixed (diamond), signs rotate with the lagna
 //  • south: signs fixed in a 4×4 frame, lagna marked
 //  • east (Bengal/Odisha): signs fixed, Aries at top, anticlockwise
-// Each graha shows its short name plus small marks: R retrograde,
-// C combust, V vargottama.
+// Each graha shows its short name plus marks in brackets: R retrograde,
+// C combust, V vargottama, e.g. Sa(R) or Me(R,C).
 
 export type ChartStyle = 'north' | 'south' | 'east';
 export type ChartGraha = { name: string; signIndex: number; house: number; retro?: boolean };
@@ -39,17 +39,20 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
   // Rough text widths (SVG can't measure): Latin capitals are wider than
   // lower case; Indic glyphs are wider still.
   const textW = (str: string, fs: number) => [...str].reduce((w, c) => w + (/[ऀ-৿]/.test(c) ? fs * 0.78 : /[A-Z]/.test(c) ? fs * 0.7 : fs * 0.56), 0);
+  // Marks in brackets after the name: Sa(R), Me(R,C), Ju(V).
   const marksOf = (g: ChartGraha) => {
     const f = flags[g.name] || {};
-    return `${f.retro || g.retro ? 'R' : ''}${f.combust ? 'C' : ''}${f.vargottama ? 'V' : ''}`;
+    const m = [f.retro || g.retro ? 'R' : '', f.combust ? 'C' : '', f.vargottama ? 'V' : ''].filter(Boolean);
+    return m.length ? `(${m.join(',')})` : '';
   };
+  const MARK = 0.78; // marks font size relative to the name
   const itemW = (g: ChartGraha, fs: number) => {
     const m = marksOf(g);
-    return textW(abbr[g.name] || g.name.slice(0, 2), fs) + (m ? textW(m, fs * 0.6) + 1.5 : 0);
+    return textW(abbr[g.name] || g.name.slice(0, 2), fs) + (m ? textW(m, fs * MARK) * 0.8 + 1 : 0);
   };
 
-  // Name with its R/C/V marks as a small superscript right after it; the pair
-  // is centred on x so neighbours never collide.
+  // Name and its bracketed marks on one baseline, centred on x so neighbours
+  // never collide.
   const label = (g: ChartGraha, x: number, y: number, fs: number, key: string) => {
     const name = abbr[g.name] || g.name.slice(0, 2);
     const marks = marksOf(g);
@@ -59,7 +62,7 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
     return (
       <G key={key}>
         <SvgText x={x0} y={y} fontSize={fs} fontWeight="700" textAnchor="start" fill={isLuminary ? colors.primary : colors.text}>{name}</SvgText>
-        {!!marks && <SvgText x={x0 + nameW + 1.5} y={y - fs * 0.4} fontSize={fs * 0.6} fontWeight="700" textAnchor="start" fill={colors.textSecondary}>{marks}</SvgText>}
+        {!!marks && <SvgText x={x0 + nameW + 1} y={y} fontSize={fs * MARK} fontWeight="700" textAnchor="start" fill={colors.textSecondary}>{marks}</SvgText>}
       </G>
     );
   };

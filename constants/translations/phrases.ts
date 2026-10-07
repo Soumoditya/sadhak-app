@@ -500,7 +500,7 @@ export const PHRASES: Record<string, [string, string]> = {
   'Navamsa: marriage, dharma and inner strength': ['नवांश: विवाह, धर्म और आंतरिक शक्ति', 'নবাংশ: বিবাহ, ধর্ম ও অন্তর্শক্তি'],
   'Dasamsa: career and profession': ['दशांश: करियर और व्यवसाय', 'দশাংশ: কর্মজীবন ও পেশা'],
   'Moon chart: mind and emotions': ['चंद्र कुंडली: मन और भावनाएं', 'চন্দ্র কুণ্ডলী: মন ও আবেগ'],
-  'R retrograde · C combust · V vargottama': ['R वक्री · C अस्त · V वर्गोत्तम', 'R বক্রী · C অস্ত · V বর্গোত্তম'],
+  '(R) retrograde · (C) combust · (V) vargottama': ['(R) वक्री · (C) अस्त · (V) वर्गोत्तम', '(R) বক্রী · (C) অস্ত · (V) বর্গোত্তম'],
   'Your guidance': ['आपका मार्गदर्शन', 'আপনার নির্দেশনা'],
   'Today': ['आज', 'আজ'],
   'Week': ['सप्ताह', 'সপ্তাহ'],

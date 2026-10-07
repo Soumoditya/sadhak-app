@@ -476,7 +476,7 @@ export default function JyotishScreen() {
               colors={colors as any}
             />
           </View>
-          <Text style={[s.legend, { color: colors.textTertiary }]}>{tx('R retrograde · C combust · V vargottama')}</Text>
+          <Text style={[s.legend, { color: colors.textTertiary }]}>{tx('(R) retrograde · (C) combust · (V) vargottama')}</Text>
         </View>
 
         )}
