@@ -25,6 +25,8 @@ import { DS } from '../../constants/ds';
 
 const GRID_COLS = 4;
 const MAIN_TOOLS = ['panchang', 'japa', 'aarti', 'ai'];
+// Two more that peek in from the right, then a More tile.
+const EXTRA_TOOLS = ['vpuja', 'temples'];
 
 const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
@@ -38,7 +40,7 @@ function ordinalFor(n: number, lang: string) {
 export default function HomeScreen() {
   const { profile, user } = useAuth();
   const { colors, tones, isDark } = useTheme();
-  const { t, tf, locale, noTrack, display, language, native } = useLanguage();
+  const { t, tf, tx, locale, noTrack, display, language, native } = useLanguage();
   const today = new Date();
   const lat = profile?.location?.lat || 28.6139;
   const lng = profile?.location?.lng || 77.209;
@@ -102,9 +104,10 @@ export default function HomeScreen() {
   const japaOpen = japa && japa.count > 0 && japa.count < (japa.target || 108);
 
   const mainTools = MAIN_TOOLS.map((k) => TOOLS.find((x) => x.key === k)!).filter(Boolean);
-  const moreTools = TOOLS.filter((x) => !MAIN_TOOLS.includes(x.key) && x.key !== 'calendar');
+  const moreTools = EXTRA_TOOLS.map((k) => TOOLS.find((x) => x.key === k)!).filter(Boolean);
   const [gridW, setGridW] = useState(0);
-  const tileW = gridW ? Math.floor(gridW / GRID_COLS) : 0;
+  // 4 tiles fit, the 5th peeks in so the row reads as scrollable.
+  const tileW = gridW ? Math.floor(gridW / 4.4) : 0;
 
   // One gentle nudge on the scrolling row for the first few launches.
   const rowRef = useRef<ScrollView>(null);
@@ -115,7 +118,7 @@ export default function HomeScreen() {
       if (n >= 3) return;
       AsyncStorage.setItem('sadhak_tools_nudge', String(n + 1)).catch(() => {});
       timer = setTimeout(() => {
-        rowRef.current?.scrollTo({ x: 64, animated: true });
+        rowRef.current?.scrollTo({ x: 90, animated: true });
         setTimeout(() => rowRef.current?.scrollTo({ x: 0, animated: true }), 650);
       }, 1200);
     }).catch(() => {});
@@ -124,7 +127,7 @@ export default function HomeScreen() {
 
   const hero = isDark ? (['#6E2A0C', '#2E160B'] as const) : (['#C2410C', '#E3732F'] as const);
   const chTone = live?.choghadiya.quality === 'good' ? '#86EFAC' : live?.choghadiya.quality === 'bad' ? '#FECACA' : '#FDE68A';
-  const big = language === 'en' ? (live?.tithi.nameHi || panchang.tithi.nameHi) : native(live?.tithi.name || panchang.tithi.name, live?.tithi.nameHi || panchang.tithi.nameHi);
+  const big = native(live?.tithi.name || panchang.tithi.name, live?.tithi.nameHi || panchang.tithi.nameHi);
   const deva = language === 'hi' || language === 'mr';
 
   return (
@@ -167,7 +170,7 @@ export default function HomeScreen() {
 
           <View style={s.heroMain}>
             <View style={{ flex: 1 }}>
-              <Text style={[s.heroTithi, (language === 'bn' || language === 'as') && { fontFamily: undefined, fontWeight: '800', fontSize: 36, lineHeight: 50 }]} numberOfLines={1} adjustsFontSizeToFit>{big}</Text>
+              <Text style={[s.heroTithi, language === 'en' ? { fontFamily: DS.font.display, fontSize: 38, lineHeight: 50 } : (language === 'bn' || language === 'as') ? { fontFamily: undefined, fontWeight: '800', fontSize: 36, lineHeight: 50 } : null]} numberOfLines={1} adjustsFontSizeToFit>{big}</Text>
               <Text style={s.heroSub} numberOfLines={1}>
                 {native(panchang.hinduMonth.name, panchang.hinduMonth.nameHi)} {native(panchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna', panchang.tithi.pakshaHi)}
               </Text>
@@ -177,7 +180,7 @@ export default function HomeScreen() {
 
           {live && (
             <Text style={s.heroNext} numberOfLines={2}>
-              {language === 'en' ? `${live.tithi.name} ` : ''}{tf('panch.until', { t: hhmm(live.tithi.end) })} · {tf('home.thenFrom', { name: native(live.nextTithi.name, live.nextTithi.nameHi) })}
+              {tf('panch.until', { t: hhmm(live.tithi.end) })} · {tf('home.thenFrom', { name: native(live.nextTithi.name, live.nextTithi.nameHi) })}
             </Text>
           )}
 
@@ -283,18 +286,11 @@ export default function HomeScreen() {
       </View>
       <View style={[s.grid, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onLayout={(e) => setGridW(e.nativeEvent.layout.width - 16)}>
         {!!tileW && (
-          <View style={s.gridRow}>
-            {mainTools.map((tool) => <View key={tool.key} style={s.gridCell}><ToolTile tool={tool} width={tileW} /></View>)}
-          </View>
-        )}
-        <View style={[s.gridDivider, { backgroundColor: colors.divider }]} />
-        {!!tileW && (
-          <ScrollView ref={rowRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>
-            {/* Tiles a little narrower than the grid so the next one peeks in. */}
-            {moreTools.map((tool) => <ToolTile key={tool.key} tool={tool} width={Math.floor(tileW * 0.88)} />)}
+          <ScrollView ref={rowRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 6 }}>
+            {[...mainTools, ...moreTools].map((tool) => <ToolTile key={tool.key} tool={tool} width={tileW} />)}
             <Pressable
               onPress={() => router.push('/(tabs)/tools')}
-              style={({ pressed }) => [s.moreTile, { width: Math.floor(tileW * 0.88), opacity: pressed ? 0.6 : 1 }]}
+              style={({ pressed }) => [s.moreTile, { width: tileW, opacity: pressed ? 0.6 : 1 }]}
               accessibilityRole="button"
             >
               <View style={[s.moreGlyph, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceSecondary }]}>
@@ -320,7 +316,7 @@ export default function HomeScreen() {
           style={({ pressed }) => [s.shareBtn, { borderColor: colors.primary + '55', backgroundColor: colors.primary + (pressed ? '22' : '10'), opacity: sharing ? 0.6 : 1 }]}
         >
           <Icon name="share-network" size={16} color={colors.primary} />
-          <Text style={[s.shareText, { color: colors.primary }]}>{t('home.shareShloka')}</Text>
+          <Text style={[s.shareText, { color: colors.primary }]}>{tx('Share')}</Text>
         </Pressable>
       </View>
 
@@ -351,7 +347,7 @@ export default function HomeScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[s.obsName, { color: colors.text }]} numberOfLines={1}>{native(o.name, o.nameHi)}</Text>
                     <Text style={[s.obsSub, { color: colors.textTertiary }]} numberOfLines={1}>
-                      {language === 'en' ? o.nameHi : o.name} · {o.date.toLocaleDateString(locale, { weekday: 'long' })}
+                      {o.date.toLocaleDateString(locale, { weekday: 'long' })}
                     </Text>
                   </View>
                   <View style={[s.obsWhen, { backgroundColor: o.daysAway <= 1 ? tone.bg : colors.surfaceSecondary }]}>
@@ -405,7 +401,7 @@ const s = StyleSheet.create({
   heroOver: { flex: 1, color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 },
   heroMain: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
   heroTithi: { color: '#FFFFFF', fontSize: 40, lineHeight: 60, fontFamily: DS.font.deva },
-  heroSub: { color: 'rgba(255,255,255,0.92)', fontSize: 14.5, lineHeight: 22, fontFamily: DS.font.deva },
+  heroSub: { color: 'rgba(255,255,255,0.92)', fontSize: 14.5, lineHeight: 22 },
   heroNext: { color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 19, marginTop: 6 },
   clock: { alignItems: 'flex-end' },
   clockText: { color: '#FFFFFF', fontSize: 40, lineHeight: 46, fontFamily: DS.font.display, fontVariant: ['tabular-nums'] },
@@ -443,7 +439,7 @@ const s = StyleSheet.create({
   gridCell: { flex: 1, alignItems: 'center' },
   gridDivider: { height: 1, marginHorizontal: 8 },
   moreTile: { alignItems: 'center', paddingVertical: 6, gap: 8 },
-  moreGlyph: { width: 48, height: 48, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  moreGlyph: { width: 52, height: 52, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   moreLabel: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
 
   list: { borderRadius: 22, borderWidth: 1, paddingHorizontal: 14 },

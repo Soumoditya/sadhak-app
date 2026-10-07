@@ -10,7 +10,6 @@ import { useDialog } from '../contexts/DialogContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { goBackOrHome } from '../components/ui/Header';
-import { LanguageChip, ThemeToggle } from '../components/ui/QuickSettings';
 
 const STORE_KEY = 'sadhak_japa_state';
 const GOLD = '#F5B841';
@@ -86,13 +85,7 @@ export default function JapaScreen() {
           <Ionicons name="chevron-back" size={22} color={pal.fg} />
         </TouchableOpacity>
         <Text style={[st.title, { color: pal.fg }]}>{tr('t.japa')}</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <LanguageChip />
-          <ThemeToggle />
-          <TouchableOpacity style={[st.iconBtn, { backgroundColor: pal.panel, borderColor: pal.line, opacity: count ? 1 : 0.4 }]} onPress={reset} hitSlop={8} accessibilityLabel="Reset">
-            <MaterialCommunityIcons name="restore" size={21} color={pal.fg} />
-          </TouchableOpacity>
-        </View>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Stats */}
@@ -123,6 +116,11 @@ export default function JapaScreen() {
 
       {/* Mala size */}
       <View style={[st.bottom, { paddingBottom: insets.bottom + 24 }]}>
+        <TouchableOpacity onPress={reset} disabled={!count} hitSlop={8} accessibilityLabel={tx('Reset')}
+          style={[st.resetBtn, { borderColor: pal.line, backgroundColor: pal.panel, opacity: count ? 1 : 0.45 }]}>
+          <MaterialCommunityIcons name="restore" size={17} color={pal.fg} />
+          <Text style={[st.resetText, { color: pal.fg }]}>{tx('Reset')}</Text>
+        </TouchableOpacity>
         <Text style={[st.bottomLabel, { color: pal.faint }]}>{tx('BEADS PER MALA')}</Text>
         <View style={st.targets}>
           {TARGETS.map((m) => {
@@ -162,6 +160,8 @@ const st = StyleSheet.create({
   of: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '600', marginTop: -6 },
   hint: { color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 22 },
   bottom: { alignItems: 'center' },
+  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, height: 36, borderRadius: 18, borderWidth: 1, marginBottom: 18 },
+  resetText: { fontSize: 13.5, fontWeight: '800' },
   bottomLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 10 },
   targets: { flexDirection: 'row', gap: 10 },
   target: { minWidth: 76, alignItems: 'center', paddingVertical: 10, borderRadius: 100, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },

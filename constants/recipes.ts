@@ -321,3 +321,33 @@ export const BHOG_RECIPES: BhogRecipe[] = [
     playQuery: 'satvik khichdi bhog recipe',
   },
 ];
+
+// ─── Allergens ─────────────────────────────────────────────────────────────
+// Worked out from the ingredient names so every recipe is covered.
+export type Allergen = 'dairy' | 'nuts' | 'peanuts' | 'gluten' | 'sesame' | 'coconut';
+export const ALLERGENS: { key: Allergen; label: string; icon: string }[] = [
+  { key: 'dairy', label: 'Dairy', icon: 'cup-water' },
+  { key: 'nuts', label: 'Tree nuts', icon: 'peanut-off-outline' },
+  { key: 'peanuts', label: 'Peanuts', icon: 'peanut-outline' },
+  { key: 'gluten', label: 'Gluten', icon: 'barley' },
+  { key: 'sesame', label: 'Sesame', icon: 'grain' },
+  { key: 'coconut', label: 'Coconut', icon: 'palm-tree' },
+];
+const ALLERGEN_RX: Record<Allergen, RegExp> = {
+  dairy: /\b(ghee|milk|khoya|mawa|paneer|curd|dahi|yog(h)?urt|butter|cream|malai|chhena|rabri|condensed)\b/i,
+  nuts: /\b(cashews?|kaju|almonds?|badam|pistachios?|pista|walnuts?|chironji|nuts)\b/i,
+  peanuts: /\b(peanuts?|groundnuts?|moongphali)\b/i,
+  gluten: /\b(wheat|atta|sooji|semolina|maida|rava|dalia|barley|vermicelli|seviyan|hing|asafoetida)\b/i,
+  sesame: /\b(sesame|til)\b/i,
+  coconut: /\b(coconut|nariyal|copra)\b/i,
+};
+const cache = new Map<string, Allergen[]>();
+/** Allergens in a recipe. Makhana (fox nut) is a seed, not a tree nut. */
+export function allergensOf(r: BhogRecipe): Allergen[] {
+  const hit = cache.get(r.id);
+  if (hit) return hit;
+  const text = r.ingredients.map((i) => i.item.replace(/makhana \(foxnuts\)|foxnuts?/gi, '')).join(' · ');
+  const out = (Object.keys(ALLERGEN_RX) as Allergen[]).filter((k) => ALLERGEN_RX[k].test(text));
+  cache.set(r.id, out);
+  return out;
+}

@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Share, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Share, Pressable, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import * as Clipboard from 'expo-clipboard';
+import ActionSheet, { type SheetAction } from '../ui/ActionSheet';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useDialog } from '../../contexts/DialogContext';
-import { getLatestComments, deletePost, timeAgo, type Post, type PostComment } from '../../services/posts';
+import { getLatestComments, deletePost, timeAgo, updatePostText, setPostPinned, type Post, type PostComment } from '../../services/posts';
 import { WEBSITE_URL } from '../../constants/appInfo';
 import Avatar from './Avatar';
 
@@ -14,7 +17,7 @@ import Avatar from './Avatar';
  * caption, and the latest two comments inline with "View all".
  */
 export default function PostCard({
-  post, uid, onLike, onOpenComments, onDeleted, onImage, commentsVersion = 0,
+  post, uid, onLike, onOpenComments, onDeleted, onImage, onChanged, commentsVersion = 0,
 }: {
   post: Post;
   uid?: string;
@@ -22,6 +25,8 @@ export default function PostCard({
   onOpenComments: (p: Post) => void;
   onDeleted?: (id: string) => void;
   onImage?: (url: string) => void;
+  /** Post was edited or (un)pinned. */
+  onChanged?: (p: Post) => void;
   /** Bump to re-fetch the inline comment preview. */
   commentsVersion?: number;
 }) {
@@ -32,6 +37,10 @@ export default function PostCard({
   const mine = !!uid && post.authorId === uid;
   const [preview, setPreview] = useState<PostComment[]>([]);
   const lastTap = useRef(0);
+  const [menu, setMenu] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(post.text);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!post.commentCount) { setPreview([]); return; }
@@ -49,10 +58,22 @@ export default function PostCard({
     setTimeout(() => { if (lastTap.current === now && post.imageUrl) onImage?.(post.imageUrl); }, 300);
   };
 
-  const menu = async () => {
+  const remove = async () => {
     const ok = await dialog.confirm({ title: tx('Delete this post?'), message: tx('This cannot be undone.'), confirmText: tx('Delete'), destructive: true, tone: 'danger' });
     if (!ok) return;
     try { await deletePost(post.id); onDeleted?.(post.id); } catch (e: any) { dialog.alert('Could not delete', String(e?.message || e).slice(0, 200)); }
+  };
+
+  const togglePin = async () => {
+    try { await setPostPinned(post.id, !post.pinned); onChanged?.({ ...post, pinned: !post.pinned, pinnedAt: post.pinned ? null : Date.now() }); }
+    catch (e: any) { dialog.alert('Could not update', String(e?.message || e).slice(0, 200)); }
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    try { await updatePostText(post.id, draft); onChanged?.({ ...post, text: draft.trim(), editedAt: Date.now() }); setEditing(false); }
+    catch (e: any) { dialog.alert('Could not save', String(e?.message || e).slice(0, 200)); }
+    finally { setSaving(false); }
   };
 
   const share = () => {
@@ -76,15 +97,14 @@ export default function PostCard({
           <View style={{ flex: 1 }}>
             <Text style={[s.name, { color: colors.text }]} numberOfLines={1}>{post.authorName}</Text>
             <Text style={[s.meta, { color: colors.textTertiary }]} numberOfLines={1}>
-              {post.authorUsername ? `@${post.authorUsername} · ` : ''}{timeAgo(post.createdAt)}
+              {post.authorUsername ? `@${post.authorUsername} · ` : ''}{timeAgo(post.createdAt)}{post.editedAt ? ` · ${tx('edited')}` : ''}
             </Text>
           </View>
         </TouchableOpacity>
-        {mine && (
-          <TouchableOpacity onPress={menu} hitSlop={10} accessibilityLabel={tx('Delete')}>
-            <Ionicons name="trash-outline" size={19} color={colors.textTertiary} />
-          </TouchableOpacity>
-        )}
+        {post.pinned && <Ionicons name="pin" size={16} color={colors.primary} />}
+        <TouchableOpacity onPress={() => setMenu(true)} hitSlop={10} accessibilityLabel={tx('More options')}>
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.textTertiary} />
+        </TouchableOpacity>
       </View>
 
       {!post.imageUrl && caption}
@@ -126,6 +146,47 @@ export default function PostCard({
           <Text style={[s.viewAll, { color: colors.textTertiary }]}>{tx('Add a comment…')}</Text>
         </TouchableOpacity>
       )}
+
+      <ActionSheet
+        visible={menu}
+        onClose={() => setMenu(false)}
+        actions={[
+          ...(mine ? [
+            { label: tx(post.pinned ? 'Unpin from profile' : 'Pin to profile'), icon: (post.pinned ? 'pin-outline' : 'pin') as any, onPress: togglePin },
+            { label: tx('Edit caption'), icon: 'create-outline' as any, onPress: () => { setDraft(post.text); setEditing(true); } },
+          ] : [
+            { label: tx('View profile'), icon: 'person-circle-outline' as any, onPress: () => openUser(post.authorId) },
+          ]),
+          { label: tx('Share'), icon: 'share-social-outline', onPress: share },
+          ...(post.text ? [{ label: tx('Copy text'), icon: 'copy-outline' as any, onPress: () => { Clipboard.setStringAsync(post.text).catch(() => {}); } }] : []),
+          ...(mine ? [{ label: tx('Delete'), icon: 'trash-outline' as any, onPress: remove, danger: true }] : []),
+        ] as SheetAction[]}
+      />
+      <Modal visible={editing} transparent animationType="slide" onRequestClose={() => setEditing(false)} statusBarTranslucent navigationBarTranslucent>
+        <KeyboardAvoidingView behavior="padding" style={s.editOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEditing(false)} />
+          <View style={[s.editSheet, { backgroundColor: colors.surface }]}>
+            <Text style={[s.editTitle, { color: colors.text }]}>{tx('Edit caption')}</Text>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              multiline
+              autoFocus
+              maxLength={2000}
+              style={[s.editInput, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.background }]}
+              placeholderTextColor={colors.textTertiary}
+            />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              <TouchableOpacity onPress={() => setEditing(false)} style={[s.editBtn, { borderColor: colors.cardBorder }]}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>{tx('Cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveEdit} disabled={saving} style={[s.editBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+                {saving ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontWeight: '800' }}>{tx('Save')}</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -144,4 +205,9 @@ const s = StyleSheet.create({
   bodyTop: { paddingTop: 0, paddingBottom: 4, fontSize: 15.5 },
   viewAll: { fontSize: 13.5, paddingHorizontal: 14, paddingTop: 6 },
   preview: { fontSize: 14, lineHeight: 20, paddingHorizontal: 14, paddingTop: 4 },
+  editOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  editSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 18, paddingBottom: 28 },
+  editTitle: { fontSize: 17, fontWeight: '800', marginBottom: 10 },
+  editInput: { minHeight: 120, maxHeight: 260, borderWidth: 1, borderRadius: 14, padding: 12, fontSize: 15.5, textAlignVertical: 'top' },
+  editBtn: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

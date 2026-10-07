@@ -20,6 +20,8 @@ import { requestFirstRunPermissions } from '../services/firstRunPermissions';
 import { downloadPendingUpdate, applyUpdateNow } from '../services/appUpdates';
 import { openFile } from '../services/downloads';
 import { useDialog } from '../contexts/DialogContext';
+import { startDiagnostics, trackScreen } from '../services/diagnostics';
+import { usePathname } from 'expo-router';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -116,6 +118,11 @@ function RootLayoutInner() {
   const { profile } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const dialog = useDialog();
+
+  // Anonymous diagnostics (errors, slow screens, slow network) for real phones.
+  const pathname = usePathname();
+  useEffect(() => { startDiagnostics(); }, []);
+  useEffect(() => { if (pathname) trackScreen(pathname); }, [pathname]);
 
   // OTA: fetch a new update in the background and offer to restart into it
   // right away (otherwise it would only apply on the next cold start).

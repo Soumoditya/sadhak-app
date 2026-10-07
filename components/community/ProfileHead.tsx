@@ -63,7 +63,7 @@ const GAP = 3;
 const CELL = (W - 20 * 2 - GAP * 2) / 3;
 
 /** Three-column grid; tapping a tile opens the vertical post feed at it. */
-export function PostGrid({ posts, uid, name }: { posts: Post[]; uid: string; name?: string }) {
+export function PostGrid({ posts, uid, name, sort = 'new' }: { posts: Post[]; uid: string; name?: string; sort?: string }) {
   const { colors } = useTheme();
   return (
     <View style={s.grid}>
@@ -72,7 +72,7 @@ export function PostGrid({ posts, uid, name }: { posts: Post[]; uid: string; nam
           key={p.id}
           style={s.cell}
           activeOpacity={0.85}
-          onPress={() => router.push({ pathname: '/posts', params: { uid, start: p.id, name: name || '' } })}
+          onPress={() => router.push({ pathname: '/posts', params: { uid, start: p.id, name: name || '', sort } })}
         >
           {p.imageUrl ? (
             <Image source={{ uri: p.imageUrl }} style={s.img} />
@@ -80,6 +80,9 @@ export function PostGrid({ posts, uid, name }: { posts: Post[]; uid: string; nam
             <View style={[s.textCell, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <Text style={{ color: colors.textSecondary, fontSize: 11.5, lineHeight: 15 }} numberOfLines={5}>{p.text}</Text>
             </View>
+          )}
+          {p.pinned && (
+            <View style={s.pin}><Ionicons name="pin" size={11} color="#FFF" /></View>
           )}
           {(p.likeCount > 0 || p.commentCount > 0) && (
             <View style={s.badge}>
@@ -107,9 +110,34 @@ const s = StyleSheet.create({
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { fontSize: 13 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
+  seg: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 2 },
+  segBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9 },
   cell: { width: CELL, height: CELL, borderRadius: 8, overflow: 'hidden' },
   img: { width: '100%', height: '100%' },
   textCell: { flex: 1, borderWidth: 1, borderRadius: 8, padding: 8, justifyContent: 'center' },
   badge: { position: 'absolute', left: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2 },
   badgeText: { color: '#FFF', fontSize: 10.5, fontWeight: '700' },
+  pin: { position: 'absolute', right: 6, top: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 8, padding: 3 },
 });
+
+/** Hot / New / Top switch for a profile's posts. */
+export function PostSort({ value, onChange }: { value: 'hot' | 'new' | 'top'; onChange: (v: 'hot' | 'new' | 'top') => void }) {
+  const { colors } = useTheme();
+  const { tx } = useLanguage();
+  const opts: { k: 'hot' | 'new' | 'top'; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+    { k: 'new', label: 'New', icon: 'time-outline' }, { k: 'hot', label: 'Hot', icon: 'flame-outline' }, { k: 'top', label: 'Top', icon: 'trending-up-outline' },
+  ];
+  return (
+    <View style={[s.seg, { backgroundColor: colors.surfaceSecondary }]}>
+      {opts.map((o) => {
+        const on = value === o.k;
+        return (
+          <TouchableOpacity key={o.k} onPress={() => onChange(o.k)} style={[s.segBtn, on && { backgroundColor: colors.surface }]} accessibilityState={{ selected: on }}>
+            <Ionicons name={o.icon} size={13} color={on ? colors.primary : colors.textSecondary} />
+            <Text style={{ fontSize: 12, fontWeight: '800', color: on ? colors.primary : colors.textSecondary }}>{tx(o.label)}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}

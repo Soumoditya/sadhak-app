@@ -23,6 +23,9 @@ export interface Post {
   commentCount: number;
   likedBy: string[];
   createdAt: any;
+  pinned?: boolean;
+  pinnedAt?: number | null;
+  editedAt?: number | null;
 }
 
 export interface PostComment {
@@ -63,6 +66,9 @@ function toPost(d: any): Post {
     commentCount: v.commentCount ?? 0,
     likedBy: Array.isArray(v.likedBy) ? v.likedBy : [],
     createdAt: v.createdAt ?? null,
+    pinned: !!v.pinned,
+    pinnedAt: v.pinnedAt ?? null,
+    editedAt: v.editedAt ?? null,
   };
 }
 
@@ -232,4 +238,21 @@ export async function syncAuthorOnPosts(uid: string, a: { displayName: string; u
     if (v.authorName === a.displayName && v.authorUsername === a.username && v.authorPfp === a.profilePicUrl) return null;
     return updateDoc(d.ref, { authorName: a.displayName || 'Sadhak', authorUsername: a.username || '', authorPfp: a.profilePicUrl || null }).catch(() => {});
   }));
+}
+
+/** Author edits the caption (hashtags re-extracted). */
+export async function updatePostText(postId: string, text: string): Promise<void> {
+  const t = text.trim();
+  await updateDoc(doc(db, 'posts', postId), { text: t, hashtags: extractHashtags(t), editedAt: Date.now() });
+}
+
+/** Author pins a post to the top of their profile (or unpins it). */
+export async function setPostPinned(postId: string, pinned: boolean): Promise<void> {
+  await updateDoc(doc(db, 'posts', postId), { pinned, pinnedAt: pinned ? Date.now() : null });
+}
+
+/** Pinned first (latest pin on top), then the chosen order. */
+export function withPinnedFirst(posts: Post[]): Post[] {
+  const pinned = posts.filter((p) => p.pinned).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0));
+  return [...pinned, ...posts.filter((p) => !p.pinned)];
 }

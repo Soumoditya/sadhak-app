@@ -26,5 +26,7 @@ export function usePostList(initial: Post[] = []) {
     setVersion((v) => v + 1);
   }, []);
 
-  return { uid: user?.uid, posts, setPosts, like, onDeleted, commentsFor, setCommentsFor, onCommentAdded, version };
+  const onChanged = useCallback((np: Post) => setPosts((prev) => prev.map((p) => (p.id === np.id ? np : p))), []);
+
+  return { uid: user?.uid, posts, setPosts, like, onDeleted, onChanged, commentsFor, setCommentsFor, onCommentAdded, version };
 }

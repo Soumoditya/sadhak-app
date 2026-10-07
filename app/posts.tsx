@@ -8,12 +8,12 @@ import ImageViewer from '../components/community/ImageViewer';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDsInsets } from '../constants/ds';
-import { getUserPosts } from '../services/posts';
+import { getUserPosts, rankPosts, withPinnedFirst, type FeedSort } from '../services/posts';
 import { usePostList } from '../hooks/usePostList';
 
 /** A person's posts as a vertical feed, opened at the tapped post. */
 export default function PostsScreen() {
-  const { uid, start, name } = useLocalSearchParams<{ uid: string; start?: string; name?: string }>();
+  const { uid, start, name, sort } = useLocalSearchParams<{ uid: string; start?: string; name?: string; sort?: string }>();
   const { colors } = useTheme();
   const { tx } = useLanguage();
   const { insets } = useDsInsets();
@@ -24,7 +24,8 @@ export default function PostsScreen() {
 
   useEffect(() => {
     if (!uid) return;
-    getUserPosts(uid).then((p) => {
+    getUserPosts(uid).then((raw) => {
+      const p = withPinnedFirst(rankPosts(raw, (sort as FeedSort) || 'new', 'all'));
       list.setPosts(p);
       const i = start ? p.findIndex((x) => x.id === start) : -1;
       if (i > 0) setTimeout(() => ref.current?.scrollToIndex({ index: i, animated: false }), 60);
@@ -51,6 +52,7 @@ export default function PostsScreen() {
               onLike={list.like}
               onOpenComments={list.setCommentsFor}
               onDeleted={list.onDeleted}
+      onChanged={list.onChanged}
               onImage={setViewImage}
               commentsVersion={list.version}
             />

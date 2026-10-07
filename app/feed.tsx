@@ -78,6 +78,7 @@ export default function FeedScreen() {
       onLike={list.like}
       onOpenComments={list.setCommentsFor}
       onDeleted={list.onDeleted}
+      onChanged={list.onChanged}
       onImage={setViewImage}
       commentsVersion={list.version}
     />

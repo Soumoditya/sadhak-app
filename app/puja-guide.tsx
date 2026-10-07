@@ -3,7 +3,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } fro
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { remote } from '../constants/remoteImage';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +10,7 @@ import { useLayoutInsets } from '../constants/layout';
 import { PUJA_GUIDES, type PujaGuide } from '../constants/pujaGuides';
 import { Diya } from '../components/ui';
 import { resolveDeityImage } from '../constants/deityImages';
+import Emblem, { emblemForDeity } from '../components/art/Emblem';
 import { Header } from '../components/ui';
 import { toneSolid } from '../constants/theme';
 
@@ -36,22 +36,14 @@ export default function PujaGuideScreen() {
             <TouchableOpacity style={st.dBack} onPress={() => setGuide(null)} hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color="#FFF" />
             </TouchableOpacity>
-            {heroImg ? (
+            {heroImg?.local ? (
               <View style={st.dHeroImgWrap}>
-                <ExpoImage
-                  source={heroImg.local ?? remote(heroImg.url)}
-                  placeholder={{ blurhash: heroImg.blurhash }}
-                  style={st.dHeroImg}
-                  contentFit="cover"
-                  transition={280}
-                  cachePolicy="disk"
-                />
+                <ExpoImage source={heroImg.local} style={st.dHeroImg} contentFit="cover" transition={280} />
               </View>
             ) : (
-              <MaterialCommunityIcons name={guide.icon as any} size={36} color="#FFD700" />
+              <Emblem name={emblemForDeity(guide.deity)} size={92} color={toneSolid(guide.color)} />
             )}
             <Text style={st.dTitle}>{native(guide.deity, guide.deityHi)}</Text>
-            {language === 'en' && <Text style={st.dTitleHi}>{guide.deityHi}</Text>}
             <View style={st.dDayChip}>
               <MaterialCommunityIcons name="calendar-star" size={13} color="#FFF" />
               <Text style={st.dDayText}>{tx(guide.day)}</Text>
@@ -138,22 +130,14 @@ export default function PujaGuideScreen() {
             onPress={() => setGuide(g)}
             activeOpacity={0.75}
           >
-            <View style={[st.cardIcon, { backgroundColor: tone(g.color).bg, borderColor: tone(g.color).fg + '44', borderWidth: img ? 1 : 0 }]}>
-              {img ? (
-                <ExpoImage
-                  source={img.local ?? remote(img.url)}
-                  placeholder={{ blurhash: img.blurhash }}
-                  style={st.cardIconImg}
-                  contentFit="cover"
-                  transition={220}
-                  cachePolicy="disk"
-                />
+            <View style={[st.cardIcon, { backgroundColor: tone(g.color).bg, borderColor: tone(g.color).fg + '44', borderWidth: img?.local ? 1 : 0 }]}>
+              {img?.local ? (
+                <ExpoImage source={img.local} style={st.cardIconImg} contentFit="cover" transition={220} />
               ) : (
-                <MaterialCommunityIcons name={g.icon as any} size={26} color={tone(g.color).fg} />
+                <Emblem name={emblemForDeity(g.deity)} size={54} color={toneSolid(g.color)} />
               )}
             </View>
             <Text style={[st.cardTitle, { color: colors.text }]} numberOfLines={1}>{language === 'en' ? g.deity.replace('Lord ', '').replace('Goddess ', '').replace('Maa ', '') : native(g.deity, g.deityHi)}</Text>
-            {language === 'en' && <Text style={[st.cardHi, { color: tone(g.color).fg }]}>{g.deityHi}</Text>}
             <Text style={[st.cardDay, { color: colors.textTertiary }]} numberOfLines={1}>{tx(g.day)}</Text>
           </TouchableOpacity>
           );

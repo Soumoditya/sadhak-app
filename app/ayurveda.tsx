@@ -35,7 +35,7 @@ function parseStored(v: string): Result | null {
 }
 
 export default function AyurvedaScreen() {
-  const { tx } = useLanguage();
+  const { tx, native } = useLanguage();
 
   const { colors, tone } = useTheme();
   const { screenBottom } = useDsInsets();
@@ -92,12 +92,12 @@ export default function AyurvedaScreen() {
     const g = DOSHAS[view];
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Header title={tx('Your Ayurvedic Type')} subtitle={sec ? `${p.name}-${sec.name} prakriti` : `${p.name} · ${p.nameHi}`} />
+        <Header title={tx('Your Ayurvedic Type')} subtitle={sec ? `${native(p.name, p.nameHi)}-${native(sec.name, sec.nameHi)} ${tx('prakriti')}` : native(p.name, p.nameHi)} />
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
           <View style={[st.hero, { backgroundColor: tone(p.color).bg, borderColor: tone(p.color).fg + '35' }]}>
             <View style={[st.heroIcon, { backgroundColor: tone(p.color).bg }]}><MaterialCommunityIcons name={p.icon as any} size={34} color={tone(p.color).fg} /></View>
             <Text style={[st.heroName, { color: colors.text }]}>
-              {p.name}{sec ? <Text style={{ color: tone(sec.color).fg }}>-{sec.name}</Text> : null}
+              {native(p.name, p.nameHi)}{sec ? <Text style={{ color: tone(sec.color).fg }}>-{native(sec.name, sec.nameHi)}</Text> : null}
             </Text>
             <Text style={[st.heroEl, { color: colors.textSecondary }]}>{tx(p.elements)}{sec ? ` · ${tx(sec.elements)}` : ''}</Text>
             <Text style={[st.heroNature, { color: colors.textSecondary }]}>{tx(p.nature)}</Text>
@@ -108,7 +108,7 @@ export default function AyurvedaScreen() {
                 const pct = Math.round((result.tally[d] / sum) * 100);
                 return (
                   <View key={d} style={st.barRow}>
-                    <Text style={[st.barLabel, { color: colors.text }]}>{DOSHAS[d].name}</Text>
+                    <Text style={[st.barLabel, { color: colors.text }]}>{native(DOSHAS[d].name, DOSHAS[d].nameHi)}</Text>
                     <View style={[st.barTrack, { backgroundColor: colors.cardBorder }]}>
                       <View style={[st.barFill, { width: `${pct}%`, backgroundColor: toneSolid(DOSHAS[d].color) }]} />
                     </View>
@@ -127,7 +127,7 @@ export default function AyurvedaScreen() {
               return (
                 <TouchableOpacity key={d} onPress={() => setView(d)} activeOpacity={0.8}
                   style={[st.viewTab, { borderColor: active ? c : colors.cardBorder, backgroundColor: active ? c + '18' : colors.surface }]}>
-                  <Text style={{ color: active ? c : colors.textSecondary, fontWeight: '800', fontSize: 13 }}>{DOSHAS[d].name}</Text>
+                  <Text style={{ color: active ? c : colors.textSecondary, fontWeight: '800', fontSize: 13 }}>{native(DOSHAS[d].name, DOSHAS[d].nameHi)}</Text>
                 </TouchableOpacity>
               );
             })}

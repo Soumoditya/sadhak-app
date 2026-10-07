@@ -5,12 +5,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { getUserPosts, type Post } from '../../services/posts';
+import { getUserPosts, rankPosts, withPinnedFirst, type Post } from '../../services/posts';
 import { followCounts } from '../../services/social';
 import { shareSadhak } from '../../services/shareApp';
 import { useDialog } from '../../contexts/DialogContext';
 import { Screen, Button, AppBar, Icon } from '../../components/ui';
-import { ProfileHead, PostGrid } from '../../components/community/ProfileHead';
+import { ProfileHead, PostGrid, PostSort } from '../../components/community/ProfileHead';
 import { DS } from '../../constants/ds';
 
 export default function ProfileScreen() {
@@ -23,6 +23,8 @@ export default function ProfileScreen() {
   const [counts, setCounts] = useState({ followers: 0, following: 0 });
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [sort, setSort] = useState<'hot' | 'new' | 'top'>('new');
+  const ordered = useMemo(() => withPinnedFirst(rankPosts(myPosts, sort, 'all')), [myPosts, sort]);
 
   // Year the user joined, from createdAt (Firestore Timestamp | Date | ms).
   const since = useMemo(() => {
@@ -108,7 +110,8 @@ export default function ProfileScreen() {
       <View style={styles.postsHeadRow}>
         <MaterialCommunityIcons name="grid" size={16} color={colors.text} />
         <Text style={[styles.postsHead, { color: colors.text }]}>{t('p.myPosts')}</Text>
-        <TouchableOpacity onPress={() => router.push('/create-post')} style={{ marginLeft: 'auto' }} hitSlop={8} accessibilityLabel={tx('New post')}>
+        <View style={{ marginLeft: 'auto' }}>{myPosts.length > 1 && <PostSort value={sort} onChange={setSort} />}</View>
+        <TouchableOpacity onPress={() => router.push('/create-post')} style={{ marginLeft: 8 }} hitSlop={8} accessibilityLabel={tx('New post')}>
           <MaterialCommunityIcons name="plus-box-outline" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
@@ -125,7 +128,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <PostGrid posts={myPosts} uid={user?.uid || ''} name={profile?.displayName} />
+        <PostGrid posts={ordered} uid={user?.uid || ''} name={profile?.displayName} sort={sort} />
       )}
     </Screen>
   );

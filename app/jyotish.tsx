@@ -13,7 +13,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { Header, Icon } from '../components/ui';
 import { useDsInsets, DS } from '../constants/ds';
-import KundliChart, { type ChartStyle } from '../components/charts/KundliChart';
+import KundliChart, { ABBR, type ChartStyle } from '../components/charts/KundliChart';
 import { router } from 'expo-router';
 import {
   computeAndSaveKundli, computeKundli, saveKundli, loadNatal, getCachedDaily, getPrediction, KUNDLI_MAX_AGE_MS, localDateKey,
@@ -51,6 +51,7 @@ export default function JyotishScreen() {
   const [chartTab, setChartTab] = useState<'d1' | 'd9' | 'd10' | 'moon'>('d1');
   const [pred, setPred] = useState<Prediction | null>(null);
   const [predPeriod, setPredPeriod] = useState<PredictionPeriod>('daily');
+  const [tab, setTab] = useState<'overview' | 'planets' | 'dasha' | 'yogas' | 'details'>('overview');
   const [predSource, setPredSource] = useState<'local' | 'ai'>('local');
   const [aiBusy, setAiBusy] = useState(false);
   const [chartStyle, setChartStyle] = useState<ChartStyle>(language === 'bn' || language === 'as' || language === 'od' ? 'east' : 'north');
@@ -389,7 +390,7 @@ export default function JyotishScreen() {
     ['Lagna (Ascendant)', native(b.lagna, b.lagnaHi)], ['Rashi (Moon sign)', `${native(b.rashi, b.rashiHi)} · ${loc.planet(b.rashiLord)}`],
     ['Nakshatra', `${native(b.nakshatra, b.nakshatraHi)} · ${tx('pada')} ${b.pada}`], ['Nakshatra lord', loc.planet(b.nakLord)],
     ...extraBirthDetails(kundli),
-    ['Gana', b.gana], ['Nadi', b.nadi], ['Yoni', b.yoni], ['Deity', b.deity],
+    ['Gana', tx(b.gana)], ['Nadi', tx(b.nadi)], ['Yoni', tx(b.yoni)], ['Deity', tx(b.deity)],
     ...birthPanchang,
     ['Ayanamsa', `Lahiri ${Number(kundli.meta.ayanamsa).toFixed(2)}°`],
   ];
@@ -402,7 +403,18 @@ export default function JyotishScreen() {
           <Icon name="note-pencil" size={18} color={colors.text} />
         </TouchableOpacity>
       } />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 4, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.tabBar}>
+        {([['overview', 'Overview'], ['planets', 'Planets'], ['dasha', 'Dasha'], ['yogas', 'Yogas & doshas'], ['details', 'Birth details']] as const).map(([k, label]) => {
+          const on = tab === k;
+          return (
+            <TouchableOpacity key={k} onPress={() => setTab(k)} style={[s.tabPill, { backgroundColor: on ? colors.primary : colors.surface, borderColor: on ? colors.primary : colors.cardBorder }]} accessibilityState={{ selected: on }}>
+              <Text style={{ color: on ? '#FFF' : colors.textSecondary, fontWeight: '800', fontSize: 13.5 }}>{tx(label)}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 6, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
+        {tab === 'overview' && (<>
         <View style={s.chipRow}>
           {maha && (
             <View style={[s.statusChip, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -418,7 +430,10 @@ export default function JyotishScreen() {
           </View>
         </View>
 
+        </>)}
+
         {/* Chart */}
+        {tab === 'overview' && (
         <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={s.cardHead}>
             <Text style={[s.cardTitle, { color: colors.text }, display]}>{tx('Birth chart')}</Text>
@@ -431,7 +446,7 @@ export default function JyotishScreen() {
             </View>
           </View>
           <View style={s.chartTabs}>
-            {([['d1', 'D1 · राशि'], ['d9', 'D9 · नवांश'], ['d10', 'D10 · दशांश'], ['moon', 'चन्द्र']] as const).map(([key, label]) => {
+            {([['d1', 'D1 · ' + tx('Rashi')], ['d9', 'D9 · ' + tx('Navamsa')], ['d10', 'D10 · ' + tx('Dasamsa')], ['moon', tx('Moon chart')]] as const).map(([key, label]) => {
               const active = chartTab === key;
               const disabled = key !== 'd1' && !kundli.charts;
               return (
@@ -464,6 +479,9 @@ export default function JyotishScreen() {
           <Text style={[s.legend, { color: colors.textTertiary }]}>{tx('R retrograde · C combust · V vargottama')}</Text>
         </View>
 
+        )}
+
+        {tab === 'overview' && (<>
         {/* Guidance */}
         <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           <View style={s.cardHead}>
@@ -532,8 +550,10 @@ export default function JyotishScreen() {
           )}
         </View>
 
+        </>)}
+
         {/* Birth details */}
-        <Section2 title={tx('Birth details')} colors={colors} display={display}>
+        {tab === 'details' && (<Section2 title={tx('Birth details')} colors={colors} display={display}>
           {infoRows.map(([k, v], i) => (
             <View key={k} style={[s.infoRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
               <Text style={[s.infoKey, { color: colors.textSecondary }]}>{tx(k)}</Text>
@@ -542,8 +562,10 @@ export default function JyotishScreen() {
           ))}
         </Section2>
 
+        )}
+
         {/* Grahas */}
-        <Section2 title={tx('Planets')} colors={colors} display={display}>
+        {tab === 'planets' && (<Section2 title={tx('Planets')} colors={colors} display={display}>
           {kundli.planets.map((p, i) => {
             const f = flags[p.name] || {};
             const dig = p.dignity && p.dignity !== '—' && p.dignity !== 'Neutral' ? p.dignity : null;
@@ -551,11 +573,11 @@ export default function JyotishScreen() {
             return (
               <View key={p.name} style={[s.graha, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
                 <View style={[s.grahaBadge, { backgroundColor: p.name === 'Sun' || p.name === 'Moon' ? tones.saffron.bg : colors.surfaceSecondary }]}>
-                  <Text style={[s.grahaAbbr, { color: p.name === 'Sun' || p.name === 'Moon' ? tones.saffron.fg : colors.text }]}>{p.nameHi}</Text>
+                  <Text style={[s.grahaAbbr, { color: p.name === 'Sun' || p.name === 'Moon' ? tones.saffron.fg : colors.text }]}>{(ABBR[language === 'mr' ? 'hi' : language === 'as' ? 'bn' : language] || ABBR.en)[p.name] || p.name.slice(0, 2)}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.grahaName, { color: colors.text }]}>{loc.planet(p.name)} <Text style={{ color: colors.textTertiary, fontWeight: '600' }}>· {loc.sign(p.signIndex)} {fmtDeg(p.degree)}</Text></Text>
-                  <Text style={[s.grahaSub, { color: colors.textSecondary }]}>{tx('House')} {p.house} · {tx(HOUSE_MEANING[p.house])} · {p.nakshatra} {p.pada}</Text>
+                  <Text style={[s.grahaSub, { color: colors.textSecondary }]}>{tx('House')} {p.house} · {tx(HOUSE_MEANING[p.house])} · {typeof p.nakshatraIndex === 'number' ? loc.nak(p.nakshatraIndex) : p.nakshatra} {p.pada}</Text>
                   {(dig || f.retro || f.combust || f.vargottama) && (
                     <View style={s.tagRow}>
                       {dig && <Tag text={tx(dig)} tone={tone} />}
@@ -570,6 +592,9 @@ export default function JyotishScreen() {
           })}
         </Section2>
 
+        )}
+
+        {tab === 'dasha' && (<>
         {/* Dasha */}
         {kundli.dasha && (
           <Section2 title={tx('Vimshottari dasha')} colors={colors} display={display}>
@@ -648,6 +673,9 @@ export default function JyotishScreen() {
           )}
         </Section2>
 
+        </>)}
+
+        {tab === 'yogas' && (<>
         {/* Yogas */}
         <Section2 title={tx('Yogas')} colors={colors} display={display}>
           {presentYogas.length === 0 && <Text style={{ color: colors.textSecondary, fontSize: 13.5, lineHeight: 19 }}>{tx('None of the major classical yogas are formed. Every chart still has its own strengths: see the dashas and planet dignities above.')}</Text>}
@@ -681,6 +709,8 @@ export default function JyotishScreen() {
             </View>
           ))}
         </Section2>
+
+        </>)}
 
         <Text style={{ color: colors.textTertiary, fontSize: 11.5, textAlign: 'center', marginTop: 4, lineHeight: 17 }}>{tx('Calculated with Swiss Ephemeris · Lahiri ayanamsa · whole-sign houses.')}</Text>
       </ScrollView>
@@ -762,6 +792,12 @@ const s = StyleSheet.create({
   segText: { fontSize: 12, fontWeight: '800' },
   chartTabs: { flexDirection: 'row', gap: 6, marginBottom: 6, flexWrap: 'wrap', justifyContent: 'center' },
   chartTab: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 100, borderWidth: 1 },
+  tabBar: { paddingHorizontal: 20, paddingBottom: 10, gap: 8 },
+  tabPill: { height: 38, paddingHorizontal: 15, borderRadius: 19, borderWidth: 1, justifyContent: 'center' },
+  glanceCard: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  glanceTile: { flex: 1, borderWidth: 1, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center' },
+  glanceKey: { fontSize: 11.5, fontWeight: '700' },
+  glanceVal: { fontSize: 16, fontWeight: '800', marginTop: 3 },
   chartSub: { fontSize: 12, marginBottom: 12, textAlign: 'center' },
   glance: { fontSize: 13.5, textAlign: 'center', marginBottom: 4, lineHeight: 20 },
   legend: { fontSize: 11.5, textAlign: 'center', marginTop: 10 },

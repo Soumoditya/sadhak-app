@@ -45,6 +45,8 @@ export const UI: Record<string, [string, string, string]> = {
   'f.ai': ['Sadhak AI', 'साधक AI', 'সাধক AI'],
   'f.jyotish': ['Jyotish', 'ज्योतिष', 'জ্যোতিষ'],
   'f.vastu': ['Vastu', 'वास्तु', 'বাস্তু'],
+  'f.vpuja': ['Puja', 'पूजा', 'পূজা'],
+  'd.vpuja': ['Virtual puja: flowers, diya, bell and aarti', 'फूल, दीया, घंटी और आरती अर्पित करें', 'ফুল, প্রদীপ, ঘণ্টা ও আরতি নিবেদন করুন'],
   'f.puja': ['Puja Guide', 'पूजा विधि', 'পূজা বিধি'],
   'f.bhog': ['Satvik Bhog', 'सात्विक भोग', 'সাত্ত্বিক ভোগ'],
   'f.ayurveda': ['Ayurveda', 'आयुर्वेद', 'আয়ুর্বেদ'],
@@ -63,7 +65,7 @@ export const UI: Record<string, [string, string, string]> = {
   // ── Panchang ──
   'panch.subtitle': ['Daily Hindu almanac', 'दैनिक हिंदू पंचांग', 'দৈনিক হিন্দু পঞ্জিকা'],
   'panch.for': ['For {city}', '{city} के लिए', '{city}-এর জন্য'],
-  'panch.fiveElements': ['Five elements · पंचांग', 'पंचांग के पाँच अंग', 'পঞ্জিকার পাঁচ অঙ্গ'],
+  'panch.fiveElements': ['Five elements', 'पंचांग के पाँच अंग', 'পঞ্জিকার পাঁচ অঙ্গ'],
   'panch.until': ['until {t}', '{t} तक', '{t} পর্যন্ত'],
   'panch.muhurta': ['Muhurta · good & bad times', 'मुहूर्त · शुभ और अशुभ समय', 'মুহূর্ত · শুভ ও অশুভ সময়'],
   'panch.now': ['NOW', 'अभी', 'এখন'],

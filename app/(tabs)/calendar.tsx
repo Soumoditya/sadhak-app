@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { holidaysOn, isPublicHoliday, type Holiday } from '../../constants/holidays';
+import { REGIONS, defaultRegion, solarMonthDays, lunarMonth, regionalFestivals, type Region, type RegionalDay, type RegionalFest } from '../../services/regional';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -15,7 +16,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { calculatePanchang } from '../../services/panchang';
 import { getDailyGroomingAdvice, getGroomingStatusColor, type GroomingStatus } from '../../services/groomingRules';
-import { getFestivalsForDate, getFixedFestivals, type Festival } from '../../services/festivals';
+import { lunarFestivalsOn, getFixedFestivals, type Festival } from '../../services/festivals';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLayoutInsets } from '../../constants/layout';
 import { AppBar, Icon } from '../../components/ui';
@@ -50,6 +51,11 @@ interface DayInfo {
   isEkadashi: boolean;
   festivals: Festival[];
   holidays: Holiday[];
+  regional?: RegionalDay;
+  regionalFests: RegionalFest[];
+  tithiNo: number;
+  paksha: 'shukla' | 'krishna';
+  month: { en: string; hi: string };
 }
 
 function fmt12(h: number, m: number): string {
@@ -80,6 +86,19 @@ export default function CalendarScreen() {
   const [remHour, setRemHour] = useState(7);
   const [remMinute, setRemMinute] = useState(0);
   const [groomOpen, setGroomOpen] = useState(false);
+  // Regional calendar (Bengali, Tamil, Amanta …), remembered per device.
+  const [region, setRegionState] = useState<Region>(() => defaultRegion(language));
+  const [regionSheet, setRegionSheet] = useState(false);
+  // A region the user picked sticks; otherwise follow the app language.
+  useEffect(() => {
+    AsyncStorage.getItem('sadhak_calendar_region').then((v) => {
+      if (v && REGIONS.some((r) => r.key === v)) setRegionState(v as Region);
+      else setRegionState(defaultRegion(language));
+    }).catch(() => {});
+  }, [language]);
+  const setRegion = (r: Region) => { setRegionState(r); AsyncStorage.setItem('sadhak_calendar_region', r).catch(() => {}); };
+  const regionInfo = REGIONS.find((r) => r.key === region)!;
+  const holidayName = (h: Holiday) => (language === 'hi' || language === 'mr' ? h.hi : language === 'bn' || language === 'as' ? h.bn : h.name);
   const [showClock, setShowClock] = useState(false);
   const [monthPicker, setMonthPicker] = useState(false);
 
@@ -124,6 +143,8 @@ export default function CalendarScreen() {
   const monthInfo = useMemo(() => {
     const map: Record<number, DayInfo> = {};
     const daysInMonth = new Date(year, month + 1, 0).getDate();
+    let solar: Record<number, RegionalDay> = {};
+    try { solar = regionInfo.solar ? solarMonthDays(year, month, region, lat, lon, language) : {}; } catch {}
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d);
       try {
@@ -134,7 +155,7 @@ export default function CalendarScreen() {
         // (or be a fixed Gregorian date). Month-wide observances without a tithi
         // were matching EVERY day and gold-washing half the calendar.
         const dayFestivals = [
-          ...getFestivalsForDate(p.hinduMonth.name, p.tithi.name, p.tithi.paksha).filter(f => !!f.tithi),
+          ...lunarFestivalsOn(date, lat, lon),
           ...getFixedFestivals(month + 1, d),
         ].filter(f => f.type === 'major' || f.type === 'minor' || f.type === 'sankranti');
         map[d] = {
@@ -144,13 +165,52 @@ export default function CalendarScreen() {
           isEkadashi: tn.includes('ekadashi'),
           festivals: dayFestivals,
           holidays: holidaysOn(date),
+          regional: solar[d],
+          regionalFests: (() => { try { return regionalFestivals(region, date, lat, lon, solar[d]); } catch { return []; } })(),
+          tithiNo: ((p.tithi.number - 1) % 15) + 1,
+          paksha: p.tithi.paksha,
+          month: lunarMonth(region, p.hinduMonth.name, p.tithi.paksha),
         };
       } catch {
-        map[d] = { status: 'allowed', isPurnima: false, isAmavasya: false, isEkadashi: false, festivals: [], holidays: holidaysOn(date) };
+        map[d] = { status: 'allowed', isPurnima: false, isAmavasya: false, isEkadashi: false, festivals: [], holidays: holidaysOn(date), regionalFests: [], tithiNo: 0, paksha: 'shukla', month: { en: '', hi: '' } };
       }
     }
     return map;
-  }, [year, month, lat, lon, profile?.gender, profile?.marriageStatus]);
+  }, [year, month, lat, lon, profile?.gender, profile?.marriageStatus, region, language]);
+
+  // Festivals, fasts and holidays of the visible month, in date order.
+  const monthAgenda = useMemo(() => {
+    const out: { key: string; day: number; title: string; sub?: string; tone: { bg: string; fg: string } }[] = [];
+    Object.entries(monthInfo).forEach(([d, i]) => {
+      const day = Number(d);
+      i.regionalFests.forEach((f) => out.push({ key: `r${d}${f.name}`, day, title: language === 'bn' || language === 'as' ? (f.bn || native(f.name, f.hi)) : native(f.name, f.hi), sub: tx(f.note), tone: tones.saffron }));
+      i.festivals.forEach((f) => out.push({ key: `f${d}${f.id}`, day, title: native(f.name, f.nameHi), sub: f.fasting ? tx('Fast') : undefined, tone: tones.kumkum }));
+      if (i.isEkadashi && !i.festivals.some((f) => /ekadashi/i.test(f.name))) out.push({ key: `e${d}`, day, title: native('Ekadashi', 'एकादशी'), sub: tx('Fast'), tone: tones.plum });
+      if (i.isPurnima && !i.festivals.some((f) => /purnima/i.test(f.name))) out.push({ key: `p${d}`, day, title: native('Purnima', 'पूर्णिमा'), tone: tones.haldi });
+      if (i.isAmavasya && !i.festivals.some((f) => /amavasya/i.test(f.name))) out.push({ key: `a${d}`, day, title: native('Amavasya', 'अमावस्या'), tone: tones.neel });
+      // A holiday that is the same event as a festival (Dussehra, Diwali) tags
+      // the festival instead of adding a second row.
+      const stem = (x: string) => x.toLowerCase().replace(/[^a-z]/g, '').slice(0, 5);
+      i.holidays.filter(isPublicHoliday).forEach((h) => {
+        const f = i.festivals.find((x) => stem(x.name) === stem(h.name));
+        const same = f && out.find((o) => o.key === `f${d}${f.id}`);
+        if (same) same.sub = [same.sub, tx('Public holiday')].filter(Boolean).join(' · ');
+        else out.push({ key: `h${d}${h.name}`, day, title: holidayName(h), sub: tx('Public holiday'), tone: tones.neel });
+      });
+    });
+    return out.sort((a, b) => a.day - b.day);
+  }, [monthInfo, native, tx, language, tones]);
+
+  // Regional months this Gregorian month spans, e.g. "Ashwin – Kartik 1433".
+  const monthSpan = useMemo(() => {
+    const names: string[] = [];
+    Object.values(monthInfo).forEach((i) => {
+      const n = i.regional ? i.regional.monthName : native(i.month.en, i.month.hi);
+      if (n && !names.includes(n)) names.push(n);
+    });
+    const yr = Object.values(monthInfo).map((i) => i.regional?.year).filter(Boolean).pop();
+    return `${names.join(' – ')}${yr ? ` ${yr}` : ''} · ${language === 'bn' || language === 'as' ? regionInfo.native : tx(regionInfo.label)}`;
+  }, [monthInfo, native, language, regionInfo, tx]);
 
   const selectedPanchang = useMemo(
     () => calculatePanchang(selectedDate, lat, lon),
@@ -282,7 +342,6 @@ export default function CalendarScreen() {
     ].filter((p) => p.date.getTime() > Date.now());
   }, [selectedDate.toDateString(), selectedPanchang?.sunrise, tx]);
 
-  const holidayName = (h: Holiday) => (language === 'hi' || language === 'mr' ? h.hi : language === 'bn' || language === 'as' ? h.bn : h.name);
 
   const groomingColor = getGroomingStatusColor(selectedGrooming.overallStatus);
   const hasNote = !!notes[selectedDateKey];
@@ -296,6 +355,10 @@ export default function CalendarScreen() {
     line: tx(f.description),
     tag: f.fasting ? tx('Fast') : f.type === 'major' ? tx('Festival') : undefined,
     icon: 'star-four-points', tone: tones.kumkum,
+  }));
+  (selectedInfo?.regionalFests || []).forEach((f) => dayEvents.unshift({
+    title: language === 'bn' || language === 'as' ? (f.bn || native(f.name, f.hi)) : native(f.name, f.hi),
+    line: tx(f.note), tag: tx(regionInfo.label), icon: 'star-four-points', tone: tones.saffron,
   }));
   (selectedInfo?.holidays || []).forEach((h) => dayEvents.push({
     title: holidayName(h),
@@ -315,7 +378,7 @@ export default function CalendarScreen() {
         <View style={{ paddingTop: headerPaddingTop }}>
           <AppBar
             title={t('f.calendar')}
-            subtitle={selectedPanchang ? `${native(selectedPanchang.hinduMonth.name, selectedPanchang.hinduMonth.nameHi)} · ${native(selectedPanchang.tithi.paksha === 'shukla' ? 'Shukla paksha' : 'Krishna paksha', selectedPanchang.tithi.pakshaHi)}` : ''}
+            subtitle={monthSpan}
             right={
               <TouchableOpacity
                 onPress={goToToday}
@@ -355,6 +418,12 @@ export default function CalendarScreen() {
           </TouchableOpacity>
         </View>
 
+        <TouchableOpacity onPress={() => setRegionSheet(true)} style={[st.regionChip, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} activeOpacity={0.8}>
+          <Ionicons name="earth-outline" size={15} color={colors.primary} />
+          <Text style={[st.regionText, { color: colors.text }]} numberOfLines={1}>{tx(regionInfo.label)} {tx('calendar')}</Text>
+          <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         {/* ═══ Calendar grid — clean by default, markers only when meaningful ═══ */}
         <View style={[st.calendarCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} {...swipe.panHandlers}>
           <View style={st.dayHeaders}>
@@ -379,7 +448,7 @@ export default function CalendarScreen() {
               const today = isToday(day);
               const selected = isSelected(day);
               const isSunday = new Date(year, month, day).getDay() === 0;
-              const hasFestival = (info?.festivals.length || 0) > 0;
+              const hasFestival = (info?.festivals.length || 0) + (info?.regionalFests.length || 0) > 0;
               const dayHasNote = !!notes[getDateKey(new Date(year, month, day))];
               const holiday = !!info?.holidays.some(isPublicHoliday);
               const fest = tones.kumkum;
@@ -411,6 +480,11 @@ export default function CalendarScreen() {
                     >
                       {day}
                     </Text>
+                    {!!info && (
+                      <Text style={[st.cellSub, { color: selected ? 'rgba(255,255,255,0.85)' : colors.textTertiary }]} numberOfLines={1}>
+                        {info.regional ? (info.regional.day === 1 ? info.regional.monthName.slice(0, 4) : info.regional.day) : `${info.paksha === 'shukla' ? '' : ''}${info.tithiNo}`}
+                      </Text>
+                    )}
                     {(info?.isPurnima || info?.isAmavasya || info?.isEkadashi) && (
                       <View style={[st.tithiDot, {
                         backgroundColor: info.isPurnima ? colors.purnima : info.isEkadashi ? colors.ekadashi : colors.amavasya,
@@ -456,7 +530,7 @@ export default function CalendarScreen() {
                 {native(selectedPanchang.tithi.name, selectedPanchang.tithi.nameHi)} · {native(selectedPanchang.nakshatra.name, selectedPanchang.nakshatra.nameHi)}
               </Text>
               <Text style={[st.detailSub, { color: colors.textTertiary }]} numberOfLines={1}>
-                {native(selectedPanchang.hinduMonth.name, selectedPanchang.hinduMonth.nameHi)} {native(selectedPanchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna', selectedPanchang.tithi.pakshaHi)} · {native(selectedPanchang.yoga.name, selectedPanchang.yoga.nameHi)} {tx('yoga')}
+                {selectedInfo?.regional ? `${selectedInfo.regional.label} · ` : ''}{native((selectedInfo?.month.en || selectedPanchang.hinduMonth.name), (selectedInfo?.month.hi || selectedPanchang.hinduMonth.nameHi))} {native(selectedPanchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna', selectedPanchang.tithi.pakshaHi)}
               </Text>
             </View>
           </View>
@@ -555,6 +629,26 @@ export default function CalendarScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ═══ This month at a glance ═══ */}
+        {monthAgenda.length > 0 && (
+          <View style={[st.detailCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Text style={[st.agendaTitle, { color: colors.text }, display]}>{tx('This month')}</Text>
+            {monthAgenda.map((a, i) => (
+              <TouchableOpacity key={a.key} onPress={() => setSelectedDate(new Date(year, month, a.day))} activeOpacity={0.7}
+                style={[st.agendaRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
+                <View style={[st.agendaDate, { backgroundColor: a.tone.bg }]}>
+                  <Text style={{ color: a.tone.fg, fontWeight: '800', fontSize: 16 }}>{a.day}</Text>
+                  <Text style={{ color: a.tone.fg, fontWeight: '700', fontSize: 9.5 }}>{dayNames[new Date(year, month, a.day).getDay()]}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14.5 }} numberOfLines={1}>{a.title}</Text>
+                  {!!a.sub && <Text style={{ color: colors.textTertiary, fontSize: 12.5, marginTop: 1 }} numberOfLines={1}>{a.sub}</Text>}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
       <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: colors.background }} />
 
@@ -663,6 +757,31 @@ export default function CalendarScreen() {
         </View>
       </Modal>
 
+      {/* ═══ Regional calendar picker ═══ */}
+      <Modal visible={regionSheet} transparent animationType="slide" onRequestClose={() => setRegionSheet(false)} statusBarTranslucent navigationBarTranslucent>
+        <View style={st.modalOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setRegionSheet(false)} />
+          <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 24 + bottomInset }]}>
+            <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[st.sheetTitle, { color: colors.text }]}>{tx('Regional calendar')}</Text>
+            <Text style={[st.sheetSub, { color: colors.textSecondary }]}>{tx('Dates, month names and local festivals follow your region.')}</Text>
+            {REGIONS.map((r) => {
+              const on = r.key === region;
+              return (
+                <TouchableOpacity key={r.key} onPress={() => { setRegion(r.key); setRegionSheet(false); }} activeOpacity={0.8}
+                  style={[st.presetRow, { borderColor: on ? colors.primary : colors.cardBorder, backgroundColor: on ? colors.primary + '10' : colors.background }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[st.presetTitle, { color: colors.text }]}>{tx(r.label)} <Text style={{ color: colors.textTertiary, fontWeight: '600' }}>{r.native}</Text></Text>
+                    <Text style={[st.presetSub, { color: colors.textTertiary }]}>{tx(r.who)}</Text>
+                  </View>
+                  {on && <Ionicons name="checkmark-circle" size={22} color={colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
+
       {/* ═══ Month / year jump ═══ */}
       <Modal visible={monthPicker} transparent animationType="slide" onRequestClose={() => setMonthPicker(false)}>
         <View style={st.modalOverlay}>
@@ -716,6 +835,11 @@ const st = StyleSheet.create({
   headerTopRow: { flexDirection: 'row', alignItems: 'center' },
   headerTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
   headerSub: { fontSize: 13, marginTop: 3 },
+  regionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', marginTop: 10, paddingHorizontal: 14, height: 34, borderRadius: 17, borderWidth: 1 },
+  regionText: { fontSize: 13, fontWeight: '700' },
+  agendaTitle: { fontSize: 19, lineHeight: 26, marginBottom: 6 },
+  agendaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  agendaDate: { width: 42, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   todayPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, paddingHorizontal: 12, height: 40, borderRadius: 100 },
   todayPillText: { fontSize: 12, fontWeight: '800' },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -729,8 +853,9 @@ const st = StyleSheet.create({
   dayHeaders: { flexDirection: 'row' },
   dayHeaderText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { height: 48, justifyContent: 'center', alignItems: 'center' },
-  cellInner: { width: 40, height: 40, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  cell: { height: 56, justifyContent: 'center', alignItems: 'center' },
+  cellInner: { width: 44, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  cellSub: { fontSize: 9.5, fontWeight: '700', marginTop: 1 },
   cellDay: { fontSize: 14.5, fontWeight: '600' },
   statusBar: { position: 'absolute', bottom: 5, width: 14, height: 3, borderRadius: 2 },
   tithiDot: { position: 'absolute', top: 4, right: 4, width: 6, height: 6, borderRadius: 3, borderWidth: 1 },
@@ -764,7 +889,7 @@ const st = StyleSheet.create({
   groomRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 13, borderWidth: 1 },
   groomText: { fontSize: 13.5, fontWeight: '700' },
   groomWord: { fontSize: 13.5, fontWeight: '800' },
-  holidayBar: { position: 'absolute', bottom: 4, width: 16, height: 3, borderRadius: 2 },
+  holidayBar: { position: 'absolute', bottom: 3, width: 16, height: 3, borderRadius: 2 },
   presetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1, marginBottom: 8 },
   presetIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   presetTitle: { fontSize: 15, fontWeight: '700' },

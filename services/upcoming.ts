@@ -1,5 +1,5 @@
 import { calculatePanchang } from './panchang';
-import { getFestivalsForDate, getFixedFestivals } from './festivals';
+import { lunarFestivalsOn, getFixedFestivals } from './festivals';
 
 export type Observance = {
   date: Date;
@@ -22,7 +22,7 @@ export function getUpcomingObservances(from: Date, lat: number, lon: number, lim
     try { p = calculatePanchang(date, lat, lon); } catch { continue; }
     const tn = (p.tithi.name || '').toLowerCase();
     const fests = [
-      ...getFestivalsForDate(p.hinduMonth.name, p.tithi.name, p.tithi.paksha).filter((f) => !!f.tithi),
+      ...lunarFestivalsOn(date, lat, lon),
       ...getFixedFestivals(date.getMonth() + 1, date.getDate()),
     ].filter((f) => f.type === 'major' || f.type === 'minor' || f.type === 'sankranti');
     for (const f of fests) {

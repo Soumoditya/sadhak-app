@@ -9,8 +9,8 @@ import { LanguageChip, ThemeToggle } from './QuickSettings';
 
 /**
  * Screen header for every pushed screen: back, display-face title, optional
- * right actions, and the same language chip + theme toggle as Home and the
- * tabs (pass quick={false} on screens that draw their own, e.g. Settings).
+ * right actions. Language and theme switches live on Home, the tabs and
+ * Settings; pass quick to show them here too.
  */
 interface Props {
   title: string;
@@ -29,7 +29,7 @@ export function goBackOrHome() {
   else router.replace('/');
 }
 
-export default function Header({ title, subtitle, back = true, right, onBack, quick = true }: Props) {
+export default function Header({ title, subtitle, back = true, right, onBack, quick = false }: Props) {
   const { colors } = useTheme();
   const { display, noTrack, tx } = useLanguage();
   const { insets } = useDsInsets();

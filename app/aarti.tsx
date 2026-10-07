@@ -3,7 +3,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } fro
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { remote } from '../constants/remoteImage';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +12,7 @@ import {
   type DevotionalCategory, type DevotionalItem,
 } from '../constants/devotional';
 import { getDeityImage } from '../constants/deityImages';
+import Emblem, { emblemForDeity } from '../components/art/Emblem';
 import { Diya } from '../components/ui';
 import { DS } from '../constants/ds';
 import { Header } from '../components/ui';
@@ -20,7 +20,7 @@ import { toneSolid } from '../constants/theme';
 
 export default function DevotionalScreen() {
   const { colors, isDark, tone } = useTheme();
-  const { t: tr, tx } = useLanguage();
+  const { t: tr, tx, native } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [category, setCategory] = useState<DevotionalCategory>('aarti');
   const [selected, setSelected] = useState<DevotionalItem | null>(null);
@@ -63,24 +63,16 @@ export default function DevotionalScreen() {
               <View style={[st.emblemGlow, { backgroundColor: toneSolid(selected.color), opacity: 0.18 }]} />
               <View style={[st.emblemRing, { borderColor: tone(selected.color).fg + '66' }]} />
               <View style={[st.emblemCore, { backgroundColor: colors.surfaceElevated, borderColor: tone(selected.color).fg + '55' }]}>
-                {deityImg ? (
-                  <ExpoImage
-                    source={deityImg.local ?? remote(deityImg.url)}
-                    placeholder={{ blurhash: deityImg.blurhash }}
-                    style={st.emblemImage}
-                    contentFit="cover"
-                    transition={280}
-                    cachePolicy="disk"
-                  />
+                {deityImg?.local ? (
+                  <ExpoImage source={deityImg.local} style={st.emblemImage} contentFit="cover" transition={280} />
                 ) : (
-                  <Diya size={40} color={tone(selected.color).fg} />
+                  <Emblem name={emblemForDeity(selected.deity)} size={88} color={toneSolid(selected.color)} />
                 )}
               </View>
             </View>
 
-            <Text style={[st.detailTitle, { color: colors.text }]}>{selected.title}</Text>
-            <Text style={[st.detailTitleHi, { color: tone(selected.color).fg }]}>{selected.titleHi}</Text>
-            <Text style={[st.detailDeity, { color: colors.textTertiary }]}>{selected.deity}</Text>
+            <Text style={[st.detailTitle, { color: colors.text }]}>{native(selected.title, selected.titleHi)}</Text>
+            <Text style={[st.detailDeity, { color: colors.textTertiary }]}>{tx(selected.deity)}</Text>
 
             <TouchableOpacity style={[st.listenBtn, { backgroundColor: toneSolid(selected.color) }]} onPress={() => openPlayer(selected)} activeOpacity={0.85}>
               <MaterialCommunityIcons name="play-circle" size={19} color="#FFF" />
@@ -139,15 +131,10 @@ export default function DevotionalScreen() {
           >
             {/* Deity avatar with a thin colored ring, or the category icon fallback */}
             <View style={[st.cardIcon, { backgroundColor: tone(item.color).bg, borderColor: tone(item.color).fg + '55', borderWidth: 1 }]}>
-              {img ? (
-                <ExpoImage
-                  source={img.local ?? remote(img.url)}
-                  placeholder={{ blurhash: img.blurhash }}
-                  style={st.cardIconImage}
-                  contentFit="cover"
-                  transition={220}
-                  cachePolicy="disk"
-                />
+              {img?.local ? (
+                <ExpoImage source={img.local} style={st.cardIconImage} contentFit="cover" transition={220} />
+              ) : item.deity ? (
+                <Emblem name={emblemForDeity(item.deity)} size={48} color={toneSolid(item.color)} />
               ) : item.category === 'aarti' ? (
                 <Diya size={26} color={tone(item.color).fg} />
               ) : (
@@ -158,9 +145,8 @@ export default function DevotionalScreen() {
               )}
             </View>
             <View style={st.cardInfo}>
-              <Text style={[st.cardTitle, { color: colors.text }]}>{item.title}</Text>
-              <Text style={[st.cardTitleHi, { color: colors.primary }]} numberOfLines={1}>{item.titleHi}</Text>
-              <Text style={[st.cardDeity, { color: colors.textSecondary }]}>{item.deity}</Text>
+              <Text style={[st.cardTitle, { color: colors.text }]}>{native(item.title, item.titleHi)}</Text>
+              <Text style={[st.cardDeity, { color: colors.textSecondary }]}>{tx(item.deity)}</Text>
             </View>
             <TouchableOpacity onPress={() => openPlayer(item)} hitSlop={8} style={[st.playBtn, { backgroundColor: tone(item.color).bg }]}>
               <MaterialCommunityIcons name="play" size={20} color={tone(item.color).fg} />

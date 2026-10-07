@@ -6,10 +6,19 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Header } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
 import { WIKI, WIKI_CATEGORIES, type WikiArticle, type WikiCat } from '../constants/hinduWiki';
+import Emblem, { type EmblemName } from '../components/art/Emblem';
+
+const EMBLEM: Record<string, EmblemName> = {
+  ganesha: 'modak', shiva: 'trishul', vishnu: 'chakra', durga: 'mukut', hanuman: 'gada', lakshmi: 'lotus',
+  gita: 'flute', vedas: 'yajna', upanishads: 'om', ramayana: 'bow',
+  diwali: 'diya', holi: 'colours', navratri: 'kalash', ekadashi: 'moon',
+  dharma: 'dharmachakra', karma: 'scales', moksha: 'sun', atman: 'flame',
+};
+const emblemOf = (a: WikiArticle): EmblemName => EMBLEM[a.id] || (a.category === 'scriptures' ? 'book' : a.category === 'festivals' ? 'diya' : a.category === 'deities' ? 'om' : 'dharmachakra');
 
 export default function WikiScreen() {
   const { colors, tone } = useTheme();
-  const { t: tr, tx, native, language } = useLanguage();
+  const { t: tr, tx, native, language, display } = useLanguage();
   const { screenBottom } = useDsInsets();
   const [cat, setCat] = useState<WikiCat | 'all'>('all');
   const [q, setQ] = useState('');
@@ -38,16 +47,21 @@ export default function WikiScreen() {
     const related = WIKI.filter((a) => a.category === article.category && a.id !== article.id).slice(0, 4);
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Header title={native(article.title, article.titleHi)} subtitle={c.label} onBack={() => setArticle(null)} />
+        <Header title={tx(c.label)} subtitle={tr('f.wiki')} onBack={() => setArticle(null)} />
         <ScrollView ref={readerRef} contentContainerStyle={{ padding: 20, paddingBottom: screenBottom }} showsVerticalScrollIndicator={false}>
-          {language === 'en' && !!article.titleHi && <Text style={[st.artHi, { color: tone(c.color).fg }]}>{article.titleHi}</Text>}
+          <View style={[st.hero, { backgroundColor: tone(c.color).bg }]}>
+            <Emblem name={emblemOf(article)} size={112} color={c.color} />
+            <Text style={[st.heroTitle, { color: colors.text }, display]}>{native(article.title, article.titleHi)}</Text>
+            <Text style={[st.heroSum, { color: colors.textSecondary }]}>{tx(article.summary)}</Text>
+          </View>
           <Text style={[st.artBody, { color: colors.text }]}>{tx(article.body)}</Text>
           {related.length > 0 && (
             <View style={{ marginTop: 26 }}>
-              <Text style={[st.relLabel, { color: colors.textTertiary }]}>{tx('MORE IN')} {c.label.toUpperCase()}</Text>
+              <Text style={[st.relLabel, { color: colors.textTertiary }]}>{tx('More in')} {tx(c.label)}</Text>
               {related.map((r) => (
                 <TouchableOpacity key={r.id} onPress={() => setArticle(r)} activeOpacity={0.8}
                   style={[st.relRow, { borderColor: colors.cardBorder }]}>
+                  <Emblem name={emblemOf(r)} size={34} color={c.color} />
                   <Text style={[st.relTitle, { color: colors.text }]} numberOfLines={1}>{native(r.title, r.titleHi)}</Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
                 </TouchableOpacity>
@@ -92,9 +106,9 @@ export default function WikiScreen() {
           return (
             <TouchableOpacity key={a.id} onPress={() => setArticle(a)} activeOpacity={0.8}
               style={[st.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <View style={[st.cardIcon, { backgroundColor: tone(c.color).bg }]}><MaterialCommunityIcons name={c.icon as any} size={20} color={tone(c.color).fg} /></View>
+              <Emblem name={emblemOf(a)} size={52} color={c.color} />
               <View style={{ flex: 1 }}>
-                <Text style={[st.cardTitle, { color: colors.text }]}>{native(a.title, a.titleHi)}{language === 'en' && a.titleHi ? <Text style={{ color: colors.textTertiary }}>  {a.titleHi}</Text> : null}</Text>
+                <Text style={[st.cardTitle, { color: colors.text }]}>{native(a.title, a.titleHi)}</Text>
                 <Text style={[st.cardSum, { color: colors.textSecondary }]} numberOfLines={2}>{tx(a.summary)}</Text>
               </View>
               <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
@@ -115,10 +129,12 @@ const st = StyleSheet.create({
   cardIcon: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   cardTitle: { fontSize: 15, fontWeight: '800' },
   cardSum: { fontSize: 12.5, lineHeight: 18, marginTop: 2 },
-  artHi: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
+  hero: { alignItems: 'center', borderRadius: 22, padding: 20, marginBottom: 18, gap: 8 },
+  heroTitle: { fontSize: 26, fontWeight: '800', textAlign: 'center', marginTop: 4 },
+  heroSum: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
   artBody: { fontSize: 15, lineHeight: 25 },
-  relLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.1, marginBottom: 6 },
-  relRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 13, borderBottomWidth: 1 },
+  relLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.1, marginBottom: 6, textTransform: 'uppercase' },
+  relRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1 },
   relTitle: { fontSize: 15, fontWeight: '700', flex: 1 },
   back: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, borderRadius: 12, borderWidth: 1, marginTop: 22 },
 });

@@ -10,7 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Avatar from '../../components/community/Avatar';
 import { subscribeDms } from '../../services/social';
 import { db, rtdb, collection, getDocs, addDoc, serverTimestamp, ref, onValue, off } from '../../config/firebase';
-import { Screen, Card, Button, Diya, Icon, fromMaterial, AppBar } from '../../components/ui';
+import { Screen, Button, Diya, Icon, fromMaterial, AppBar, ActionSheet } from '../../components/ui';
 import { DS, useDsInsets } from '../../constants/ds';
 
 type ChatTab = 'rooms' | 'dms' | 'groups' | 'channels';
@@ -48,7 +48,10 @@ export default function CommunityScreen() {
   const dialog = useDialog();
   const { insets, tabScrollBottom } = useDsInsets();
 
-  const [tab, setTab] = useState<ChatTab>('rooms');
+  const [tab, setTabState] = useState<ChatTab>('rooms');
+  const [touched, setTouched] = useState(false);
+  const setTab = (k: ChatTab) => { setTouched(true); setTabState(k); };
+  const [menu, setMenu] = useState(false);
   const [rooms, setRooms] = useState<Room[]>(DEFAULT_ROOMS);
   const [groups, setGroups] = useState<Room[]>([]);
   const [channels, setChannels] = useState<Room[]>([]);
@@ -61,6 +64,8 @@ export default function CommunityScreen() {
       pfp: d.otherPfp, lastMessage: d.lastMessage, lastMessageTime: d.lastMessageTime,
     }))));
   }, [user?.uid]);
+  // People who already chat land on their chats first.
+  useEffect(() => { if (!touched && dms.length) setTabState('dms'); }, [dms.length]);
   const [q, setQ] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [cName, setCName] = useState('');
@@ -121,9 +126,18 @@ export default function CommunityScreen() {
     const items = tab === 'rooms' ? rooms : tab === 'groups' ? groups : tab === 'channels' ? channels : dms;
     const query = q.trim().toLowerCase();
     return query ? items.filter(r => r.name.toLowerCase().includes(query) || (r.description || '').toLowerCase().includes(query)) : items;
-  }, [tab, rooms, groups, channels, q]);
+  }, [tab, rooms, groups, channels, dms, q]);
+  const counts: Record<ChatTab, number> = { dms: dms.length, rooms: rooms.length, groups: groups.length, channels: channels.length };
 
   const canCreate = tab === 'groups' || tab === 'channels';
+
+  const TABS: { k: ChatTab; label: string }[] = [
+    { k: 'dms', label: tx('Chats') },
+    { k: 'rooms', label: t('chat.rooms') },
+    { k: 'groups', label: t('chat.groups') },
+    { k: 'channels', label: t('chat.channels') },
+  ];
+  const isLive = (ts?: number) => !!ts && Date.now() - ts < 15 * 60_000;
 
   return (
     <Screen tabbed edges={{ top: false, bottom: false }}>
@@ -132,34 +146,13 @@ export default function CommunityScreen() {
         <AppBar
           title={t('chat.title')}
           subtitle={t('chat.subtitle')}
-          right={canCreate ? (
-            <TouchableOpacity
-              onPress={() => setCreateOpen(true)}
-              accessibilityLabel={tx('New')}
-              style={[s.newBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-            >
-              <Icon name="plus" size={18} color="#FFF" weight="regular" />
+          right={
+            <TouchableOpacity onPress={() => setMenu(true)} accessibilityLabel={tx('New')} style={[s.newBtn, { backgroundColor: colors.primary }]}>
+              <Ionicons name="create-outline" size={19} color="#FFF" />
             </TouchableOpacity>
-          ) : undefined}
+          }
         />
       </View>
-
-      {/* Explore Feed banner */}
-      <Card
-        onPress={() => router.push('/feed')}
-        style={{ marginTop: 0, backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }}
-      >
-        <View style={s.exploreRow}>
-          <View style={[s.exploreIcon, { backgroundColor: colors.primary }]}>
-            <Icon name="newspaper" size={20} color="#FFF" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.exploreTitle, { color: colors.text }]}>{t('chat.explore')}</Text>
-            <Text style={[s.exploreSub, { color: colors.textSecondary }]}>{t('chat.exploreSub')}</Text>
-          </View>
-          <Icon name="caret-right" size={16} color={colors.textTertiary} weight="regular" />
-        </View>
-      </Card>
 
       {/* Search */}
       <View style={[s.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -173,78 +166,117 @@ export default function CommunityScreen() {
         {!!q && <TouchableOpacity onPress={() => setQ('')}><Ionicons name="close-circle" size={17} color={colors.textTertiary} /></TouchableOpacity>}
       </View>
 
-      {/* Compact tabs */}
-      <View style={[s.tabBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        {(['rooms', 'dms', 'groups', 'channels'] as ChatTab[]).map((k) => {
+      {/* Shortcuts */}
+      <View style={s.shortcuts}>
+        {([
+          { key: 'feed', label: tx('Feed'), icon: 'newspaper', tone: 'saffron', go: () => router.push('/feed') },
+          { key: 'post', label: tx('New post'), icon: 'note-pencil', tone: 'kumkum', go: () => router.push('/create-post') },
+          { key: 'people', label: tx('People'), icon: 'users-three', tone: 'neel', go: () => (user?.uid ? router.push({ pathname: '/follows', params: { uid: user.uid, kind: 'following' } }) : router.push('/feed')) },
+          { key: 'ask', label: tx('Ask'), icon: 'question', tone: 'plum', go: () => openRoom(DEFAULT_ROOMS[DEFAULT_ROOMS.length - 1]) },
+        ] as const).map((x) => (
+          <TouchableOpacity key={x.key} onPress={x.go} style={s.shortcut} activeOpacity={0.75}>
+            <View style={[s.shortcutIcon, { backgroundColor: tone(x.tone).bg }]}>
+              <Icon name={x.icon} size={22} color={tone(x.tone).fg} />
+            </View>
+            <Text style={[s.shortcutText, { color: colors.text }]} numberOfLines={1}>{x.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Tabs */}
+      <View style={[s.tabBar, { borderBottomColor: colors.divider }]}>
+        {TABS.map(({ k, label }) => {
           const active = tab === k;
-          const label = k === 'rooms' ? t('chat.rooms') : k === 'dms' ? t('chat.dms') : k === 'groups' ? t('chat.groups') : t('chat.channels');
           return (
-            <TouchableOpacity
-              key={k}
-              style={[s.tab, active && { backgroundColor: colors.primary }]}
-              onPress={() => setTab(k)}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.tabText, { color: active ? '#FFF' : colors.textSecondary }]}>{label}</Text>
+            <TouchableOpacity key={k} style={s.tab} onPress={() => setTab(k)} activeOpacity={0.8}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Text style={[s.tabText, { color: active ? colors.primary : colors.textSecondary }]} numberOfLines={1}>{label}</Text>
+                {k !== 'rooms' && counts[k] > 0 && (
+                  <View style={[s.count, { backgroundColor: active ? colors.primary : colors.surfaceSecondary }]}>
+                    <Text style={[s.countText, { color: active ? '#FFF' : colors.textSecondary }]}>{counts[k]}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={[s.tabLine, { backgroundColor: active ? colors.primary : 'transparent' }]} />
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {/* Rooms list */}
+      {/* List */}
       <FlatList
         data={list}
         keyExtractor={(r) => r.id}
-        style={{ marginTop: DS.space.md }}
-        contentContainerStyle={{ paddingBottom: tabScrollBottom, gap: 8 }}
+        contentContainerStyle={{ paddingBottom: tabScrollBottom, paddingTop: 4 }}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={canCreate ? (
+          <TouchableOpacity onPress={() => { setCType(tab === 'channels' ? 'broadcast' : 'group'); setCreateOpen(true); }} style={s.row} activeOpacity={0.7}>
+            <View style={[s.avatarBox, { backgroundColor: colors.primary + '14', borderRadius: 24 }]}>
+              <Ionicons name="add" size={24} color={colors.primary} />
+            </View>
+            <Text style={[s.rowName, { color: colors.primary }]}>{tx(tab === 'channels' ? 'New channel' : 'New group')}</Text>
+          </TouchableOpacity>
+        ) : null}
+        ItemSeparatorComponent={() => <View style={[s.sep, { backgroundColor: colors.divider }]} />}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => openRoom(item)}
-            style={[s.roomCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-            activeOpacity={0.75}
-          >
-            <View style={[s.roomIcon, { backgroundColor: tone(item.color).bg }]}>
+          <TouchableOpacity onPress={() => openRoom(item)} style={s.row} activeOpacity={0.7}>
+            <View style={[s.avatarBox, { backgroundColor: item.type === 'dm' ? 'transparent' : tone(item.color).bg }]}>
               {item.type === 'dm' ? (
-                <Avatar uri={item.pfp} name={item.name} size={42} />
+                <Avatar uri={item.pfp} name={item.name} size={48} />
               ) : item.icon === 'candle' ? (
-                <Diya size={22} color={tone(item.color).fg} />
+                <Diya size={24} color={tone(item.color).fg} />
               ) : fromMaterial(item.icon) ? (
-                <Icon name={fromMaterial(item.icon)!} size={24} color={tone(item.color).fg} />
+                <Icon name={fromMaterial(item.icon)!} size={25} color={tone(item.color).fg} />
               ) : (
-                <MaterialCommunityIcons name={item.icon as any} size={20} color={tone(item.color).fg} />
+                <MaterialCommunityIcons name={item.icon as any} size={22} color={tone(item.color).fg} />
               )}
+              {isLive(item.lastMessageTime) && <View style={[s.liveDot, { borderColor: colors.background }]} />}
             </View>
             <View style={{ flex: 1 }}>
-              <View style={s.roomTop}>
-                <Text style={[s.roomName, { color: colors.text }]} numberOfLines={1}>{item.type === 'dm' ? item.name : tx(item.name)}</Text>
+              <View style={s.rowTop}>
+                <Text style={[s.rowName, { color: colors.text }]} numberOfLines={1}>{item.type === 'dm' ? item.name : tx(item.name)}</Text>
                 {!!item.lastMessageTime && (
-                  <Text style={[s.roomTime, { color: colors.textTertiary }]}>{relTime(item.lastMessageTime)}</Text>
+                  <Text style={[s.rowTime, { color: isLive(item.lastMessageTime) ? colors.primary : colors.textTertiary }]}>{relTime(item.lastMessageTime)}</Text>
                 )}
               </View>
-              <Text style={[s.roomLast, { color: colors.textSecondary }]} numberOfLines={1}>
+              <Text style={[s.rowLast, { color: colors.textSecondary }]} numberOfLines={1}>
                 {item.lastMessage || tx(item.description || '')}
               </Text>
+              {!!item.memberCount && item.type !== 'dm' && (
+                <Text style={[s.rowMeta, { color: colors.textTertiary }]}>{item.memberCount} {tx('members')}</Text>
+              )}
             </View>
           </TouchableOpacity>
         )}
         ListEmptyComponent={
           tab === 'dms' ? (
             <View style={s.empty}>
-              <MaterialCommunityIcons name="message-outline" size={36} color={colors.textTertiary} />
+              <View style={[s.emptyIcon, { backgroundColor: colors.primary + '12' }]}>
+                <Icon name="chat-circle" size={30} color={colors.primary} />
+              </View>
               <Text style={[s.emptyTitle, { color: colors.text }]}>{tx('No direct messages yet')}</Text>
               <Text style={[s.emptySub, { color: colors.textSecondary }]}>{tx('Open someone’s profile from the feed and tap Message.')}</Text>
+              <Button title={tx('Find sadhaks')} onPress={() => router.push('/feed')} style={{ marginTop: 12, paddingHorizontal: 22 }} />
             </View>
-          ) : (
+          ) : canCreate ? null : (
             <View style={s.empty}>
-              <MaterialCommunityIcons name={canCreate ? 'plus-circle-outline' : 'magnify'} size={36} color={colors.textTertiary} />
-              <Text style={[s.emptyTitle, { color: colors.text }]}>{q ? 'No matches' : canCreate ? `No ${tab} yet` : 'Nothing here'}</Text>
-              <Text style={[s.emptySub, { color: colors.textSecondary }]}>
-                {q ? 'Try a different search.' : canCreate ? `Create the first ${tab === 'groups' ? 'group' : 'channel'}.` : 'Check back later.'}
-              </Text>
+              <MaterialCommunityIcons name="magnify" size={36} color={colors.textTertiary} />
+              <Text style={[s.emptyTitle, { color: colors.text }]}>{tx('No matches')}</Text>
+              <Text style={[s.emptySub, { color: colors.textSecondary }]}>{tx('Try a different search.')}</Text>
             </View>
           )
         }
+      />
+
+      <ActionSheet
+        visible={menu}
+        onClose={() => setMenu(false)}
+        actions={[
+          { label: tx('New post'), icon: 'create-outline', onPress: () => router.push('/create-post') },
+          { label: tx('New group'), icon: 'people-outline', onPress: () => { setCType('group'); setCreateOpen(true); } },
+          { label: tx('New channel'), icon: 'megaphone-outline', onPress: () => { setCType('broadcast'); setCreateOpen(true); } },
+          { label: tx('Find sadhaks'), icon: 'search-outline', onPress: () => router.push('/feed') },
+        ]}
       />
 
       {/* Create modal */}
@@ -300,27 +332,34 @@ const s = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
   sub: { fontSize: 13, marginTop: 2 },
-  newBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderRadius: 100, paddingHorizontal: 12, height: 32 },
+  newBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 
-  exploreRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  exploreIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  exploreTitle: { fontSize: 15.5, fontWeight: '800' },
-  exploreSub: { fontSize: 12.5, marginTop: 2 },
-
-  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: DS.space.lg, paddingHorizontal: 14, height: 44, borderRadius: DS.radius.lg, borderWidth: 1 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: DS.space.sm, paddingHorizontal: 14, height: 44, borderRadius: DS.radius.lg, borderWidth: 1 },
   searchInput: { flex: 1, fontSize: 14.5 },
 
-  tabBar: { flexDirection: 'row', marginTop: DS.space.md, padding: 4, borderRadius: DS.radius.lg, borderWidth: 1 },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: DS.radius.md },
-  tabText: { fontSize: 12.5, fontWeight: '700' },
+  shortcuts: { flexDirection: 'row', justifyContent: 'space-between', marginTop: DS.space.lg, paddingHorizontal: 4 },
+  shortcut: { alignItems: 'center', gap: 6, width: 72 },
+  shortcutIcon: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
+  shortcutText: { fontSize: 12, fontWeight: '700' },
 
-  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: DS.radius.lg, borderWidth: 1 },
-  roomIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  roomTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  roomName: { flex: 1, fontSize: 14.5, fontWeight: '700' },
-  roomTime: { fontSize: 11.5, fontWeight: '600' },
-  roomLast: { fontSize: 12.5, marginTop: 3 },
+  tabBar: { flexDirection: 'row', marginTop: DS.space.lg, borderBottomWidth: 1 },
+  tab: { flex: 1, alignItems: 'center', paddingTop: 8 },
+  tabText: { fontSize: 13.5, fontWeight: '800' },
+  tabLine: { height: 3, borderRadius: 2, alignSelf: 'stretch', marginTop: 8, marginHorizontal: 10 },
+  count: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
+  countText: { fontSize: 10.5, fontWeight: '800' },
 
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12 },
+  avatarBox: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  liveDot: { position: 'absolute', right: -1, bottom: -1, width: 13, height: 13, borderRadius: 7, backgroundColor: '#22A35A', borderWidth: 2 },
+  rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  rowName: { flex: 1, fontSize: 15.5, fontWeight: '800' },
+  rowTime: { fontSize: 11.5, fontWeight: '700' },
+  rowLast: { fontSize: 13, marginTop: 3 },
+  rowMeta: { fontSize: 11.5, marginTop: 2 },
+  sep: { height: 1, marginLeft: 62 },
+
+  emptyIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 6 },
   emptyTitle: { fontSize: 15, fontWeight: '700', marginTop: 6 },
   emptySub: { fontSize: 12.5, textAlign: 'center', maxWidth: 260 },

@@ -97,11 +97,11 @@ export function cleanMarkdown(input: string): string {
     .trim();
 }
 
-export const STARTER_QUESTIONS = [
-  'What should I do on Ekadashi?',
-  'Explain Gayatri Mantra and when to chant it',
-  'How do I start a daily puja at home?',
-  'Why is Tulsi sacred?',
-  'गीता का सार क्या है?',
-  'What is the meaning of my japa count 108?',
+export const STARTER_QUESTIONS: { q: string; icon: string }[] = [
+  { q: 'What should I do on Ekadashi?', icon: 'moon-waxing-crescent' },
+  { q: 'Explain Gayatri Mantra and when to chant it', icon: 'white-balance-sunny' },
+  { q: 'How do I start a daily puja at home?', icon: 'flower-outline' },
+  { q: 'Why is Tulsi sacred?', icon: 'leaf' },
+  { q: 'What is the essence of the Bhagavad Gita?', icon: 'book-open-variant' },
+  { q: 'Why do we chant 108 times in japa?', icon: 'circle-multiple-outline' },
 ];

@@ -1,13 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Header, Button } from '../../components/ui';
-import { ProfileHead, PostGrid } from '../../components/community/ProfileHead';
+import { ProfileHead, PostGrid, PostSort } from '../../components/community/ProfileHead';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDialog } from '../../contexts/DialogContext';
-import { getUserPosts, type Post } from '../../services/posts';
+import { getUserPosts, rankPosts, withPinnedFirst, type Post } from '../../services/posts';
 import { getPublicProfile, followCounts, isFollowing, follow, unfollow, ensureDm } from '../../services/social';
 import { DS, useDsInsets } from '../../constants/ds';
 
@@ -27,6 +27,8 @@ export default function PublicProfile() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [sort, setSort] = useState<'hot' | 'new' | 'top'>('new');
+  const ordered = useMemo(() => withPinnedFirst(rankPosts(posts, sort, 'all')), [posts, sort]);
 
   useEffect(() => { if (uid && uid === user?.uid) router.replace('/(tabs)/profile'); }, [uid, user?.uid]);
 
@@ -91,8 +93,11 @@ export default function PublicProfile() {
             <Button title={followed ? tx('Following') : tx('Follow')} variant={followed ? 'secondary' : 'primary'} size="md" icon={followed ? 'account-check-outline' : 'account-plus-outline'} loading={busy} onPress={toggleFollow} style={{ flex: 1 }} />
             <Button title={tx('Message')} variant="secondary" size="md" icon="message-outline" onPress={message} style={{ flex: 1 }} />
           </View>
-          <Text style={[s.section, { color: colors.text }]}>{tx('Posts')}</Text>
-          {posts.length ? <PostGrid posts={posts} uid={p.uid} name={p.displayName} /> : (
+          <View style={s.sectionRow}>
+            <Text style={[s.section, { color: colors.text }]}>{tx('Posts')}</Text>
+            {posts.length > 1 && <PostSort value={sort} onChange={setSort} />}
+          </View>
+          {posts.length ? <PostGrid posts={ordered} uid={p.uid} name={p.displayName} sort={sort} /> : (
             <Text style={[s.empty, { color: colors.textTertiary }]}>{tx('No posts yet')}</Text>
           )}
         </>
@@ -104,6 +109,7 @@ export default function PublicProfile() {
 
 const s = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10, marginTop: DS.space.lg },
-  section: { fontSize: 15, fontWeight: '800', marginTop: 26, marginBottom: 12 },
+  section: { fontSize: 15, fontWeight: '800' },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 26, marginBottom: 12 },
   empty: { textAlign: 'center', fontSize: 14, marginTop: 30 },
 });

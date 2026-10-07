@@ -1,8 +1,8 @@
 // Share Sadhak with a branded image card (not just a bare link).
-// Android's share sheet can't attach both an image and a caption through
-// expo-sharing, so the invite text (with the link) is copied to the clipboard
-// first and the caller can tell the user to paste it.
-import { Share } from 'react-native';
+// react-native-share sends the image and the caption together (WhatsApp,
+// Telegram, Instagram etc. show the text as the caption). On builds without
+// that native module we fall back to expo-sharing + caption on the clipboard.
+import { Share, NativeModules, TurboModuleRegistry } from 'react-native';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -10,7 +10,7 @@ import * as Clipboard from 'expo-clipboard';
 import { WEBSITE_URL } from '../constants/appInfo';
 
 export const SHARE_MESSAGE =
-  `🙏 Sadhak — your daily Hindu spiritual companion.\n\n` +
+  `🙏 Sadhak: your daily Hindu spiritual companion.\n\n` +
   `Panchang, Hindu calendar, nearby temples & bhandaras, aarti, japa, jyotish and more.\n\n` +
   `Get it free: ${WEBSITE_URL}`;
 
@@ -21,7 +21,23 @@ export const SHARE_MESSAGE =
  */
 export async function shareImageAsset(
   module: number, fileName: string, message: string, title = 'Share',
-): Promise<'image' | 'text' | 'cancelled'> {
+): Promise<'captioned' | 'image' | 'text' | 'cancelled'> {
+  // Preferred: one share with image + caption.
+  const RNShare = nativeShare();
+  if (RNShare) {
+    try {
+      const asset = Asset.fromModule(module);
+      await asset.downloadAsync();
+      const src = asset.localUri || asset.uri;
+      const dest = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => {});
+      await FileSystem.copyAsync({ from: src, to: dest }).catch(async () => { await FileSystem.downloadAsync(src, dest); });
+      const r = await RNShare.open({ url: dest, type: 'image/jpeg', message, title, filename: fileName, failOnCancel: false });
+      return r?.dismissedAction ? 'cancelled' : 'captioned';
+    } catch {
+      // fall through
+    }
+  }
   try {
     if (await Sharing.isAvailableAsync()) {
       const asset = Asset.fromModule(module);
@@ -48,10 +64,21 @@ export async function shareImageAsset(
   }
 }
 
+/** react-native-share, only when the native side exists in this build. */
+function nativeShare(): any {
+  try {
+    const has = !!(NativeModules as any).RNShare || !!(TurboModuleRegistry as any).get?.('RNShare');
+    if (!has) return null;
+    return require('react-native-share').default;
+  } catch {
+    return null;
+  }
+}
+
 export function shareSadhak() {
   return shareImageAsset(require('../assets/images/share-card.jpg'), 'Sadhak.jpg', SHARE_MESSAGE, 'Share Sadhak');
 }
 
 export function shlokaShareMessage(text: string, meaning: string, source: string) {
-  return `🙏 ${text}\n"${meaning}"\n— ${source}\n\nShloka of the day from Sadhak, your daily spiritual companion: ${WEBSITE_URL}`;
+  return `🙏 ${text}\n"${meaning}"\n(${source})\n\nShloka of the day from Sadhak, your daily spiritual companion: ${WEBSITE_URL}`;
 }

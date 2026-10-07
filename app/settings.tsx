@@ -14,6 +14,7 @@ import { APP_VERSION, WEBSITE_URL } from '../constants/appInfo';
 import { Header, Card, SettingsRow, Icon } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
 import { updateLabel } from '../services/appUpdates';
+import { diagnosticsEnabled, setDiagnosticsEnabled, getInstallId, flush } from '../services/diagnostics';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -27,6 +28,7 @@ export default function SettingsScreen() {
   const { screenBottom } = useDsInsets();
   const [languageOpen, setLanguageOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [diagOn, setDiagOn] = useState(diagnosticsEnabled());
 
   const s = profile?.settings || ({} as any);
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === language);
@@ -157,6 +159,13 @@ export default function SettingsScreen() {
             </Card>
           </>
         )}
+
+        <SectionLabel label={tx('Diagnostics')} />
+        <Card padded={false} style={{ overflow: 'hidden' }}>
+          <SettingsRow icon="information-outline" label={tx('Share anonymous diagnostics')} detail={tx('Reports slow screens, failed requests and crashes. No personal data.')} right="switch" switchValue={diagOn} onSwitchChange={(v) => { setDiagOn(v); setDiagnosticsEnabled(v); }} />
+          <Divider />
+          <SettingsRow icon="file-document-outline" label={tx('Send report now')} detail={`ID ${getInstallId() || '-'}`} onPress={async () => { await flush(); dialog.alert(tx('Report sent'), `${tx('Quote this ID if you contact us')}: ${getInstallId()}`); }} />
+        </Card>
 
         <SectionLabel label={t('s.support')} />
         <Card padded={false} style={{ overflow: 'hidden' }}>

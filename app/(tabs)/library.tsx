@@ -21,6 +21,11 @@ import { useLayoutInsets } from '../../constants/layout';
 import { AppBar, Icon } from '../../components/ui';
 import { myRating, rateBook, average, ratingScore } from '../../services/ratings';
 import { increment } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import BookCover from '../../components/library/BookCover';
+
+const LAST_READ = 'sadhak_last_read';
+type LastRead = { id: string; title: string; author: string; url: string; category: string; at: number };
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: 'bookshelf', color: '#C2410C' },
@@ -58,7 +63,7 @@ export default function LibraryScreen() {
   const { user, isAdmin } = useAuth();
   const { colors, isDark, tone } = useTheme();
   const dialog = useDialog();
-  const { t, tx } = useLanguage();
+  const { t, tx, display } = useLanguage();
   const { headerPaddingTop, tabContentPadding, bottomInset } = useLayoutInsets();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,6 +82,10 @@ export default function LibraryScreen() {
   const [rateFor, setRateFor] = useState<LibraryItem | null>(null);
   const [myStars, setMyStars] = useState(0);
   const [savingRate, setSavingRate] = useState(false);
+  const [lastRead, setLastRead] = useState<LastRead | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem(LAST_READ).then((v) => { if (v) setLastRead(JSON.parse(v)); }).catch(() => {});
+  }, []);
 
   const openRate = async (book: LibraryItem) => {
     if (!user) return;
@@ -172,6 +181,8 @@ export default function LibraryScreen() {
       return 0; // newest is already the default order
     });
 
+  const browsing = !searchQuery && selectedCategory === 'all';
+
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
@@ -237,6 +248,20 @@ export default function LibraryScreen() {
   // Read inside the app (pdf.js reader) instead of kicking users to an external app.
   const openPDF = (url: string, title?: string) =>
     router.push({ pathname: '/reader', params: { url, title: title || '' } });
+  const openBook = (book: LibraryItem) => {
+    const lr: LastRead = { id: book.id, title: book.title, author: book.author, url: book.cloudinaryUrl, category: book.category, at: Date.now() };
+    setLastRead(lr);
+    AsyncStorage.setItem(LAST_READ, JSON.stringify(lr)).catch(() => {});
+    openPDF(book.cloudinaryUrl, book.title);
+  };
+
+  // Preset categories resolve to their entry; a custom category (any string not
+  // in CATEGORIES) keeps its own label with a plain book glyph.
+  const catOf = (category: string) => {
+    const preset = CATEGORIES.find(c => c.id === category);
+    const other = CATEGORIES[CATEGORIES.length - 1];
+    return preset || { ...other, name: category || other.name, icon: 'book-outline' };
+  };
 
   const downloadPDF = async (book: LibraryItem) => {
     try {
@@ -282,19 +307,14 @@ export default function LibraryScreen() {
   };
 
   const renderBookCard = ({ item }: { item: LibraryItem }) => {
-    // Preset categories resolve to their chip; a custom category (any string not
-    // in CATEGORIES) keeps its own label but shows a proper book glyph (not the
-    // "···" dots that read as an unfinished placeholder).
-    const preset = CATEGORIES.find(c => c.id === item.category);
-    const other = CATEGORIES[CATEGORIES.length - 1];
-    const cat = preset || { ...other, name: item.category || other.name, icon: 'book-outline' };
+    const cat = catOf(item.category);
     const isDownloading = downloadingId === item.id;
 
     if (viewMode === 'grid') {
       return (
-        <TouchableOpacity style={[st.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
-          <View style={[st.gridIcon, { backgroundColor: tone(cat.color).bg }]}>
-            <MaterialCommunityIcons name={cat.icon as any} size={32} color={tone(cat.color).fg} />
+        <TouchableOpacity style={[st.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openBook(item)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
+          <View style={{ alignItems: 'center', marginBottom: 10 }}>
+            <BookCover title={item.title} color={cat.color} icon={cat.icon} width={GRID_W - 56} />
           </View>
           <Text style={[st.gridTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
           <Text style={[st.gridAuthor, { color: colors.textSecondary }]} numberOfLines={1}>{item.author}</Text>
@@ -310,17 +330,14 @@ export default function LibraryScreen() {
     }
 
     return (
-      <TouchableOpacity style={[st.bookCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openPDF(item.cloudinaryUrl, item.title)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
-        <View style={[st.bookIcon, { backgroundColor: tone(cat.color).bg }]}>
-          <MaterialCommunityIcons name={cat.icon as any} size={28} color={tone(cat.color).fg} />
-        </View>
+      <TouchableOpacity style={[st.bookCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]} onPress={() => openBook(item)} onLongPress={() => deleteBook(item)} activeOpacity={0.7}>
+        <BookCover title={item.title} color={cat.color} icon={cat.icon} width={50} />
         <View style={st.bookInfo}>
           <Text style={[st.bookTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
           <Text style={[st.bookAuthor, { color: colors.textSecondary }]}>{item.author}</Text>
           {item.description ? <Text style={[st.bookDesc, { color: colors.textTertiary }]} numberOfLines={1}>{item.description}</Text> : null}
           <View style={st.bookMeta}>
             <Stars book={item} />
-            <Text style={[st.bookSize, { color: colors.textTertiary }]}>{formatFileSize(item.fileSize)}</Text>
             {(item.downloadCount || 0) > 0 && (
               <View style={st.downloadBadge}>
                 <MaterialCommunityIcons name="download" size={10} color={colors.textTertiary} />
@@ -368,36 +385,6 @@ export default function LibraryScreen() {
         {searchQuery ? <TouchableOpacity onPress={() => setSearchQuery('')}><Ionicons name="close-circle" size={18} color={colors.textTertiary} /></TouchableOpacity> : null}
       </View>
 
-      {/* Sort */}
-      <View style={st.sortRow}>
-        {([
-          { mode: 'newest' as SortMode, label: 'Newest', icon: 'clock-outline' },
-          { mode: 'top' as SortMode, label: 'Top rated', icon: 'star' },
-          { mode: 'popular' as SortMode, label: 'Popular', icon: 'fire' },
-          { mode: 'title' as SortMode, label: 'A-Z', icon: 'sort-alphabetical-ascending' },
-        ]).map(({ mode, label, icon }) => {
-          const active = sortMode === mode;
-          return (
-            <TouchableOpacity key={mode} style={[st.sortChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]} onPress={() => setSortMode(mode)}>
-              <MaterialCommunityIcons name={icon as any} size={14} color={active ? '#FFF' : colors.textSecondary} />
-              <Text style={[st.sortText, { color: active ? '#FFF' : colors.textSecondary }]}>{tx(label)}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Categories */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.catScroll} contentContainerStyle={st.catRow}>
-        {CATEGORIES.map(cat => (
-          <TouchableOpacity key={cat.id}
-            style={[st.catChip, { backgroundColor: selectedCategory === cat.id ? colors.primary : colors.surface, borderColor: selectedCategory === cat.id ? colors.primary : colors.border }]}
-            onPress={() => setSelectedCategory(cat.id)}>
-            <MaterialCommunityIcons name={cat.icon as any} size={14} color={selectedCategory === cat.id ? '#FFF' : tone(cat.color).fg} />
-            <Text style={[st.catText, { color: selectedCategory === cat.id ? '#FFF' : colors.text }]}>{tx(cat.name)}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
       {/* Books */}
       {loading ? (
         <View style={st.loadingContainer}>
@@ -411,14 +398,102 @@ export default function LibraryScreen() {
           keyExtractor={item => item.id}
           numColumns={viewMode === 'grid' ? 2 : 1}
           key={viewMode}
-          contentContainerStyle={[viewMode === 'grid' ? st.gridList : st.booksList, { paddingBottom: tabContentPadding }]}
+          contentContainerStyle={[viewMode === 'grid' ? st.gridList : st.booksList, { paddingBottom: tabContentPadding + 70 }]}
           columnWrapperStyle={viewMode === 'grid' ? { gap: 10 } : undefined}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View>
+              {browsing ? (
+                <>
+                  {lastRead && (
+                    <TouchableOpacity activeOpacity={0.85} onPress={() => openPDF(lastRead.url, lastRead.title)} style={[st.continue, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                      <BookCover title={lastRead.title} color={catOf(lastRead.category).color} icon={catOf(lastRead.category).icon} width={46} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[st.kicker, { color: colors.primary }]}>{tx('Continue reading').toUpperCase()}</Text>
+                        <Text style={[st.bookTitle, { color: colors.text }]} numberOfLines={1}>{lastRead.title}</Text>
+                        <Text style={[st.bookAuthor, { color: colors.textSecondary }]} numberOfLines={1}>{lastRead.author}</Text>
+                      </View>
+                      <View style={[st.playBtn, { backgroundColor: colors.primary }]}>
+                        <Ionicons name="book-outline" size={18} color="#FFF" />
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  <Text style={[st.section, { color: colors.text }, display]}>{tx('Browse by category')}</Text>
+                  <View style={st.catGrid}>
+                    {CATEGORIES.filter((c) => c.id !== 'all').map((cat) => {
+                      const n = books.filter((b) => b.category === cat.id).length;
+                      return (
+                        <TouchableOpacity key={cat.id} style={[st.catTile, { backgroundColor: tone(cat.color).bg }]} onPress={() => setSelectedCategory(cat.id)} activeOpacity={0.8}>
+                          <MaterialCommunityIcons name={cat.icon as any} size={24} color={tone(cat.color).fg} />
+                          <Text style={[st.catTileName, { color: colors.text }]} numberOfLines={2}>{tx(cat.name)}</Text>
+                          <Text style={[st.catTileCount, { color: tone(cat.color).fg }]}>{n}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {[
+                    { key: 'top', title: tx('Top rated'), list: books.filter((b) => b.ratingCount).sort((a, b) => ratingScore(b.ratingSum, b.ratingCount) - ratingScore(a.ratingSum, a.ratingCount)).slice(0, 10) },
+                    { key: 'new', title: tx('New arrivals'), list: books.slice(0, 10) },
+                  ].filter((sh) => sh.list.length >= 2).map((sh) => (
+                    <View key={sh.key}>
+                      <Text style={[st.section, { color: colors.text }, display]}>{sh.title}</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingRight: 20 }} style={{ marginHorizontal: -20, paddingLeft: 20 }}>
+                        {sh.list.map((b) => {
+                          const c = catOf(b.category);
+                          return (
+                            <TouchableOpacity key={b.id} style={{ width: 104 }} onPress={() => openBook(b)} activeOpacity={0.8}>
+                              <BookCover title={b.title} color={c.color} icon={c.icon} width={104} />
+                              <Text style={[st.shelfTitle, { color: colors.text }]} numberOfLines={2}>{b.title}</Text>
+                              <Stars book={b} size={11} />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  ))}
+                  <Text style={[st.section, { color: colors.text }, display]}>{tx('All books')}</Text>
+                </>
+              ) : (
+                <View style={st.filterHead}>
+                  {selectedCategory !== 'all' && (
+                    <TouchableOpacity onPress={() => setSelectedCategory('all')} style={[st.backChip, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                      <Ionicons name="chevron-back" size={15} color={colors.text} />
+                      <Text style={{ color: colors.text, fontSize: 12.5, fontWeight: '700' }}>{tx('All')}</Text>
+                    </TouchableOpacity>
+                  )}
+                  <Text style={[st.filterTitle, { color: colors.text }, display]} numberOfLines={1}>
+                    {selectedCategory !== 'all' ? tx(catOf(selectedCategory).name) : tx('Results')}
+                  </Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: 13 }}>{filteredBooks.length}</Text>
+                </View>
+              )}
+              {books.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingRight: 20 }} style={{ marginHorizontal: -20, paddingLeft: 20, marginBottom: 10, flexGrow: 0 }}>
+                  {([
+                    { mode: 'newest' as SortMode, label: 'Newest', icon: 'clock-outline' },
+                    { mode: 'top' as SortMode, label: 'Top rated', icon: 'star' },
+                    { mode: 'popular' as SortMode, label: 'Popular', icon: 'fire' },
+                    { mode: 'title' as SortMode, label: 'A-Z', icon: 'sort-alphabetical-ascending' },
+                  ]).map(({ mode, label, icon }) => {
+                    const active = sortMode === mode;
+                    return (
+                      <TouchableOpacity key={mode} style={[st.sortChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]} onPress={() => setSortMode(mode)}>
+                        <MaterialCommunityIcons name={icon as any} size={14} color={active ? '#FFF' : colors.textSecondary} />
+                        <Text style={[st.sortText, { color: active ? '#FFF' : colors.textSecondary }]}>{tx(label)}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
+          }
           ListEmptyComponent={
             <View style={st.emptyState}>
-              <MaterialCommunityIcons name="book-open-blank-variant" size={60} color={colors.textTertiary} />
+              <MaterialCommunityIcons name="book-open-blank-variant" size={48} color={colors.textTertiary} />
               <Text style={[st.emptyTitle, { color: colors.text }]}>
-                {tx(searchQuery ? 'No Results' : 'Library is Empty')}
+                {tx(searchQuery ? 'No Results' : browsing ? 'Library is Empty' : 'Nothing here yet')}
               </Text>
               <Text style={[st.emptyText, { color: colors.textSecondary }]}>
                 {searchQuery ? `${tx('No books match')} "${searchQuery}"` : tx('Upload a PDF to get started')}
@@ -586,7 +661,18 @@ const st = StyleSheet.create({
   rateCard: { borderRadius: 24, borderWidth: 1, padding: 22, alignItems: 'center' },
   rateTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' },
   rateStars: { flexDirection: 'row', gap: 6, marginVertical: 18 },
-  sortRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, paddingTop: 10, gap: 6 },
+  continue: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12, borderRadius: 18, borderWidth: 1, marginTop: 4 },
+  kicker: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1 },
+  playBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  section: { fontSize: 18, fontWeight: '800', marginTop: 20, marginBottom: 10 },
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  catTile: { width: '22%', flexGrow: 1, borderRadius: 14, padding: 10, minHeight: 96, gap: 6 },
+  catTileName: { fontSize: 11.5, fontWeight: '700', lineHeight: 15 },
+  catTileCount: { fontSize: 11, fontWeight: '800', marginTop: 'auto' },
+  shelfTitle: { fontSize: 12.5, fontWeight: '700', marginTop: 8, marginBottom: 2, lineHeight: 16 },
+  filterHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, marginBottom: 10 },
+  backChip: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 10, height: 32, borderRadius: 16, borderWidth: 1 },
+  filterTitle: { flex: 1, fontSize: 18, fontWeight: '800' },
   sortChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   sortText: { fontSize: 12, fontWeight: '600' },
 
@@ -598,7 +684,7 @@ const st = StyleSheet.create({
   catText: { fontSize: 11, fontWeight: '600' },
 
   // List view
-  booksList: { paddingHorizontal: 20, paddingBottom: 100, gap: 8 },
+  booksList: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 100, gap: 8 },
   bookCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16, borderWidth: 1, gap: 12 },
   bookIcon: { width: 52, height: 60, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   bookInfo: { flex: 1 },
@@ -613,7 +699,7 @@ const st = StyleSheet.create({
   dlBtn: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 
   // Grid view
-  gridList: { paddingHorizontal: 20, paddingBottom: 100, gap: 10 },
+  gridList: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 100, gap: 10 },
   gridCard: { width: GRID_W, borderRadius: 16, padding: 14, borderWidth: 1 },
   gridIcon: { width: '100%' as any, height: 80, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
   gridTitle: { fontSize: 14, fontWeight: '700', lineHeight: 18 },

@@ -101,3 +101,49 @@ export function liveNow(now: Date, lat: number, lon: number): LiveNow {
     isDay, sunrise: s0.rise, sunset: s0.set,
   };
 }
+
+/** All 24 horas and 16 choghadiyas of the Vedic day that starts at this date's sunrise. */
+export function daySlots(date: Date, lat: number, lon: number): { hora: Slot[]; chogh: (Slot & { quality: 'good' | 'neutral' | 'bad'; night: boolean })[]; sunrise: Date; sunset: Date } {
+  const d0 = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const d1 = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + 1);
+  const s0 = sun(d0, lat, lon), s1 = sun(d1, lat, lon);
+  const weekday = d0.getDay();
+  const dayLen = (s0.set.getTime() - s0.rise.getTime()) / 12;
+  const nightLen = (s1.rise.getTime() - s0.set.getTime()) / 12;
+  const h0 = HORA_SEQ.indexOf(WEEKDAY_LORD[weekday] as any);
+  const hora: Slot[] = Array.from({ length: 24 }, (_, i) => {
+    const st = i < 12 ? s0.rise.getTime() + i * dayLen : s0.set.getTime() + (i - 12) * nightLen;
+    return { name: HORA_SEQ[(h0 + i) % 7], start: new Date(st), end: new Date(st + (i < 12 ? dayLen : nightLen)) };
+  });
+  const cd = (s0.set.getTime() - s0.rise.getTime()) / 8, cn = (s1.rise.getTime() - s0.set.getTime()) / 8;
+  const chogh = Array.from({ length: 16 }, (_, k) => {
+    const night = k >= 8;
+    const name = night ? CH_NIGHT[(CH_NIGHT_START[weekday] + k - 8) % 7] : CH_DAY[(CH_DAY_START[weekday] + k) % 7];
+    const st = night ? s0.set.getTime() + (k - 8) * cn : s0.rise.getTime() + k * cd;
+    return { name, start: new Date(st), end: new Date(st + (night ? cn : cd)), quality: CH_QUALITY[name], night };
+  });
+  return { hora, chogh, sunrise: s0.rise, sunset: s0.set };
+}
+
+// Disha shool: direction to avoid starting a journey, by weekday.
+export const DISHA_SHOOL = ['West', 'East', 'North', 'North', 'South', 'West', 'East'];
+
+const RITU = [
+  { en: 'Vasanta (spring)', hi: 'वसंत' }, { en: 'Grishma (summer)', hi: 'ग्रीष्म' }, { en: 'Varsha (monsoon)', hi: 'वर्षा' },
+  { en: 'Sharad (autumn)', hi: 'शरद' }, { en: 'Hemanta (pre-winter)', hi: 'हेमंत' }, { en: 'Shishira (winter)', hi: 'शिशिर' },
+];
+
+/** Ritu and ayana from the Sun's sidereal sign (0 = Aries). */
+export function rituAyana(sunSign: number) {
+  // Pisces+Aries spring, Taurus+Gemini summer, … Capricorn+Aquarius winter.
+  const r = Math.floor(((sunSign + 1) % 12) / 2);
+  const uttara = [9, 10, 11, 0, 1, 2].includes(sunSign);
+  return { ritu: RITU[r], ayana: uttara ? { en: 'Uttarayana', hi: 'उत्तरायण' } : { en: 'Dakshinayana', hi: 'दक्षिणायन' } };
+}
+
+/** Vikram and Shaka samvat years for a date, given the amanta month name. */
+export function samvat(date: Date, amantaMonth: string) {
+  const beforeNewYear = date.getMonth() <= 3 && /Phalguna|Magha|Pausha/.test(amantaMonth);
+  const y = date.getFullYear();
+  return { vikram: y + (beforeNewYear ? 56 : 57), shaka: y - (beforeNewYear ? 79 : 78) };
+}

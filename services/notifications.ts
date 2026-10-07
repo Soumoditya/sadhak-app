@@ -13,7 +13,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { calculatePanchang } from './panchang';
-import { getFestivalsForDate, getFixedFestivals } from './festivals';
+import { lunarFestivalsOn, getFixedFestivals } from './festivals';
 import { getDailyGroomingAdvice } from './groomingRules';
 
 // Configure notification handler.
@@ -534,7 +534,7 @@ async function scheduleObservanceNow(): Promise<void> {
     let title = '';
     if (prefs.festival) {
       const fests = [
-        ...getFestivalsForDate(p.hinduMonth.name, p.tithi.name, p.tithi.paksha).filter((f) => !!f.tithi),
+        ...lunarFestivalsOn(day, prefs.lat, prefs.lng),
         ...getFixedFestivals(day.getMonth() + 1, day.getDate()),
       ].filter((f) => f.type === 'major' || f.type === 'minor' || f.type === 'sankranti');
       if (fests.length) {

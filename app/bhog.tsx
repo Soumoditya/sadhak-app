@@ -8,7 +8,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
-import { BHOG_RECIPES, type BhogRecipe } from '../constants/recipes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BHOG_RECIPES, ALLERGENS, allergensOf, type BhogRecipe, type Allergen } from '../constants/recipes';
 import { getFoodImage } from '../constants/foodImages';
 import { Header } from '../components/ui';
 import { toneSolid } from '../constants/theme';
@@ -19,6 +20,16 @@ export default function BhogScreen() {
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [query, setQuery] = useState('');
   const [recipe, setRecipe] = useState<BhogRecipe | null>(null);
+  const [avoid, setAvoid] = useState<Allergen[]>([]);
+  useEffect(() => {
+    AsyncStorage.getItem('sadhak_bhog_avoid').then((v) => { if (v) setAvoid(JSON.parse(v)); }).catch(() => {});
+  }, []);
+  const toggleAvoid = (a: Allergen) => setAvoid((cur) => {
+    const next = cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a];
+    AsyncStorage.setItem('sadhak_bhog_avoid', JSON.stringify(next)).catch(() => {});
+    return next;
+  });
+  const allergenLabel = (a: Allergen) => tx(ALLERGENS.find((x) => x.key === a)!.label);
 
   useEffect(() => {
     if (!recipe) return;
@@ -28,18 +39,20 @@ export default function BhogScreen() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return BHOG_RECIPES;
-    // Match by name, occasion OR ingredient — "what can I make with sabudana?"
-    return BHOG_RECIPES.filter(r =>
+    const safe = BHOG_RECIPES.filter((r) => !allergensOf(r).some((a) => avoid.includes(a)));
+    if (!q) return safe;
+    // Match by name, occasion OR ingredient: "what can I make with sabudana?"
+    return safe.filter(r =>
       r.name.toLowerCase().includes(q) ||
       r.nameHi.includes(q) ||
       r.occasion.toLowerCase().includes(q) ||
       r.ingredients.some(i => i.item.toLowerCase().includes(q)),
     );
-  }, [query]);
+  }, [query, avoid]);
 
   const surpriseMe = () => {
-    const pick = BHOG_RECIPES[Math.floor(Math.random() * BHOG_RECIPES.length)];
+    const pool = filtered.length ? filtered : BHOG_RECIPES;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
     setRecipe(pick);
   };
 
@@ -68,13 +81,21 @@ export default function BhogScreen() {
               <MaterialCommunityIcons name={recipe.icon as any} size={34} color="#FFD700" />
             )}
             <Text style={st.dTitle}>{native(recipe.name, recipe.nameHi)}</Text>
-            {language === 'en' && <Text style={st.dTitleHi}>{recipe.nameHi}</Text>}
             <View style={st.dMeta}>
               <View style={st.dChip}><MaterialCommunityIcons name="clock-outline" size={12} color="#FFF" /><Text style={st.dChipText}>{recipe.time}</Text></View>
               <View style={st.dChip}><MaterialCommunityIcons name="leaf" size={12} color="#FFF" /><Text style={st.dChipText}>{tx('No onion · No garlic')}</Text></View>
             </View>
             <Text style={st.dOccasion}>{tx(recipe.occasion)}</Text>
           </LinearGradient>
+
+          {allergensOf(recipe).length > 0 && (
+            <View style={[st.allergyNote, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color={colors.warning || '#B7791F'} />
+              <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 12.5, lineHeight: 18 }}>
+                <Text style={{ fontWeight: '800', color: colors.text }}>{tx('Contains')}: </Text>{allergensOf(recipe).map(allergenLabel).join(', ')}
+              </Text>
+            </View>
+          )}
 
           {/* Ingredients */}
           <View style={[st.section, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -130,7 +151,7 @@ export default function BhogScreen() {
     <View style={[st.container, { backgroundColor: colors.background }]}>
       <Header
         title={tr('f.bhog')}
-        subtitle={tx('सात्विक भोग · no onion, no garlic')}
+        subtitle={tx('No onion · No garlic')}
         right={
           <TouchableOpacity onPress={surpriseMe} accessibilityLabel={tx('Surprise me')} style={[st.randomBtn, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]} hitSlop={6}>
             <MaterialCommunityIcons name="dice-5-outline" size={20} color={colors.primary} />
@@ -153,9 +174,24 @@ export default function BhogScreen() {
         )}
       </View>
 
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={st.avoidRow}>
+        <Text style={[st.avoidLabel, { color: colors.textTertiary }]}>{tx('Avoid')}</Text>
+        {ALLERGENS.map((a) => {
+          const on = avoid.includes(a.key);
+          return (
+            <TouchableOpacity key={a.key} onPress={() => toggleAvoid(a.key)} style={[st.avoidChip, { borderColor: on ? colors.error : colors.cardBorder, backgroundColor: on ? colors.error + '14' : colors.surface }]}>
+              {on && <Ionicons name="close" size={13} color={colors.error} />}
+              <Text style={[st.avoidText, { color: on ? colors.error : colors.textSecondary }]}>{tx(a.label)}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[st.list, { paddingBottom: screenBottomPadding }]}>
         {filtered.length === 0 && (
-          <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 40, fontSize: 13 }}>{tx('Nothing matches "')}{query}{tx('" — try an ingredient like "makhana".')}</Text>
+          <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 40, fontSize: 13, paddingHorizontal: 20 }}>
+            {query ? `${tx('Nothing matches')} "${query}". ${tx('Try an ingredient like makhana.')}` : tx('No recipes without these ingredients yet.')}
+          </Text>
         )}
         {filtered.map((r) => {
           const img = getFoodImage(r.id);
@@ -181,8 +217,11 @@ export default function BhogScreen() {
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[st.cardTitle, { color: colors.text }]}>{native(r.name, r.nameHi)} {language === 'en' && <Text style={{ color: tone(r.color).fg, fontSize: 13 }}>{r.nameHi}</Text>}</Text>
+              <Text style={[st.cardTitle, { color: colors.text }]}>{native(r.name, r.nameHi)}</Text>
               <Text style={[st.cardMeta, { color: colors.textTertiary }]} numberOfLines={1}>{tx(r.occasion)}</Text>
+              {allergensOf(r).length > 0 && (
+                <Text style={[st.cardAllergen, { color: colors.textTertiary }]} numberOfLines={1}>{tx('Contains')}: {allergensOf(r).map(allergenLabel).join(', ')}</Text>
+              )}
             </View>
             <View style={[st.timeChip, { backgroundColor: colors.background }]}>
               <MaterialCommunityIcons name="clock-outline" size={11} color={colors.textTertiary} />
@@ -209,6 +248,12 @@ const st = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14 },
 
   list: { padding: 16, gap: 8 },
+  avoidRow: { paddingHorizontal: 20, paddingTop: 10, gap: 6, alignItems: 'center' },
+  avoidLabel: { fontSize: 11.5, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', marginRight: 2 },
+  avoidChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 11, height: 30, borderRadius: 15, borderWidth: 1 },
+  avoidText: { fontSize: 12, fontWeight: '700' },
+  cardAllergen: { fontSize: 11, marginTop: 2, fontStyle: 'italic' },
+  allergyNote: { flexDirection: 'row', gap: 8, alignItems: 'center', marginHorizontal: 16, marginTop: 12, borderRadius: 14, borderWidth: 1, padding: 12 },
   card: { flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, borderWidth: 1, gap: 12 },
   cardIcon: { width: 46, height: 46, borderRadius: 13, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   cardIconImg: { width: '100%', height: '100%', borderRadius: 13 },

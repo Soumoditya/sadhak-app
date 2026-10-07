@@ -12,7 +12,7 @@ export type ChartStyle = 'north' | 'south' | 'east';
 export type ChartGraha = { name: string; signIndex: number; house: number; retro?: boolean };
 export type Flags = Record<string, { retro?: boolean; combust?: boolean; vargottama?: boolean }>;
 
-const ABBR: Record<string, Record<string, string>> = {
+export const ABBR: Record<string, Record<string, string>> = {
   en: { Sun: 'Su', Moon: 'Mo', Mars: 'Ma', Mercury: 'Me', Jupiter: 'Ju', Venus: 'Ve', Saturn: 'Sa', Rahu: 'Ra', Ketu: 'Ke', Lagna: 'As' },
   hi: { Sun: 'सू', Moon: 'चं', Mars: 'मं', Mercury: 'बु', Jupiter: 'गु', Venus: 'शु', Saturn: 'श', Rahu: 'रा', Ketu: 'के', Lagna: 'ल' },
   bn: { Sun: 'র', Moon: 'চ', Mars: 'ম', Mercury: 'বু', Jupiter: 'বৃ', Venus: 'শু', Saturn: 'শ', Rahu: 'রা', Ketu: 'কে', Lagna: 'ল' },
@@ -36,33 +36,59 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
   for (let i = 0; i < 12; i++) bySign[i] = [];
   grahas.forEach((g) => bySign[g.signIndex]?.push(g));
 
-  const label = (g: ChartGraha, x: number, y: number, fs: number, key: string) => {
+  // Rough text widths (SVG can't measure): Latin capitals are wider than
+  // lower case; Indic glyphs are wider still.
+  const textW = (str: string, fs: number) => [...str].reduce((w, c) => w + (/[ऀ-৿]/.test(c) ? fs * 0.78 : /[A-Z]/.test(c) ? fs * 0.7 : fs * 0.56), 0);
+  const marksOf = (g: ChartGraha) => {
     const f = flags[g.name] || {};
-    const marks = `${f.retro || g.retro ? 'R' : ''}${f.combust ? 'C' : ''}${f.vargottama ? 'V' : ''}`;
+    return `${f.retro || g.retro ? 'R' : ''}${f.combust ? 'C' : ''}${f.vargottama ? 'V' : ''}`;
+  };
+  const itemW = (g: ChartGraha, fs: number) => {
+    const m = marksOf(g);
+    return textW(abbr[g.name] || g.name.slice(0, 2), fs) + (m ? textW(m, fs * 0.6) + 1.5 : 0);
+  };
+
+  // Name with its R/C/V marks as a small superscript right after it; the pair
+  // is centred on x so neighbours never collide.
+  const label = (g: ChartGraha, x: number, y: number, fs: number, key: string) => {
+    const name = abbr[g.name] || g.name.slice(0, 2);
+    const marks = marksOf(g);
+    const nameW = textW(name, fs);
+    const x0 = x - itemW(g, fs) / 2;
     const isLuminary = g.name === 'Sun' || g.name === 'Moon';
     return (
-      <SvgText key={key} x={x} y={y} fontSize={fs} fontWeight="700" textAnchor="middle" fill={isLuminary ? colors.primary : colors.text}>
-        {abbr[g.name] || g.name.slice(0, 2)}
-        {!!marks && <TSpan fontSize={fs * 0.62} dy={-fs * 0.38} fill={colors.textSecondary}>{marks}</TSpan>}
-      </SvgText>
+      <G key={key}>
+        <SvgText x={x0} y={y} fontSize={fs} fontWeight="700" textAnchor="start" fill={isLuminary ? colors.primary : colors.text}>{name}</SvgText>
+        {!!marks && <SvgText x={x0 + nameW + 1.5} y={y - fs * 0.4} fontSize={fs * 0.6} fontWeight="700" textAnchor="start" fill={colors.textSecondary}>{marks}</SvgText>}
+      </G>
     );
   };
 
-  // Lay out the grahas of one cell around its centre.
+  // Lay out the grahas of one cell in centred rows that fit maxW.
   const cell = (list: ChartGraha[], cx: number, cy: number, maxW: number, keyBase: string, extraTop = 0, tight = false, maxCols = 3) => {
     const n = list.length;
     if (!n) return null;
-    const gap = tight ? 19 : 26;
-    const cols = n > 2 ? Math.min(maxCols, Math.max(2, Math.floor(maxW / gap))) : 1;
-    const rows = Math.ceil(n / cols);
-    const fs = tight ? (n > 2 ? 9.5 : 11) : n > 4 ? 10.5 : 12.5;
-    const lh = fs + (tight ? 4.5 : 4);
-    const y0 = cy - ((rows - 1) * lh) / 2 + fs * 0.35 + extraTop;
-    return list.map((g, i) => {
-      const r = Math.floor(i / cols), c = i % cols;
-      const inRow = Math.min(cols, n - r * cols);
-      const x = cx + (c - (inRow - 1) / 2) * gap;
-      return label(g, x, y0 + r * lh, fs, `${keyBase}-${g.name}`);
+    const fs = tight ? (n > 2 ? 10 : 11) : n > 4 ? 10.5 : 12.5;
+    const gap = tight ? 5 : 8;
+    const rows: ChartGraha[][] = [];
+    let row: ChartGraha[] = [], w = 0;
+    for (const g of list) {
+      const iw = itemW(g, fs);
+      if (row.length && (w + gap + iw > maxW || row.length >= maxCols)) { rows.push(row); row = []; w = 0; }
+      w += (row.length ? gap : 0) + iw; row.push(g);
+    }
+    if (row.length) rows.push(row);
+    const lh = fs + (tight ? 4 : 5);
+    const y0 = cy - ((rows.length - 1) * lh) / 2 + fs * 0.35 + extraTop;
+    return rows.flatMap((r, ri) => {
+      const total = r.reduce((t, g, i) => t + itemW(g, fs) + (i ? gap : 0), 0);
+      let x = cx - total / 2;
+      return r.map((g) => {
+        const iw = itemW(g, fs);
+        const el = label(g, x + iw / 2, y0 + ri * lh, fs, `${keyBase}-${g.name}`);
+        x += iw + gap;
+        return el;
+      });
     });
   };
 
@@ -81,7 +107,7 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
   // Sign number, always in brackets and in the same corner of its cell.
   const num = (sign: number, x: number, y: number, anchor: 'start' | 'middle' | 'end' = 'middle', lagna = false, withAs = false) => (
     <SvgText x={x} y={y} fontSize={9.5} fontWeight={lagna ? '800' : '700'} fill={lagna ? colors.primary : colors.textTertiary} textAnchor={anchor}>
-      ({sign + 1}){withAs ? ` ${abbr.Lagna}` : ''}
+      {`(${sign + 1})${withAs ? ` ${abbr.Lagna}` : ''}`}
     </SvgText>
   );
 
@@ -115,14 +141,14 @@ export default function KundliChart({ grahas, lagnaSignIndex, flags = {}, style 
           const sign = (lagnaSignIndex + house - 1) % 12;
           const diamond = [1, 4, 7, 10].includes(house);
           const side = [3, 5, 9, 11].includes(house);
-          const k = diamond ? 0.3 : 0.32;
+          const k = diamond ? 0.34 : 0.5;
           const nx = (ax + (fx - ax) * k) * S;
           const ny = (ay + (fy - ay) * k) * S + 3.5;
           const list = bySign[sign];
           // Planets: diamonds stay at the centroid nudged outward; triangles
           // likewise, with side triangles stacking in at most two columns.
-          const px = (fx + (fx - ax) * (diamond ? 0.12 : side ? 0.08 : 0)) * S;
-          const py = (fy + (fy - ay) * (diamond ? 0.12 : side ? 0 : 0.1)) * S + 2;
+          const px = (fx + (fx - ax) * (diamond ? 0.12 : side ? 0.12 : 0)) * S;
+          const py = (fy + (fy - ay) * (diamond ? 0.12 : side ? 0 : 0.12)) * S + 2;
           return (
             <G key={house}>
               {num(sign, nx, ny, 'middle', house === 1)}

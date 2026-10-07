@@ -26,6 +26,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.15.0',
+    date: '2026-10-07',
+    title: 'Virtual puja, regional calendars and a richer Panchang',
+    changes: [
+      'Virtual puja: offer flowers, light diyas, ring the temple bell, do aarti and chant the mantra, with a daily streak',
+      'Calendar for your region: Bengali, Assamese, Odia, Tamil, Malayalam, North Indian and Amanta, with local festivals',
+      'Festival dates now follow the right time of day (Diwali at pradosh, Dussehra in the afternoon) and skip Adhik months',
+      'Panchang: hora and choghadiya tables, festivals of the day, sun and moon signs, ritu, ayana, disha shool and samvat',
+      'Jyotish in clear tabs; charts without overlapping labels',
+      'Sadhak AI redesigned: typing bubble, copy and share, new chat, more reliable answers',
+      'Library with covers, Continue reading, categories and shelves; Community with shortcuts and cleaner lists',
+      'Posts can be pinned, edited and filtered on profiles',
+      'Bhog recipes filter by allergy (dairy, nuts, peanuts, gluten, sesame, coconut)',
+      'Vastu compass picks a working sensor on every phone',
+      'Wiki, aarti and puja guide use Sadhak\'s own emblem art',
+      'Share the shloka or the app as a picture with its caption',
+      'One script per language everywhere; language and theme switches on Home, tabs and Settings',
+      'Optional anonymous diagnostics to find slow or broken screens',
+    ],
+  },
+  {
     version: '1.14.0',
     date: '2026-10-06',
     title: 'Live Today card, community and full Hindi & Bengali',

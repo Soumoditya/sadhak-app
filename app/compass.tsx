@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, ScrollView, useWindowDimensions, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { Magnetometer, DeviceMotion } from 'expo-sensors';
+import { Magnetometer, DeviceMotion, Accelerometer } from 'expo-sensors';
+import { logEvent } from '../services/diagnostics';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Line, Path, Text as SvgText, G } from 'react-native-svg';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -65,15 +66,47 @@ export default function CompassScreen() {
     Animated.timing(rotation, { toValue: unwrapped.current, duration: 90, easing: Easing.linear, useNativeDriver: true }).start();
   };
 
+  // Every heading source runs at once. Some phones grant a source and then
+  // never update it (frozen fused heading, dead rotation sensor), so the
+  // screen follows whichever source is alive and actually moving.
+  const stats = useRef<Record<Exclude<Source, 'none'>, { last: number; hist: { t: number; v: number }[]; n: number }>>({
+    fused: { last: 0, hist: [], n: 0 }, motion: { last: 0, hist: [], n: 0 }, magnetometer: { last: 0, hist: [], n: 0 },
+  }).current;
+  const active = useRef<Exclude<Source, 'none'> | null>(null);
+  const pinned = useRef<Exclude<Source, 'none'> | null>(null);
+  const [rate, setRate] = useState(0);
+
+  const swing = (h: { t: number; v: number }[]) => {
+    if (h.length < 2) return 0;
+    const v0 = h[0].v;
+    return h.reduce((m, x) => Math.max(m, Math.abs(((x.v - v0 + 540) % 360) - 180)), 0);
+  };
+  const ORDER: Exclude<Source, 'none'>[] = ['fused', 'motion', 'magnetometer'];
+  const onReading = (src: Exclude<Source, 'none'>, v: number) => {
+    const now = Date.now();
+    const st0 = stats[src];
+    st0.last = now; st0.n++;
+    st0.hist.push({ t: now, v });
+    while (st0.hist.length && now - st0.hist[0].t > 3000) st0.hist.shift();
+    const alive = (k: Exclude<Source, 'none'>) => now - stats[k].last < 1500;
+    let cur = pinned.current && alive(pinned.current) ? pinned.current : active.current;
+    if (!pinned.current) {
+      if (!cur || !alive(cur)) cur = ORDER.find(alive) || src;
+      // Stuck source: flat for 3 s while another one is clearly turning.
+      else if (stats[cur].hist.length > 5 && swing(stats[cur].hist) < 0.3) {
+        const moving = ORDER.find((k) => k !== cur && alive(k) && swing(stats[k].hist) > 4);
+        if (moving) { logEvent('compass_switch', { from: cur, to: moving }); cur = moving; }
+      }
+    }
+    if (cur !== active.current) { active.current = cur; setSource(cur); }
+    if (src === cur) feed(v);
+  };
+
   useEffect(() => {
     const subs: { remove: () => void }[] = [];
     let cancelled = false;
-    let lastFused = 0;
     (async () => {
       // 1) Android's fused heading (tilt-compensated, true north with location).
-      //    Some phones grant permission but never deliver it (location off, no
-      //    rotation sensor), so the sensors below keep running as a backup and
-      //    take over whenever the fused heading goes quiet.
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted' && !cancelled) {
@@ -81,46 +114,72 @@ export default function CompassScreen() {
             const useTrue = h.trueHeading != null && h.trueHeading >= 0;
             const v = useTrue ? h.trueHeading : h.magHeading;
             if (v == null || v < 0) return;
-            lastFused = Date.now();
-            setTrueNorth(useTrue);
-            setAccuracy(typeof h.accuracy === 'number' ? h.accuracy : null);
-            setSource('fused');
-            feed(v);
+            if (active.current === 'fused' || !active.current) {
+              setTrueNorth(useTrue);
+              setAccuracy(typeof h.accuracy === 'number' ? h.accuracy : null);
+            }
+            onReading('fused', v);
           });
           if (cancelled) sub.remove(); else subs.push(sub);
         }
       } catch {}
-      const fusedQuiet = () => Date.now() - lastFused > 1200;
       // 2) Rotation-vector sensor (no location needed).
       try {
         if (!cancelled && (await DeviceMotion.isAvailableAsync())) {
           DeviceMotion.setUpdateInterval(60);
           subs.push(DeviceMotion.addListener((m) => {
             const a = m.rotation?.alpha;
-            if (typeof a !== 'number' || !fusedQuiet()) return;
-            setSource((s) => (s === 'motion' ? s : 'motion'));
-            setTrueNorth(false);
-            feed(norm((-a * 180) / Math.PI));
+            if (typeof a !== 'number') return;
+            onReading('motion', norm((-a * 180) / Math.PI));
           }));
-          return;
         }
       } catch {}
-      // 3) Raw magnetometer (needs the phone flat).
+      // 3) Magnetometer, tilt-compensated with the accelerometer on Android
+      //    (same maths as SensorManager.getRotationMatrix + getOrientation).
       try {
         if (!cancelled && (await Magnetometer.isAvailableAsync())) {
+          const g = { x: 0, y: 0, z: 1 };
+          if (Platform.OS === 'android' && (await Accelerometer.isAvailableAsync())) {
+            Accelerometer.setUpdateInterval(60);
+            subs.push(Accelerometer.addListener((a) => { g.x = g.x * 0.8 + a.x * 0.2; g.y = g.y * 0.8 + a.y * 0.2; g.z = g.z * 0.8 + a.z * 0.2; }));
+          }
           Magnetometer.setUpdateInterval(60);
-          subs.push(Magnetometer.addListener(({ x, y }) => {
-            if (!fusedQuiet()) return;
-            setSource((s) => (s === 'magnetometer' ? s : 'magnetometer'));
-            feed(norm((Math.atan2(-x, y) * 180) / Math.PI));
+          subs.push(Magnetometer.addListener(({ x: ex, y: ey, z: ez }) => {
+            const hx = ey * g.z - ez * g.y, hy = ez * g.x - ex * g.z, hz = ex * g.y - ey * g.x;
+            const hn = Math.hypot(hx, hy, hz), an = Math.hypot(g.x, g.y, g.z);
+            if (hn < 0.1 || an < 0.1) return;
+            const Hx = hx / hn, Hy = hy / hn, Hz = hz / hn;
+            const Ax = g.x / an, Ay = g.y / an, Az = g.z / an;
+            const My = Az * Hx - Ax * Hz;
+            onReading('magnetometer', norm((Math.atan2(Hy, My) * 180) / Math.PI));
           }));
-          return;
         }
       } catch {}
-      if (!cancelled && !lastFused) setSource('none');
+      // Nothing reported after 3 s: no usable sensor.
+      setTimeout(() => { if (!cancelled && !active.current) { setSource('none'); logEvent('compass_none'); } }, 3000);
     })();
-    return () => { cancelled = true; subs.forEach((x) => x.remove()); };
+    // Readings per second of the active source, for the status line.
+    let prevN = 0;
+    const tick = setInterval(() => {
+      const k = active.current;
+      if (!k) return;
+      setRate(stats[k].n - prevN); prevN = stats[k].n;
+    }, 1000);
+    return () => { cancelled = true; clearInterval(tick); subs.forEach((x) => x.remove()); };
   }, []);
+
+  const cycleSource = () => {
+    const alive = ORDER.filter((k) => Date.now() - stats[k].last < 1500);
+    if (!alive.length) return;
+    const i = pinned.current ? alive.indexOf(pinned.current) : -1;
+    const next = i + 1 < alive.length ? alive[i + 1] : null; // last step returns to auto
+    pinned.current = next;
+    active.current = next || active.current;
+    setSource(next || active.current);
+    setPinnedState(next);
+    Haptics.selectionAsync().catch(() => {});
+  };
+  const [pinnedState, setPinnedState] = useState<Source | null>(null);
 
   const shown = held ?? heading;
   const dir = directionFor(shown);
@@ -148,7 +207,7 @@ export default function CompassScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title={tr('t.compass')} subtitle={tx('वास्तु दिशा · find directions for your home')} />
+      <Header title={tr('t.compass')} subtitle={tx('Vastu directions for your home')} />
       <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: screenBottom, paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
         {source === 'none' ? (
           <View style={{ alignItems: 'center', marginTop: 60, paddingHorizontal: 20 }}>
@@ -172,10 +231,18 @@ export default function CompassScreen() {
                 {source && (
                   <View style={[st.chip, { borderColor: lowAccuracy ? '#F59E0B' : colors.cardBorder, backgroundColor: lowAccuracy ? '#F59E0B14' : 'transparent' }]}>
                     <MaterialCommunityIcons name={lowAccuracy ? 'alert-outline' : 'check-circle-outline'} size={13} color={lowAccuracy ? '#D97706' : colors.tulsiGreen || '#2D6A4F'} />
-                    <Text style={[st.chipText, { color: lowAccuracy ? '#D97706' : colors.textSecondary }]}>{tx(lowAccuracy ? 'Needs calibration' : source === 'fused' ? 'Tilt-corrected' : 'Hold phone flat')}</Text>
+                    <Text style={[st.chipText, { color: lowAccuracy ? '#D97706' : colors.textSecondary }]}>{tx(lowAccuracy ? 'Needs calibration' : source === 'magnetometer' && Platform.OS !== 'android' ? 'Hold phone flat' : 'Tilt-corrected')}</Text>
                   </View>
                 )}
               </View>
+              {/* Which sensor drives the dial; tap to try another if it seems stuck. */}
+              {source && (
+                <TouchableOpacity onPress={cycleSource} hitSlop={8} style={{ marginTop: 8 }}>
+                  <Text style={{ color: colors.textTertiary, fontSize: 11.5 }}>
+                    {tx('Sensor')}: {tx(source === 'fused' ? 'Fused heading' : source === 'motion' ? 'Rotation sensor' : 'Magnetometer')} · {rate}/s · {tx(pinnedState ? 'Fixed' : 'Auto')} ({tx('tap to switch')})
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Dial */}
@@ -203,7 +270,7 @@ export default function CompassScreen() {
                     return (
                       <G key={v.key}>
                         <SvgText x={p.x} y={p.y + (cardinal ? 2 : 1)} fontSize={cardinal ? 17 : 12} fontWeight="800" fill={v.key === 'N' ? '#DC2626' : colors.text} textAnchor="middle">{v.key}</SvgText>
-                        <SvgText x={p.x} y={p.y + (cardinal ? 15 : 13)} fontSize={8.5} fill={colors.textSecondary} textAnchor="middle">{v.labelHi}</SvgText>
+                        <SvgText x={p.x} y={p.y + (cardinal ? 15 : 13)} fontSize={8.5} fill={colors.textSecondary} textAnchor="middle">{language === 'en' ? '' : native(v.label, v.labelHi)}</SvgText>
                       </G>
                     );
                   })}
