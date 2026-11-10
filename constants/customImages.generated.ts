@@ -2,11 +2,24 @@
 // Holds the owner's own images (dropped into assets/custom/**). Empty is fine.
 
 export const CUSTOM_DEITIES: Record<string, number> = {
-
+  "hanuman": require("../assets/custom/deities/hanuman.jpg"),
+  "krishna": require("../assets/custom/deities/krishna.jpg"),
+  "lakshmi": require("../assets/custom/deities/lakshmi.jpg"),
+  "saraswati": require("../assets/custom/deities/saraswati.jpg"),
+  "vishnu": require("../assets/custom/deities/vishnu.jpg"),
 };
 
 export const CUSTOM_FOOD: Record<string, number> = {
-
+  "besan-laddu": require("../assets/custom/food/besan-laddu.jpg"),
+  "coconut-barfi": require("../assets/custom/food/coconut-barfi.jpg"),
+  "kheer": require("../assets/custom/food/kheer.jpg"),
+  "khichdi-bhog": require("../assets/custom/food/khichdi-bhog.jpg"),
+  "kuttu-puri": require("../assets/custom/food/kuttu-puri.jpg"),
+  "makhana-kheer": require("../assets/custom/food/makhana-kheer.jpg"),
+  "moong-dal-halwa": require("../assets/custom/food/moong-dal-halwa.jpg"),
+  "panchamrit": require("../assets/custom/food/panchamrit.jpg"),
+  "sabudana-khichdi": require("../assets/custom/food/sabudana-khichdi.jpg"),
+  "sooji-halwa": require("../assets/custom/food/sooji-halwa.jpg"),
 };
 
 export const CUSTOM_WALLPAPERS: Record<string, number> = {

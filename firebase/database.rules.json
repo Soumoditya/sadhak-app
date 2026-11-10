@@ -5,8 +5,8 @@
 
     "messages": {
       "$roomId": {
-        ".read": "auth != null",
-        ".write": "auth != null",
+        ".read": "auth != null && (!$roomId.beginsWith('dm_') || $roomId.contains(auth.uid))",
+        ".write": "auth != null && (!$roomId.beginsWith('dm_') || $roomId.contains(auth.uid))",
         ".indexOn": ["timestamp"]
       }
     },
@@ -21,6 +21,15 @@
     "rooms": {
       ".read": "auth != null",
       ".write": "auth != null"
+    },
+
+    "userDms": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        "$roomId": {
+          ".write": "auth != null && $roomId.contains(auth.uid)"
+        }
+      }
     }
   }
 }

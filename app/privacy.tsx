@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Header } from '../components/ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { router } from 'expo-router';
@@ -86,17 +87,7 @@ export default function PrivacyScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <LinearGradient
-          colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-          style={styles.header}
-        >
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <MaterialCommunityIcons name="shield-lock-outline" size={36} color="#FFD700" />
-          <Text style={styles.headerTitle}>{t('privacy.title')}</Text>
-          <Text style={styles.headerSub}>Last updated: June 2026</Text>
-        </LinearGradient>
+        <Header title={t('privacy.title')} subtitle="Last updated: June 2026" />
 
         <Text style={[styles.intro, { color: colors.textSecondary }]}>
           {APP_NAME} respects your privacy. This policy describes how we collect, use, and protect your information.
@@ -105,12 +96,12 @@ export default function PrivacyScreen() {
         {SECTIONS.map((section, idx) => (
           <View key={idx} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={styles.cardHeader}>
-              <MaterialCommunityIcons name={section.icon as any} size={20} color="#D94F00" />
+              <MaterialCommunityIcons name={section.icon as any} size={20} color="#C2410C" />
               <Text style={[styles.cardTitle, { color: colors.text }]}>{section.title}</Text>
             </View>
             {section.items.map((item, i) => (
               <View key={i} style={styles.bulletRow}>
-                <Text style={[styles.bullet, { color: '#D94F00' }]}>•</Text>
+                <Text style={[styles.bullet, { color: '#C2410C' }]}>•</Text>
                 <Text style={[styles.bulletText, { color: colors.textSecondary }]}>{item}</Text>
               </View>
             ))}

@@ -1,25 +1,32 @@
 import React, { useState, useMemo } from 'react';
+import { useKeyboardInset } from '../hooks/useKeyboardInset';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Image,
-  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '../contexts/AuthContext';
+import { Header } from '../components/ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDialog } from '../contexts/DialogContext';
 import { useLayoutInsets } from '../constants/layout';
 import { uploadToCloudinary } from '../services/cloudinary';
 import { createPost, extractHashtags } from '../services/posts';
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 export default function CreatePostScreen() {
+  const { tx } = useLanguage();
+
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
   const { headerPaddingTop, backBtnTop, screenBottomPadding } = useLayoutInsets();
+  const kb = useKeyboardInset();
 
   const [text, setText] = useState('');
   const [localImage, setLocalImage] = useState<string | null>(null);
@@ -84,24 +91,21 @@ export default function CreatePostScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-        style={[styles.header, { paddingTop: headerPaddingTop }]}
-      >
-        <TouchableOpacity style={[styles.backBtn, { top: backBtnTop }]} onPress={() => router.back()}>
-          <Ionicons name="close" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Post</Text>
-        <TouchableOpacity
-          style={[styles.postBtn, { opacity: canPost ? 1 : 0.5 }]}
-          disabled={!canPost}
-          onPress={submit}
-        >
-          {posting ? <ActivityIndicator color="#D94F00" size="small" /> : <Text style={styles.postBtnText}>Share</Text>}
-        </TouchableOpacity>
-      </LinearGradient>
+      <Header
+        title={tx('New Post')}
+        subtitle={tx('Share with the community')}
+        right={
+          <TouchableOpacity
+            style={[styles.postBtn, { backgroundColor: colors.primary, opacity: canPost ? 1 : 0.45 }]}
+            disabled={!canPost}
+            onPress={submit}
+          >
+            {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>{tx('Share')}</Text>}
+          </TouchableOpacity>
+        }
+      />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: screenBottomPadding }} keyboardShouldPersistTaps="handled">
           {/* Author row */}
           <View style={styles.authorRow}>
@@ -120,7 +124,7 @@ export default function CreatePostScreen() {
 
           <TextInput
             style={[styles.input, { color: colors.text }]}
-            placeholder="Share a thought, question, or blessing…  Use #hashtags"
+            placeholder={tx('Share a thought, question, or blessing…  Use #hashtags')}
             placeholderTextColor={colors.textTertiary}
             multiline
             autoFocus
@@ -152,7 +156,7 @@ export default function CreatePostScreen() {
         <View style={[styles.toolbar, { borderTopColor: colors.divider, backgroundColor: colors.surface, paddingBottom: screenBottomPadding }]}>
           <TouchableOpacity style={styles.toolBtn} onPress={pickImage}>
             <MaterialCommunityIcons name="image-plus" size={22} color={colors.primary} />
-            <Text style={[styles.toolText, { color: colors.textSecondary }]}>Photo</Text>
+            <Text style={[styles.toolText, { color: colors.textSecondary }]}>{tx('Photo')}</Text>
           </TouchableOpacity>
           <Text style={[styles.counter, { color: colors.textTertiary }]}>{text.length}/2000</Text>
         </View>
@@ -166,8 +170,8 @@ const styles = StyleSheet.create({
   header: { paddingBottom: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
   backBtn: { position: 'absolute', left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
-  postBtn: { position: 'absolute', right: 16, bottom: 12, backgroundColor: '#FFF', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20 },
-  postBtnText: { color: '#D94F00', fontWeight: '800', fontSize: 14 },
+  postBtn: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20 },
+  postBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   avatar: { width: 42, height: 42, borderRadius: 21 },
   authorName: { fontSize: 15, fontWeight: '700' },

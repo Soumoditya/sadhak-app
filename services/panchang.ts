@@ -23,6 +23,7 @@
 
 import { MhahPanchang } from 'mhah-panchang';
 import * as SunCalc from 'suncalc';
+import { lunarMonthIndex } from './lunarMonth';
 
 const mhah = new MhahPanchang();
 
@@ -76,7 +77,7 @@ export interface PanchangData {
 }
 
 // Tithi names in English and Hindi
-const TITHI_NAMES = [
+export const TITHI_NAMES = [
   { en: 'Pratipada', hi: 'प्रतिपदा' },
   { en: 'Dwitiya', hi: 'द्वितीया' },
   { en: 'Tritiya', hi: 'तृतीया' },
@@ -110,7 +111,7 @@ const TITHI_NAMES = [
 ];
 
 // Nakshatra names
-const NAKSHATRA_NAMES = [
+export const NAKSHATRA_NAMES = [
   { en: 'Ashwini', hi: 'अश्विनी', lord: 'Ketu' },
   { en: 'Bharani', hi: 'भरणी', lord: 'Venus' },
   { en: 'Krittika', hi: 'कृत्तिका', lord: 'Sun' },
@@ -198,7 +199,7 @@ const VARA_NAMES = [
 ];
 
 // Hindu month names
-const HINDU_MONTHS = [
+export const HINDU_MONTHS = [
   { en: 'Chaitra', hi: 'चैत्र' },
   { en: 'Vaishakha', hi: 'वैशाख' },
   { en: 'Jyeshtha', hi: 'ज्येष्ठ' },
@@ -211,18 +212,6 @@ const HINDU_MONTHS = [
   { en: 'Pausha', hi: 'पौष' },
   { en: 'Magha', hi: 'माघ' },
   { en: 'Phalguna', hi: 'फाल्गुन' },
-];
-
-// Adhik Maas (Purushottam Maas) — the intercalary lunar month. Its dates are
-// published years in advance; this curated table is authoritative (verified
-// against Drik Panchang) and replaces mhah-panchang's unreliable leap flag.
-// Bounds are inclusive epoch-ms (IST day boundaries). Extend as new years are
-// confirmed (next Adhik Maas after 2026 is in 2029).
-const ADHIK_MAAS_PERIODS: { start: number; end: number; monthEn: string }[] = [
-  // Adhik Shravana 2023: 18 Jul – 16 Aug 2023
-  { start: Date.UTC(2023, 6, 17, 18, 30), end: Date.UTC(2023, 7, 16, 18, 30), monthEn: 'Shravana' },
-  // Adhik Jyeshtha 2026: 17 May – 15 Jun 2026
-  { start: Date.UTC(2026, 4, 16, 18, 30), end: Date.UTC(2026, 5, 15, 18, 30), monthEn: 'Jyeshtha' },
 ];
 
 /**
@@ -252,11 +241,6 @@ function calculateRahuKaal(dayOfWeek: number, sunrise: string, sunset: string): 
   const startMin = srMin + (segment - 1) * segmentLength;
   const endMin = startMin + segmentLength;
 
-  const formatTime = (mins: number): string => {
-    const h = Math.floor(mins / 60);
-    const m = Math.round(mins % 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-  };
 
   return {
     start: formatTime(startMin),
@@ -273,13 +257,6 @@ function calculateBrahmaMuhurta(sunrise: string): { start: string; end: string }
   const startMin = srMin - 96; // 1 hr 36 min = 96 min
   const endMin = srMin - 48; // 48 min before sunrise
 
-  const formatTime = (mins: number): string => {
-    let m = mins;
-    if (m < 0) m += 1440;
-    const h = Math.floor(m / 60);
-    const min = Math.round(m % 60);
-    return `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
-  };
 
   return {
     start: formatTime(startMin),
@@ -297,11 +274,6 @@ function calculateAbhijitMuhurta(sunrise: string, sunset: string): { start: stri
   const ssMin = parseInt(ssParts[0]) * 60 + parseInt(ssParts[1]);
   const midday = (srMin + ssMin) / 2;
 
-  const formatTime = (mins: number): string => {
-    const h = Math.floor(mins / 60);
-    const m = Math.round(mins % 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-  };
 
   return {
     start: formatTime(midday - 24),
@@ -312,6 +284,12 @@ function calculateAbhijitMuhurta(sunrise: string, sunset: string): { start: stri
 /**
  * Main Panchang Calculation
  */
+// Minutes since midnight → "HH:MM", rounding first so 10:59.6 becomes 11:00.
+function formatTime(mins: number): string {
+  const t = ((Math.round(mins) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
+
 export function calculatePanchang(
   date: Date,
   lat: number = 28.6139, // Default: New Delhi
@@ -354,15 +332,11 @@ export function calculatePanchang(
   const dayOfWeek = date.getDay();
   const varaData = VARA_NAMES[dayOfWeek];
 
-  // Hindu (amanta) lunar month. mhah's masa index is offset by one vs our table.
-  // NOTE: mhah's isLeapMonth flag is unreliable (it mislabels regular months as
-  // Adhik). Adhik Maas is rare and its dates are published years in advance, so
-  // we use a curated table (ADHIK_MAAS_PERIODS) instead of the library flag.
-  const masaIno = clamp(cal?.Masa?.ino ?? 0, 11);
-  const monthBase = HINDU_MONTHS[(masaIno + 1) % 12];
-  const isLeapMonth = ADHIK_MAAS_PERIODS.some(
-    (p) => anchor.getTime() >= p.start && anchor.getTime() <= p.end,
-  );
+  // Lunar month by the sankranti rule (mhah's masa follows the solar month
+  // and flips mid-paksha at each sankranti). Purnimanta naming.
+  const lm = lunarMonthIndex(anchor, paksha);
+  const monthBase = HINDU_MONTHS[lm.purnimanta];
+  const isLeapMonth = lm.adhik;
   const hinduMonth = {
     en: (isLeapMonth ? 'Adhik ' : '') + monthBase.en,
     hi: (isLeapMonth ? 'अधिक ' : '') + monthBase.hi,
@@ -384,11 +358,6 @@ export function calculatePanchang(
   const yamaOrder: Record<number, number> = { 0: 5, 1: 4, 2: 3, 3: 2, 4: 1, 5: 7, 6: 6 };
   const yamaSeg = yamaOrder[dayOfWeek];
   const yamaStart = srMin + (yamaSeg - 1) * segLen;
-  const formatTime = (mins: number): string => {
-    const h = Math.floor(mins / 60);
-    const m = Math.round(mins % 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-  };
 
   // Gulika Kaal
   const gulikaOrder: Record<number, number> = { 0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1 };

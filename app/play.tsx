@@ -6,9 +6,13 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLayoutInsets } from '../constants/layout';
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 // In-app devotional player — YouTube search results inside a WebView so
 // aarti/bhajan videos play without leaving Sadhak. Free, no API key.
 export default function PlayScreen() {
+  const { tx } = useLanguage();
+
   const { query, title } = useLocalSearchParams<{ query: string; title?: string }>();
   const { colors } = useTheme();
   const { headerPaddingTop, bottomInset } = useLayoutInsets();
@@ -24,7 +28,7 @@ export default function PlayScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[st.title, { color: colors.text }]} numberOfLines={1}>{title || 'Play'}</Text>
-          <Text style={[st.sub, { color: colors.textTertiary }]}>Tap a video to play — stays inside Sadhak</Text>
+          <Text style={[st.sub, { color: colors.textTertiary }]}>{tx('Tap a video to play — stays inside Sadhak')}</Text>
         </View>
         <MaterialCommunityIcons name="youtube" size={24} color="#FF0000" />
       </View>
@@ -42,7 +46,7 @@ export default function PlayScreen() {
         {loading && (
           <View style={[StyleSheet.absoluteFill, st.center, { backgroundColor: colors.background }]}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>Finding devotional videos…</Text>
+            <Text style={{ color: colors.textSecondary, marginTop: 10, fontSize: 13 }}>{tx('Finding devotional videos…')}</Text>
           </View>
         )}
       </View>

@@ -7,7 +7,7 @@ export interface WikiArticle {
 export type WikiCat = 'deities' | 'scriptures' | 'festivals' | 'concepts';
 
 export const WIKI_CATEGORIES: { key: WikiCat; label: string; icon: string; color: string }[] = [
-  { key: 'deities', label: 'Deities', icon: 'account-star', color: '#D94F00' },
+  { key: 'deities', label: 'Deities', icon: 'account-star', color: '#C2410C' },
   { key: 'scriptures', label: 'Scriptures', icon: 'book-open-page-variant', color: '#1565C0' },
   { key: 'festivals', label: 'Festivals', icon: 'party-popper', color: '#7C3AED' },
   { key: 'concepts', label: 'Concepts', icon: 'lightbulb-on-outline', color: '#2D6A4F' },

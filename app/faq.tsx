@@ -5,6 +5,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Header } from '../components/ui';
 import { useDsInsets } from '../constants/ds';
 
+import { useLanguage } from '../contexts/LanguageContext';
+import { APP_VERSION } from '../constants/appInfo';
+
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -19,7 +22,7 @@ const FAQ_SECTIONS: { title: string; icon: string; color: string; items: FAQItem
   {
     title: 'Getting Started',
     icon: 'rocket-launch-outline',
-    color: '#D94F00',
+    color: '#C2410C',
     items: [
       { q: 'What is Sadhak?', a: 'Sadhak is your complete Hindu spiritual companion app. It provides daily Panchang, grooming guidance based on traditional scriptures, a Hindu calendar with festivals, a sacred library, community chat, Japa Mala counter, Aarti collection, and much more — all personalized to your gender, marriage status, and location.', icon: 'information-outline' },
       { q: 'Is this app free?', a: 'Yes! Sadhak is completely free to use. All features including Panchang, calendar, grooming rules, library, chat, and notifications are available at no cost.', icon: 'currency-inr' },
@@ -75,7 +78,7 @@ const FAQ_SECTIONS: { title: string; icon: string; color: string; items: FAQItem
     icon: 'bell-outline',
     color: '#D32F2F',
     items: [
-      { q: 'Why do I get hourly notifications?', a: 'Sadhak sends unique spiritual wisdom, mantras, Hindu facts, and Vedic knowledge every hour to keep you connected with your spiritual journey. Each notification is unique — never repeated!', icon: 'bell-ring-outline' },
+      { q: 'What notifications does Sadhak send?', a: 'Three gentle reminders a day (morning, midday and evening) plus timely alerts for festivals, Ekadashi, grahan with sutak, and grooming days. Nothing is sent during quiet hours (10 PM to 6 AM), and every kind can be turned off in Settings.', icon: 'bell-ring-outline' },
       { q: 'Can I disable notifications?', a: 'Yes! Go to Profile > Settings and toggle off "Spiritual Reminders". You can also control festival reminders, grooming reminders, and Ekadashi reminders individually.', icon: 'bell-off-outline' },
       { q: 'Are notifications time-aware?', a: 'Yes! Morning notifications focus on mantras and morning rituals, afternoon on facts and wisdom, evening on aarti and puja reminders, and night on bedtime shlokas and sleep rituals.', icon: 'clock-outline' },
     ],
@@ -94,6 +97,8 @@ const FAQ_SECTIONS: { title: string; icon: string; color: string; items: FAQItem
 ];
 
 export default function FAQScreen() {
+  const { tx } = useLanguage();
+
   const { colors, isDark } = useTheme();
   const { screenBottom } = useDsInsets();
   const [expandedSection, setExpandedSection] = useState<number | null>(0);
@@ -112,15 +117,13 @@ export default function FAQScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header title="Help & FAQ" subtitle="Answers about Sadhak" />
+      <Header title={tx('Help & FAQ')} subtitle={tx('Answers about Sadhak')} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: screenBottom }}>
       {/* Hero */}
       <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
         <MaterialCommunityIcons name="help-circle-outline" size={40} color={colors.primary} />
-        <Text style={[styles.heroTitle, { color: colors.text }]}>How can we help?</Text>
-        <Text style={[styles.heroDesc, { color: colors.textSecondary }]}>
-          Find answers to common questions about Sadhak
-        </Text>
+        <Text style={[styles.heroTitle, { color: colors.text }]}>{tx('How can we help?')}</Text>
+        <Text style={[styles.heroDesc, { color: colors.textSecondary }]}>{tx('Find answers to common questions about Sadhak')}</Text>
       </View>
 
       {/* FAQ Sections */}
@@ -175,29 +178,27 @@ export default function FAQScreen() {
 
       {/* Contact */}
       <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        <Text style={[styles.contactTitle, { color: colors.text }]}>Still need help?</Text>
-        <Text style={[styles.contactDesc, { color: colors.textSecondary }]}>
-          Reach out to us and we'll get back to you
-        </Text>
+        <Text style={[styles.contactTitle, { color: colors.text }]}>{tx('Still need help?')}</Text>
+        <Text style={[styles.contactDesc, { color: colors.textSecondary }]}>{tx('Reach out to us and we\'ll get back to you')}</Text>
         <View style={styles.contactRow}>
           <TouchableOpacity
             style={[styles.contactBtn, { backgroundColor: colors.primary + '15' }]}
             onPress={() => Linking.openURL('mailto:soumodityapramanik@gmail.com')}
           >
             <MaterialCommunityIcons name="email-outline" size={20} color={colors.primary} />
-            <Text style={[styles.contactBtnText, { color: colors.primary }]}>Email Us</Text>
+            <Text style={[styles.contactBtnText, { color: colors.primary }]}>{tx('Email Us')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.contactBtn, { backgroundColor: colors.tulsiGreen + '15' }]}
             onPress={() => Linking.openURL('https://wa.me/919064882049')}
           >
             <MaterialCommunityIcons name="whatsapp" size={20} color={colors.tulsiGreen} />
-            <Text style={[styles.contactBtnText, { color: colors.tulsiGreen }]}>WhatsApp</Text>
+            <Text style={[styles.contactBtnText, { color: colors.tulsiGreen }]}>{tx('WhatsApp')}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <Text style={[styles.version, { color: colors.textTertiary }]}>Sadhak v1.6.0 • Made with 🙏 in India</Text>
+      <Text style={[styles.version, { color: colors.textTertiary }]}>{`${tx('Sadhak v')}${APP_VERSION} • ${tx('Made with 🙏 in India')}`}</Text>
       <View style={{ height: 40 }} />
       </ScrollView>
     </View>

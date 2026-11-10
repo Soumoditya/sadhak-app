@@ -71,9 +71,10 @@ const app = initializeApp(firebaseConfig);
 // dropped it from the published TS types (known upstream issue). Pull it via
 // require so the type-checker doesn't fail while runtime behaviour is unchanged.
 const { getReactNativePersistence } = require('firebase/auth');
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+// (The web build has no RN persistence; it falls back to the browser default.)
+const auth = typeof getReactNativePersistence === 'function'
+  ? initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) })
+  : initializeAuth(app);
 
 const db = getFirestore(app);
 const rtdb = getDatabase(app);

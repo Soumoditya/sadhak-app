@@ -1,43 +1,72 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './Icon';
 import { router } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { DS, useDsInsets } from '../../constants/ds';
+import { LanguageChip, ThemeToggle } from './QuickSettings';
 
 /**
- * Redesigned page header — inline title, no gradient posters. Kept to the
- * screen padding grid so it aligns with body content.
+ * Screen header for every pushed screen: back, display-face title, optional
+ * right actions. Language and theme switches live on Home, the tabs and
+ * Settings; pass quick to show them here too.
  */
 interface Props {
   title: string;
   subtitle?: string;
   back?: boolean;
   right?: React.ReactNode;
+  /** Custom back action (e.g. close an in-screen sub-view instead of leaving). */
+  onBack?: () => void;
+  quick?: boolean;
 }
 
-export default function Header({ title, subtitle, back = true, right }: Props) {
+// Screens opened from a notification on a cold start have no history to go
+// back to; fall back to Home instead of a no-op/"GO_BACK not handled" error.
+export function goBackOrHome() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
+}
+
+export default function Header({ title, subtitle, back = true, right, onBack, quick = false }: Props) {
   const { colors } = useTheme();
+  const { display, noTrack, tx } = useLanguage();
   const { insets } = useDsInsets();
+  // Long names ("Temples & Bhandara") step down a size instead of truncating
+  // next to header actions.
+  const crowded = !!right;
+  const titleSize = crowded && title.length > 14 ? 16 : title.length > 16 || (crowded && title.length > 10) ? 18 : title.length > 11 ? 20 : 22;
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + 8, paddingBottom: DS.space.md }]}>
       <View style={styles.row}>
-        {back ? (
+        {back && (
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={onBack || goBackOrHome}
             style={[styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
           >
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
+            <Icon name="caret-left" size={20} color={colors.text} weight="regular" />
           </TouchableOpacity>
-        ) : (
-          <View style={styles.iconBtn} />
         )}
-        <View style={{ flex: 1, marginLeft: DS.space.md, marginRight: right ? DS.space.md : 0 }}>
-          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{title}</Text>
-          {subtitle && <Text style={[styles.sub, { color: colors.textTertiary }]} numberOfLines={1}>{subtitle}</Text>}
+        <View style={{ flex: 1, marginLeft: back ? DS.space.md : 0, marginRight: DS.space.sm }}>
+          <Text
+            style={[styles.title, { color: colors.text, fontSize: titleSize, lineHeight: titleSize + 8 }, display]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            {tx(title)}
+          </Text>
+          {!!subtitle && <Text style={[styles.sub, { color: colors.textTertiary }, noTrack]} numberOfLines={1}>{tx(subtitle)}</Text>}
         </View>
-        {right}
+        <View style={styles.right}>
+          {quick && <LanguageChip size={38} />}
+          {quick && <ThemeToggle size={38} />}
+          {right}
+        </View>
       </View>
     </View>
   );
@@ -46,7 +75,8 @@ export default function Header({ title, subtitle, back = true, right }: Props) {
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: DS.layout.screenPaddingH },
   row: { flexDirection: 'row', alignItems: 'center' },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: DS.type.title2.size, fontWeight: '800', letterSpacing: -0.3 },
-  sub: { fontSize: DS.type.caption.size, marginTop: 2 },
+  title: { fontSize: 22, lineHeight: 30 },
+  sub: { fontSize: DS.type.caption.size, marginTop: 0 },
 });

@@ -1,7 +1,11 @@
+import { keepsTithi, sunriseTithi, tithiGap, tithiIndex, type Kala } from './observance';
+import { HINDU_MONTHS } from './panchang';
+
 /**
  * Hindu Festival Database
  * Contains major and minor Hindu festivals with calculation rules
- * Dates are based on Hindu lunar calendar (Purnimant system)
+ * Months are Purnimanta (Krishna paksha carries the next month's name),
+ * matching PanchangData.hinduMonth.
  */
 
 export interface Festival {
@@ -20,6 +24,7 @@ export interface Festival {
   rituals?: string[];
   fasting?: boolean;
   groomingRestricted?: boolean;
+  kala?: Kala; // part of the day the rite belongs to (default sunrise)
 }
 
 export const FESTIVALS: Festival[] = [
@@ -62,6 +67,7 @@ export const FESTIVALS: Festival[] = [
     month: 'Phalguna',
     tithi: 'Chaturdashi',
     paksha: 'krishna',
+    kala: 'nishita',
     color: '#4A148C',
     icon: 'moon-waning-crescent',
     rituals: ['Night vigil', 'Shiva Linga Abhishek', 'Bel Patra offering', 'Fasting'],
@@ -69,15 +75,28 @@ export const FESTIVALS: Festival[] = [
     groomingRestricted: true,
   },
   {
-    id: 'holi',
-    name: 'Holi',
-    nameHi: 'होली',
-    description: 'Festival of Colors. Celebrates victory of good over evil.',
-    descriptionHi: 'रंगों का त्योहार। बुराई पर अच्छाई की विजय।',
-    type: 'major',
+    id: 'holika_dahan',
+    name: 'Holika Dahan',
+    nameHi: 'होलिका दहन',
+    description: 'Bonfire on the full-moon evening before Holi.',
+    descriptionHi: 'होली से पहले पूर्णिमा की शाम होलिका दहन।',
+    type: 'minor',
     month: 'Phalguna',
     tithi: 'Purnima',
     paksha: 'shukla',
+    color: '#E64A19',
+    icon: 'fire',
+  },
+  {
+    id: 'holi',
+    name: 'Holi',
+    nameHi: 'होली',
+    description: 'Festival of Colors, the morning after Holika Dahan. Celebrates victory of good over evil.',
+    descriptionHi: 'रंगों का त्योहार, होलिका दहन के अगले दिन। बुराई पर अच्छाई की विजय।',
+    type: 'major',
+    month: 'Chaitra',
+    tithi: 'Pratipada',
+    paksha: 'krishna',
     color: '#E91E63',
     icon: 'palette',
     rituals: ['Holika Dahan', 'Playing with colors', 'Thandai', 'Gujiya'],
@@ -106,6 +125,7 @@ export const FESTIVALS: Festival[] = [
     month: 'Chaitra',
     tithi: 'Navami',
     paksha: 'shukla',
+    kala: 'madhyahna',
     color: '#FF8C00',
     icon: 'bow-arrow',
     rituals: ['Ram Katha', 'Bhajan', 'Temple visit', 'Fasting'],
@@ -175,7 +195,7 @@ export const FESTIVALS: Festival[] = [
     description: 'Birth of Lord Krishna at midnight. Day of devotion and fasting.',
     descriptionHi: 'मध्यरात्रि में भगवान कृष्ण का जन्म। भक्ति और उपवास का दिन।',
     type: 'major',
-    month: 'Shravana',
+    month: 'Bhadrapada',
     tithi: 'Ashtami',
     paksha: 'krishna',
     color: '#1A237E',
@@ -194,6 +214,7 @@ export const FESTIVALS: Festival[] = [
     month: 'Bhadrapada',
     tithi: 'Chaturthi',
     paksha: 'shukla',
+    kala: 'madhyahna',
     color: '#E65100',
     icon: 'elephant',
     rituals: ['Ganesh Sthapana', 'Modak offering', 'Aarti', 'Visarjan on 10th day'],
@@ -224,6 +245,7 @@ export const FESTIVALS: Festival[] = [
     month: 'Ashvina',
     tithi: 'Dashami',
     paksha: 'shukla',
+    kala: 'aparahna',
     color: '#D32F2F',
     icon: 'sword',
     rituals: ['Ravan Dahan', 'Shami Puja', 'Weapon worship', 'New beginnings'],
@@ -238,6 +260,7 @@ export const FESTIVALS: Festival[] = [
     month: 'Kartika',
     tithi: 'Chaturthi',
     paksha: 'krishna',
+    kala: 'moonrise',
     color: '#E91E63',
     icon: 'moon-full',
     rituals: ['Fasting till moonrise', 'Viewing moon through sieve', 'Puja'],
@@ -253,6 +276,7 @@ export const FESTIVALS: Festival[] = [
     month: 'Kartika',
     tithi: 'Trayodashi',
     paksha: 'krishna',
+    kala: 'pradosh',
     color: '#FFD700',
     icon: 'currency-inr',
     rituals: ['Lakshmi Puja', 'Buying metals', 'Diya lighting'],
@@ -267,6 +291,7 @@ export const FESTIVALS: Festival[] = [
     month: 'Kartika',
     tithi: 'Amavasya',
     paksha: 'krishna',
+    kala: 'pradosh',
     color: '#FF6F00',
     icon: 'candle',
     rituals: ['Lakshmi-Ganesh Puja', 'Diya lighting', 'Rangoli', 'Fireworks', 'Sweets'],
@@ -309,6 +334,7 @@ export const FESTIVALS: Festival[] = [
     month: 'Kartika',
     tithi: 'Shashthi',
     paksha: 'shukla',
+    kala: 'sunset',
     color: '#FF6B00',
     icon: 'weather-sunset',
     rituals: ['Holy bath', 'Fasting', 'Arghya to Sun', 'Thekua offering'],
@@ -404,6 +430,7 @@ export const FESTIVALS: Festival[] = [
     month: 'Ashvina',
     tithi: 'Purnima',
     paksha: 'shukla',
+    kala: 'nishita',
     color: '#E0E0E0',
     icon: 'moon-full',
   },
@@ -443,7 +470,7 @@ export const FESTIVALS: Festival[] = [
     description: '16-day period for honoring ancestors. No auspicious activities.',
     descriptionHi: 'पितरों के सम्मान के 16 दिन। कोई शुभ कार्य नहीं।',
     type: 'observance',
-    month: 'Bhadrapada',
+    month: 'Ashvina',
     paksha: 'krishna',
     color: '#616161',
     icon: 'account-group',
@@ -464,6 +491,22 @@ export function getFestivalsForDate(
     if (f.tithi && f.tithi !== tithi) return false;
     if (f.paksha && f.paksha !== paksha) return false;
     return true;
+  });
+}
+
+/**
+ * Tithi festivals kept on a civil day, using each festival's kala and the
+ * true lunar month (Adhik months skipped). Prefer this over getFestivalsForDate.
+ */
+export function lunarFestivalsOn(date: Date, lat: number, lon: number): Festival[] {
+  const n0 = sunriseTithi(date, lat, lon);
+  return FESTIVALS.filter((f) => {
+    if (!f.tithi || !f.paksha) return false;
+    const target = tithiIndex(f.tithi, f.paksha);
+    if (target < 0 || tithiGap(target, n0) > 2) return false;
+    const pm = HINDU_MONTHS.findIndex((m) => m.en === f.month);
+    const amanta = f.paksha === 'krishna' ? (pm + 11) % 12 : pm;
+    return keepsTithi(date, amanta, target, f.kala || 'sunrise', lat, lon);
   });
 }
 

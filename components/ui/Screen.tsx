@@ -44,6 +44,11 @@ export default function Screen({
         >
           {children}
         </ScrollView>
+        {/* Edge-to-edge: keep scrolled content from running under the clock
+            and status icons. */}
+        {edges.top && insets.top > 0 && (
+          <View pointerEvents="none" style={[styles.statusBackdrop, { height: insets.top, backgroundColor: colors.background }]} />
+        )}
       </View>
     );
   }
@@ -56,4 +61,6 @@ export default function Screen({
   );
 }
 
-export const styles = StyleSheet.create({});
+export const styles = StyleSheet.create({
+  statusBackdrop: { position: 'absolute', top: 0, left: 0, right: 0 },
+});

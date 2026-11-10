@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Header } from '../components/ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { router } from 'expo-router';
@@ -9,32 +10,22 @@ import { APP_VERSION, CHANGELOG } from '../constants/appInfo';
 
 export default function ChangelogScreen() {
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { t, tx } = useLanguage();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <LinearGradient
-          colors={isDark ? [colors.surfaceElevated, colors.background] : ['#D94F00', '#F07830']}
-          style={styles.header}
-        >
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <MaterialCommunityIcons name="format-list-bulleted" size={36} color="#FFD700" />
-          <Text style={styles.headerTitle}>{t('changelog.title')}</Text>
-          <Text style={styles.headerSub}>Current: v{APP_VERSION}</Text>
-        </LinearGradient>
+        <Header title={t('changelog.title')} subtitle={`You're on v${APP_VERSION}`} />
 
         {CHANGELOG.map((entry, idx) => (
           <View key={entry.version} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <View style={styles.versionRow}>
-              <View style={[styles.versionBadge, idx === 0 && { backgroundColor: '#D94F00' }]}>
+              <View style={[styles.versionBadge, idx === 0 && { backgroundColor: '#C2410C' }]}>
                 <Text style={[styles.versionNumber, idx === 0 && { color: '#FFF' }]}>v{entry.version}</Text>
               </View>
               {idx === 0 && (
                 <View style={styles.latestBadge}>
-                  <Text style={styles.latestText}>Latest</Text>
+                  <Text style={styles.latestText}>{tx('Latest')}</Text>
                 </View>
               )}
               <Text style={[styles.dateText, { color: colors.textTertiary }]}>{entry.date}</Text>
@@ -62,7 +53,7 @@ const styles = StyleSheet.create({
   card: { marginHorizontal: 20, marginTop: 16, borderRadius: 16, padding: 16, borderWidth: 1 },
   versionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   versionBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, backgroundColor: 'rgba(217,79,0,0.1)' },
-  versionNumber: { fontSize: 13, fontWeight: '700', color: '#D94F00' },
+  versionNumber: { fontSize: 13, fontWeight: '700', color: '#C2410C' },
   latestBadge: { backgroundColor: '#4ADE80', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   latestText: { fontSize: 10, fontWeight: '700', color: '#FFF' },
   dateText: { flex: 1, textAlign: 'right', fontSize: 12 },
