@@ -47,13 +47,7 @@
           "image": "./assets/images/emblem.png",
           "imageWidth": 170,
           "resizeMode": "contain",
-          "backgroundColor": "#FBF7F1",
-          "dark": {
-            "image": "./assets/images/emblem.png",
-            "imageWidth": 170,
-            "resizeMode": "contain",
-            "backgroundColor": "#13110F"
-          }
+          "backgroundColor": "#FBF7F1"
         }
       ],
       [
