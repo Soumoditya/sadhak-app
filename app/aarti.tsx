@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLayoutInsets } from '../constants/layout';
 import {
-  DEVOTIONAL_CATEGORIES, getDevotionalByCategory,
+  DEVOTIONAL_CATEGORIES, DEVOTIONAL_ITEMS, getDevotionalByCategory,
   type DevotionalCategory, type DevotionalItem,
 } from '../constants/devotional';
 import { getDeityImage } from '../constants/deityImages';
@@ -24,6 +24,14 @@ export default function DevotionalScreen() {
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [category, setCategory] = useState<DevotionalCategory>('aarti');
   const [selected, setSelected] = useState<DevotionalItem | null>(null);
+
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  // Home search deep-links straight to one text.
+  useEffect(() => {
+    if (!id) return;
+    const item = DEVOTIONAL_ITEMS.find((d) => d.id === id);
+    if (item) { setCategory(item.category); setSelected(item); }
+  }, [id]);
 
   // Hardware back closes the open text first (was popping the whole screen).
   useEffect(() => {
@@ -197,7 +205,7 @@ const st = StyleSheet.create({
   listenBtnText: { fontSize: 14.5, fontWeight: '800', color: '#FFF' },
 
   lyricsCard: { marginHorizontal: 16, marginTop: 16, borderRadius: 18, padding: 20, borderWidth: 1 },
-  lyricsText: { fontSize: DS.type.deva.lyric.size, lineHeight: DS.type.deva.lyric.lineHeight, fontWeight: '500' },
+  lyricsText: { fontSize: DS.type.deva.lyric.size, lineHeight: DS.type.deva.lyric.lineHeight, fontWeight: '500', textAlign: 'center' },
   meaningCard: { marginHorizontal: 16, marginTop: 12, borderRadius: 16, padding: 16, borderWidth: 1 },
   meaningHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   meaningLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 1.2 },

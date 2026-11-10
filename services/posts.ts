@@ -141,6 +141,33 @@ export async function deletePost(postId: string): Promise<void> {
   await deleteDoc(doc(db, 'posts', postId));
 }
 
+// ─── Reporting ───────────────────────────────────────────────────────────────
+// Play requires a way to report objectionable posts and comments. Reports land
+// in the top-level `reports` collection (see firebase/firestore.rules); if
+// those rules have not been published yet, the write falls back to the
+// reporter's own private subcollection, which the current rules already allow,
+// so a report is never silently lost.
+
+export type ReportReason = 'spam' | 'abuse' | 'sexual' | 'other';
+
+export async function reportPost(postId: string, authorId: string, reason: ReportReason, reporterId: string): Promise<void> {
+  const data = { kind: 'post', postId, authorId, reason, reporterId, createdAt: serverTimestamp() };
+  try {
+    await addDoc(collection(db, 'reports'), data);
+  } catch {
+    await addDoc(collection(db, 'users', reporterId, 'reports'), data);
+  }
+}
+
+export async function reportComment(postId: string, commentId: string, authorId: string, reason: ReportReason, reporterId: string): Promise<void> {
+  const data = { kind: 'comment', postId, commentId, authorId, reason, reporterId, createdAt: serverTimestamp() };
+  try {
+    await addDoc(collection(db, 'reports'), data);
+  } catch {
+    await addDoc(collection(db, 'users', reporterId, 'reports'), data);
+  }
+}
+
 // ─── Comments ────────────────────────────────────────────────────────────────
 export function subscribeComments(postId: string, cb: (c: PostComment[]) => void): () => void {
   const q = query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(500));

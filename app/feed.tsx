@@ -16,6 +16,7 @@ import {
   subscribeFeed, searchUsers, searchPosts, rankPosts,
   type Post, type UserResult, type FeedSort, type TopPeriod,
 } from '../services/posts';
+import { listBlocked } from '../services/social';
 
 const SORTS: { key: FeedSort; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'hot', label: 'Hot', icon: 'flame-outline' },
@@ -43,10 +44,17 @@ export default function FeedScreen() {
   const [userResults, setUserResults] = useState<UserResult[]>([]);
   const [postResults, setPostResults] = useState<Post[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [blocked, setBlocked] = useState<Set<string>>(new Set());
   const searchTimer = useRef<any>(null);
   const isSearchMode = term.trim().length > 0;
 
   useEffect(() => subscribeFeed((p) => { list.setPosts(p); setLoading(false); }), []);
+
+  // Posts from users I blocked never render, in the feed or in search.
+  useEffect(() => {
+    if (!list.uid) return;
+    listBlocked(list.uid).then((ids) => setBlocked(new Set(ids))).catch(() => {});
+  }, [list.uid]);
 
   // Debounced search
   useEffect(() => {
@@ -63,6 +71,9 @@ export default function FeedScreen() {
   }, [term]);
 
   const ranked = useMemo(() => rankPosts(list.posts, sort, period), [list.posts, sort, period]);
+  const visible = useMemo(() => ranked.filter((p) => !blocked.has(p.authorId)), [ranked, blocked]);
+  const visibleResults = useMemo(() => postResults.filter((p) => !blocked.has(p.authorId)), [postResults, blocked]);
+  const visiblePeople = useMemo(() => userResults.filter((u) => !blocked.has(u.uid)), [userResults, blocked]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -79,6 +90,7 @@ export default function FeedScreen() {
       onOpenComments={list.setCommentsFor}
       onDeleted={list.onDeleted}
       onChanged={list.onChanged}
+      onBlocked={(id) => setBlocked((prev) => new Set(prev).add(id))}
       onImage={setViewImage}
       commentsVersion={list.version}
     />
@@ -117,10 +129,10 @@ export default function FeedScreen() {
     </View>
   );
 
-  const people = userResults.length > 0 && (
+  const people = visiblePeople.length > 0 && (
     <View style={{ marginBottom: 8 }}>
       <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>{tx('People')}</Text>
-      {userResults.map((u) => (
+      {visiblePeople.map((u) => (
         <TouchableOpacity
           key={u.uid}
           activeOpacity={0.8}
@@ -161,7 +173,7 @@ export default function FeedScreen() {
       {isSearchMode ? (
         <FlatList
           keyboardShouldPersistTaps="handled"
-          data={postResults}
+          data={visibleResults}
           keyExtractor={(p) => 'p' + p.id}
           renderItem={renderPost}
           contentContainerStyle={{ padding: 14, paddingBottom: screenBottomPadding, gap: 14 }}
@@ -169,16 +181,16 @@ export default function FeedScreen() {
             <View>
               {searching && <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />}
               {people}
-              {postResults.length > 0 && <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>{tx('Posts')}</Text>}
+              {visibleResults.length > 0 && <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>{tx('Posts')}</Text>}
             </View>
           }
-          ListEmptyComponent={!searching && userResults.length === 0 ? <Text style={[s.empty, { color: colors.textTertiary }]}>{tx('No results')}</Text> : null}
+          ListEmptyComponent={!searching && visiblePeople.length === 0 ? <Text style={[s.empty, { color: colors.textTertiary }]}>{tx('No results')}</Text> : null}
         />
       ) : loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
-          data={ranked}
+          data={visible}
           keyExtractor={(p) => p.id}
           renderItem={renderPost}
           ListHeaderComponent={sortBar}

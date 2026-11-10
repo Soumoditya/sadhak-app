@@ -99,6 +99,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     deity: 'Lord Vishnu',
     color: '#1565C0',
     playQuery: 'Om Jai Jagdish Hare aarti',
+    meaning: 'The universal aarti of the Lord of the universe, sung for every deity.',
     text: `ॐ जय जगदीश हरे, स्वामी जय जगदीश हरे।
 भक्त जनों के संकट, दास जनों के संकट,
 क्षण में दूर करे॥ ॐ जय जगदीश हरे॥
@@ -139,6 +140,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     deity: 'Lord Shiva',
     color: '#4A148C',
     playQuery: 'Om Jai Shiv Omkara aarti',
+    meaning: 'Praise of Shiva as Om itself, the creator, preserver and destroyer in one.',
     text: `ॐ जय शिव ओंकारा, स्वामी जय शिव ओंकारा।
 ब्रह्मा, विष्णु, सदाशिव, अर्द्धांगी धारा॥ ॐ जय शिव ओंकारा॥
 
@@ -182,6 +184,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     deity: 'Lord Ganesha',
     color: '#C2410C',
     playQuery: 'Jai Ganesh Jai Ganesh Deva aarti',
+    meaning: 'Praise of Ganesh, remover of obstacles and first to be worshipped.',
     text: `जय गणेश जय गणेश, जय गणेश देवा।
 माता जाकी पार्वती, पिता महादेवा॥
 
@@ -213,6 +216,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     deity: 'Lord Hanuman',
     color: '#BF360C',
     playQuery: 'Aarti Kije Hanuman Lala Ki',
+    meaning: 'Praise of Hanuman ji, devotee of Ram, giver of strength and protection.',
     text: `आरती कीजै हनुमान लला की।
 दुष्ट दलन रघुनाथ कला की॥
 
@@ -258,6 +262,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     deity: 'Goddess Lakshmi',
     color: '#D32F2F',
     playQuery: 'Om Jai Lakshmi Mata aarti',
+    meaning: 'Praise of Lakshmi, goddess of wealth, fortune and well-being.',
     text: `ॐ जय लक्ष्मी माता, मैया जय लक्ष्मी माता।
 तुमको निशदिन सेवत, हरि विष्णु विधाता॥ ॐ जय लक्ष्मी माता॥
 
@@ -297,6 +302,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     deity: 'Goddess Durga',
     color: '#C62828',
     playQuery: 'Jai Ambe Gauri aarti',
+    meaning: 'Praise of Mother Durga as Gauri, remover of sorrow and giver of blessings.',
     text: `जय अम्बे गौरी, मैया जय श्यामा गौरी।
 तुमको निशदिन ध्यावत, हरि ब्रह्मा शिवरी॥ जय अम्बे गौरी॥
 
@@ -356,6 +362,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     deity: 'Lord Krishna',
     color: '#0D47A1',
     playQuery: 'Aarti Kunj Bihari Ki',
+    meaning: 'Praise of Krishna of Vrindavan, beloved of the gopis.',
     text: `आरती कुंजबिहारी की, श्री गिरिधर कृष्ण मुरारी की॥
 
 गले में बैजन्ती माला, बजावै मुरली मधुर बाला।
@@ -394,6 +401,7 @@ export const DEVOTIONAL_ITEMS: DevotionalItem[] = [
     deity: 'Goddess Saraswati',
     color: '#B8860B',
     playQuery: 'Jai Saraswati Mata aarti',
+    meaning: 'Praise of Saraswati, goddess of learning, music and wisdom.',
     text: `जय सरस्वती माता, मैया जय सरस्वती माता।
 सद्गुण वैभव शालिनी, त्रिभुवन विख्याता॥ जय सरस्वती माता॥
 

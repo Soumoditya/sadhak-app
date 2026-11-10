@@ -70,7 +70,9 @@ export default function JyotishScreen() {
   // ── Birth-form state (defaults; prefilled from the saved natal record) ──
   const [date, setDate] = useState<Date>(new Date(1995, 0, 1));
   const [time, setTime] = useState<Date>(() => { const d = new Date(); d.setHours(6, 0, 0, 0); return d; });
-  const [hasTime, setHasTime] = useState(true);
+  // "Time is unknown" checkbox, unchecked by default: the time picker is the
+  // default, not "unknown".
+  const [timeUnknown, setTimeUnknown] = useState(false);
   const [gender, setGender] = useState<'male' | 'female'>(profile?.gender || 'male');
   const [place, setPlace] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -85,7 +87,7 @@ export default function JyotishScreen() {
     setDate(new Date(b.date + 'T00:00:00'));
     const [h, m] = (b.time || '06:00').split(':').map(Number);
     const td = new Date(); td.setHours(h, m, 0, 0); setTime(td);
-    setHasTime(b.hasTime); setGender(b.gender); setPlace(b.place);
+    setTimeUnknown(!b.hasTime); setGender(b.gender); setPlace(b.place);
     setCoords({ lat: b.lat, lng: b.lng }); setTzOffset(String(b.tzOffset)); setTzOther(b.tzOffset !== 5.5);
   };
 
@@ -267,13 +269,41 @@ export default function JyotishScreen() {
     } finally { setGeocoding(false); }
   };
 
+  // Birthplace autocomplete: suggestions appear as the user types (Nominatim,
+  // 500 ms debounce, at least 3 characters). Tapping one fills the place and
+  // its coordinates; Locate stays as a fallback.
+  const [suggestions, setSuggestions] = useState<{ name: string; lat: number; lng: number }[]>([]);
+  const pickedRef = useRef(false);
+  useEffect(() => {
+    const q = place.trim();
+    if (pickedRef.current) { pickedRef.current = false; setSuggestions([]); return; }
+    if (q.length < 3) { setSuggestions([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(q)}`,
+          { headers: { 'User-Agent': 'SadhakApp/1.0 (soumodityapramanik@gmail.com)' } },
+        );
+        const arr = await res.json();
+        setSuggestions((arr || []).map((r: any) => ({ name: String(r.display_name).split(',').slice(0, 3).join(', '), lat: parseFloat(r.lat), lng: parseFloat(r.lon) })));
+      } catch { setSuggestions([]); }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [place]);
+  const pickSuggestion = (sg: { name: string; lat: number; lng: number }) => {
+    pickedRef.current = true;
+    setPlace(sg.name);
+    setCoords({ lat: sg.lat, lng: sg.lng });
+    setSuggestions([]);
+  };
+
   const saveBirth = async () => {
     if (!user?.uid) { dialog.alert('Sign in needed', 'Please sign in to save your birth chart.'); return; }
     const where = coords ?? (place.trim() ? await geocode() : null);
     if (!where) { if (!place.trim()) dialog.alert('Set birth place', 'Type the city or town you were born in.'); return; }
     const tz = parseFloat(tzOffset);
     if (!Number.isFinite(tz) || tz < -12 || tz > 14) { dialog.alert('Timezone', 'Enter a valid timezone offset (e.g. 5.5 for India).'); return; }
-    const birth: BirthInput = { date: dateStr, time: timeStr, hasTime, place: place.trim(), lat: where.lat, lng: where.lng, tzOffset: tz, gender };
+    const birth: BirthInput = { date: dateStr, time: timeStr, hasTime: !timeUnknown, place: place.trim(), lat: where.lat, lng: where.lng, tzOffset: tz, gender };
     try {
       setSaving(true);
       birthEdited.current = true;
@@ -312,16 +342,16 @@ export default function JyotishScreen() {
 
           <View style={s.rowBetween}>
             <Text style={[s.label, { color: colors.textTertiary }]}>{tx('TIME OF BIRTH')}</Text>
-            <TouchableOpacity onPress={() => setHasTime((v) => !v)} style={s.timeToggle}>
-              <MaterialCommunityIcons name={hasTime ? 'checkbox-marked' : 'checkbox-blank-outline'} size={16} color={colors.primary} />
-              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{tx('I know my birth time')}</Text>
+            <TouchableOpacity onPress={() => setTimeUnknown((v) => !v)} style={s.timeToggle}>
+              <MaterialCommunityIcons name={timeUnknown ? 'checkbox-marked' : 'checkbox-blank-outline'} size={16} color={colors.primary} />
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{tx('Time is unknown')}</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity disabled={!hasTime} style={[s.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface, opacity: hasTime ? 1 : 0.5 }]} onPress={() => setShowTime(true)}>
+          <TouchableOpacity disabled={timeUnknown} style={[s.field, { borderColor: colors.cardBorder, backgroundColor: colors.surface, opacity: timeUnknown ? 0.5 : 1 }]} onPress={() => setShowTime(true)}>
             <MaterialCommunityIcons name="clock-outline" size={18} color={colors.primary} />
-            <Text style={[s.fieldText, { color: colors.text }]}>{hasTime ? time.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : 'Unknown — chart uses noon (lagna approximate)'}</Text>
+            <Text style={[s.fieldText, { color: colors.text }]}>{timeUnknown ? 'Unknown — chart uses noon (lagna approximate)' : time.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}</Text>
           </TouchableOpacity>
-          {showTime && hasTime && (
+          {showTime && !timeUnknown && (
             <DateTimePicker value={time} mode="time" onChange={(e, d) => { setShowTime(Platform.OS === 'ios'); if (d) setTime(d); }} />
           )}
 
@@ -345,10 +375,24 @@ export default function JyotishScreen() {
               placeholder={tx('City, State')} placeholderTextColor={colors.textTertiary}
               value={place} onChangeText={(t) => { setPlace(t); setCoords(null); }}
             />
-            <TouchableOpacity onPress={() => { geocode(); }} style={[s.locateBtn, { backgroundColor: colors.primary }]}>
+            <TouchableOpacity onPress={() => { setSuggestions([]); geocode(); }} style={[s.locateBtn, { backgroundColor: colors.primary }]}>
               {geocoding ? <ActivityIndicator size="small" color="#FFF" /> : <><MaterialCommunityIcons name="map-marker" size={16} color="#FFF" /><Text style={{ color: '#FFF', fontWeight: '800', fontSize: 12 }}>{tx('Locate')}</Text></>}
             </TouchableOpacity>
           </View>
+          {suggestions.length > 0 && (
+            <View style={[s.suggestBox, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              {suggestions.map((sg, i) => (
+                <TouchableOpacity
+                  key={`${sg.name}-${sg.lat}`}
+                  onPress={() => pickSuggestion(sg)}
+                  style={[s.suggestRow, i < suggestions.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.cardBorder }]}
+                >
+                  <MaterialCommunityIcons name="map-marker" size={16} color={colors.primary} />
+                  <Text style={{ color: colors.text, fontSize: 13.5, flex: 1 }}>{sg.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
           {coords && <Text style={{ color: colors.tulsiGreen || '#2D6A4F', fontSize: 11.5, marginTop: 4 }}>✓ {coords.lat.toFixed(3)}, {coords.lng.toFixed(3)}</Text>}
 
           <Text style={[s.label, { color: colors.textTertiary }]}>{tx('TIMEZONE AT BIRTH')}</Text>
@@ -675,7 +719,7 @@ export default function JyotishScreen() {
                   {loc.planet(maha.lord)} {tx('Mahadasha')}{antar ? ` · ${loc.planet(antar.lord)} ${tx('Antardasha')}` : ''}
                 </Text>
                 <View style={[s.bar, { backgroundColor: colors.primary + '22' }]}><View style={[s.barFill, { backgroundColor: colors.primary, width: `${pct(maha.start, maha.end) * 100}%` }]} /></View>
-                <Text style={{ color: colors.textTertiary, fontSize: 11.5, marginTop: 4 }}>{fmtShort(maha.start)} – {fmtShort(maha.end)}</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 11.5, marginTop: 4 }}>{fmtFull(maha.start)} – {fmtFull(maha.end)}</Text>
               </View>
             )}
             {!!antars.length && (
@@ -688,7 +732,7 @@ export default function JyotishScreen() {
                     <View key={a.lord + a.start} style={s.timeRow}>
                       <View style={[s.timeDot, { backgroundColor: on ? colors.primary : past ? colors.cardBorder : colors.surface, borderColor: on ? colors.primary : colors.textTertiary }]} />
                       <Text style={[s.timeLord, { color: on ? colors.primary : past ? colors.textTertiary : colors.text, fontWeight: on ? '800' : '600' }]}>{loc.planet(maha!.lord)} / {loc.planet(a.lord)}</Text>
-                      <Text style={[s.timeSpan, { color: colors.textTertiary }]}>{fmtShort(a.start)} – {fmtShort(a.end)}</Text>
+                      <Text style={[s.timeSpan, { color: colors.textTertiary }]}>{fmtFull(a.start)} – {fmtFull(a.end)}</Text>
                     </View>
                   );
                 })}
@@ -703,12 +747,12 @@ export default function JyotishScreen() {
                   <TouchableOpacity onPress={() => setOpenMaha(open ? null : m.start)} style={s.timeRow}>
                     <Icon name={open ? 'caret-down' : 'caret-right'} size={13} color={colors.textTertiary} weight="regular" />
                     <Text style={[s.timeLord, { color: on ? colors.primary : colors.text, fontWeight: on ? '800' : '600' }]}>{loc.planet(m.lord)}</Text>
-                    <Text style={[s.timeSpan, { color: colors.textTertiary }]}>{m.start.slice(0, 4)} – {m.end.slice(0, 4)}</Text>
+                    <Text style={[s.timeSpan, { color: colors.textTertiary }]}>{fmtFull(m.start)} – {fmtFull(m.end)}</Text>
                   </TouchableOpacity>
                   {open && antardashas(m).map((a) => (
                     <View key={a.start} style={[s.timeRow, { paddingLeft: 24 }]}>
                       <Text style={[s.timeLord, { color: colors.textSecondary, fontSize: 13 }]}>{loc.planet(m.lord)} / {loc.planet(a.lord)}</Text>
-                      <Text style={[s.timeSpan, { color: colors.textTertiary }]}>{fmtShort(a.start)} – {fmtShort(a.end)}</Text>
+                      <Text style={[s.timeSpan, { color: colors.textTertiary }]}>{fmtFull(a.start)} – {fmtFull(a.end)}</Text>
                     </View>
                   ))}
                 </View>
@@ -728,17 +772,17 @@ export default function JyotishScreen() {
                 <View key={x.label} style={[s.sadeCard, { borderColor: x.p === sadeNow ? tones.kumkum.fg + '55' : colors.cardBorder, backgroundColor: x.p === sadeNow ? tones.kumkum.bg : 'transparent' }]}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={{ color: x.p === sadeNow ? tones.kumkum.fg : colors.textSecondary, fontSize: 12, fontWeight: '800' }}>{x.label}</Text>
-                    <Text style={{ color: colors.text, fontSize: 13.5, fontWeight: '800' }}>{fmtShort(x.p.start)} – {fmtShort(x.p.end)}</Text>
+                    <Text style={{ color: colors.text, fontSize: 13.5, fontWeight: '800' }}>{fmtFull(x.p.start)} – {fmtFull(x.p.end)}</Text>
                   </View>
                   {(x.p.phases || []).map((ph: any) => (
-                    <Text key={ph.name} style={{ color: colors.textSecondary, fontSize: 12.5, marginTop: 4 }}>{tx(ph.name)}: {fmtShort(ph.start)} – {fmtShort(ph.end)}</Text>
+                    <Text key={ph.name} style={{ color: colors.textSecondary, fontSize: 12.5, marginTop: 4 }}>{tx(ph.name)}: {fmtFull(ph.start)} – {fmtFull(ph.end)}</Text>
                   ))}
                 </View>
               ))
           )}
           {dhaiyaNext && (
             <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 6 }}>
-              {tx('Shani Dhaiya')} ({dhaiyaNext.kind === 'dhaiya4' ? '4th' : '8th'}): {fmtShort(dhaiyaNext.start)} – {fmtShort(dhaiyaNext.end)}
+              {tx('Shani Dhaiya')} ({dhaiyaNext.kind === 'dhaiya4' ? '4th' : '8th'}): {fmtFull(dhaiyaNext.start)} – {fmtFull(dhaiyaNext.end)}
             </Text>
           )}
         </Section2>
@@ -802,7 +846,9 @@ const HOUSE_MEANING: Record<number, string> = {
   1: 'self & health', 2: 'wealth & family', 3: 'courage & siblings', 4: 'home & mother', 5: 'children & intellect', 6: 'health & rivals',
   7: 'marriage & partners', 8: 'longevity & change', 9: 'fortune & dharma', 10: 'career & status', 11: 'gains & friends', 12: 'expenses & moksha',
 };
-const fmtShort = (d: string | Date) => new Date(typeof d === 'string' ? d + 'T00:00:00' : d).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+// Full date (day, month, year) for dasha periods, so the user sees exactly
+// when each period starts and ends.
+const fmtFull = (d: string | Date) => new Date(typeof d === 'string' ? d + 'T00:00:00' : d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
 function Section2({ title, children, colors, display }: { title: string; children: React.ReactNode; colors: any; display: any }) {
   return (
@@ -853,6 +899,8 @@ const s = StyleSheet.create({
   timeToggle: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 18, marginBottom: 8 },
   genderChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 48, borderRadius: 12, borderWidth: 1 },
   locateBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, borderRadius: 12, height: 52, justifyContent: 'center' },
+  suggestBox: { borderWidth: 1, borderRadius: 12, marginTop: 6, overflow: 'hidden' },
+  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11, paddingHorizontal: 12 },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 54, borderRadius: 14, marginTop: 26 },
   saveBtnText: { color: '#FFF', fontSize: 15.5, fontWeight: '800' },
   privacy: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1 },

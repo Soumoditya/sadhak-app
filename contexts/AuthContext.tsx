@@ -344,8 +344,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       GoogleSignin.signOut().catch(() => {});
       setProfile(null);
       await AsyncStorage.removeItem('userProfile');
-      // Leave whatever screen we were on (Settings) for the login screen.
-      router.replace('/(auth)/login');
+      // Leave whatever screen we were on (Settings) for the welcome screen.
+      router.replace('/(auth)/welcome');
     } catch (error) {
       console.error('Logout error:', error);
       throw error;
@@ -375,7 +375,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await firebaseDeleteUser(user);
       setProfile(null);
       await AsyncStorage.removeItem('userProfile');
-      router.replace('/(auth)/login');
+      router.replace('/(auth)/welcome');
     } catch (error) {
       console.error('Delete account error:', error);
       throw error;

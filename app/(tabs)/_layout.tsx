@@ -1,7 +1,8 @@
 import { Tabs, Redirect } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, Animated, Pressable, type ColorValue } from 'react-native';
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import Icon from '../../components/ui/Icon';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -68,9 +69,17 @@ export default function TabLayout() {
   const { t } = useLanguage();
   const { colors, isDark } = useTheme();
   const { insets } = useLayoutInsets();
+  // New users first pick a language, then meet the welcome screen. Users who
+  // already did onboarding go straight to welcome when signed out.
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem('sadhak_onboarded')
+      .then((v) => setOnboarded(v === '1'))
+      .catch(() => setOnboarded(false));
+  }, []);
 
-  if (isLoading) return null;
-  if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
+  if (isLoading || onboarded === null) return null;
+  if (!isAuthenticated) return <Redirect href={onboarded ? '/(auth)/welcome' : '/(auth)/language'} />;
 
   return (
     <Tabs
@@ -146,9 +155,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: 'Chat',
+          title: 'Community',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon label={t('nav.chat')} color={color} focused={focused}>
+            <TabIcon label={t('nav.community')} color={color} focused={focused}>
               <Icon name="chats-circle" size={24} color={color as string} weight={focused ? 'fill' : 'regular'} />
             </TabIcon>
           ),
@@ -157,7 +166,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          // Reached from the avatar on Home and Tools; keeps the bar to five.
+          // Reached from the sidebar and Tools; keeps the bar to five.
           href: null,
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (

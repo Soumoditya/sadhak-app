@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, memo, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Platform,
   TextInput, FlatList, InteractionManager, type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
 import { eclipsesInMonth, type Grahan } from '../../services/eclipses';
@@ -237,6 +237,8 @@ export default function CalendarScreen() {
   const holidayName = (h: Holiday) => (language === 'hi' || language === 'mr' ? h.hi : language === 'bn' || language === 'as' ? h.bn : h.name);
   const [showClock, setShowClock] = useState(false);
   const [monthPicker, setMonthPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pendingDate, setPendingDate] = useState<Date>(new Date());
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -381,6 +383,20 @@ export default function CalendarScreen() {
   }), [colors, tones]);
   const onSelectDay = useCallback((d: Date) => setSelectedDate(d), []);
   const goToToday = () => { setCurrentDate(new Date()); setSelectedDate(new Date()); };
+
+  // Jump straight to a picked day (year, month, day), the same native picker
+  // Panchang uses. The pager only spans PAGE_SPAN months either side of
+  // today, so the picker is clamped to that range; the pager could not show
+  // a month outside it.
+  const minJump = useMemo(() => { const n = new Date(); return new Date(n.getFullYear() - 10, n.getMonth(), 1); }, []);
+  const maxJump = useMemo(() => { const n = new Date(); return new Date(n.getFullYear() + 10, n.getMonth() + 1, 0); }, []);
+  const applyJump = (d: Date) => {
+    setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+    setSelectedDate(d);
+    setShowDatePicker(false);
+    setMonthPicker(false);
+  };
+  const openDatePicker = () => { setPendingDate(selectedDate); setShowDatePicker(true); };
 
   const addNote = () => {
     if (!noteText.trim()) return;
@@ -912,13 +928,13 @@ export default function CalendarScreen() {
       </Modal>
 
       {/* ═══ Month / year jump ═══ */}
-      <Modal visible={monthPicker} transparent animationType="slide" onRequestClose={() => setMonthPicker(false)}>
+      <Modal visible={monthPicker} transparent animationType="slide" onRequestClose={() => { setMonthPicker(false); setShowDatePicker(false); }}>
         <View style={st.modalOverlay}>
           <View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: 30 + bottomInset }]}>
             <View style={[st.sheetHandle, { backgroundColor: colors.divider }]} />
             <View style={st.sheetHeader}>
               <Text style={[st.sheetTitle, { color: colors.text }]}>{t('cal.jumpTo')}</Text>
-              <TouchableOpacity onPress={() => setMonthPicker(false)} hitSlop={8}>
+              <TouchableOpacity onPress={() => { setMonthPicker(false); setShowDatePicker(false); }} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textTertiary} />
               </TouchableOpacity>
             </View>
@@ -950,6 +966,43 @@ export default function CalendarScreen() {
                 );
               })}
             </View>
+
+            {/* Pick an exact day: year, month and day in one tap. */}
+            <TouchableOpacity
+              onPress={openDatePicker}
+              activeOpacity={0.8}
+              style={[st.presetRow, { borderColor: colors.cardBorder, backgroundColor: colors.background, marginTop: 12 }]}
+            >
+              <View style={[st.presetIcon, { backgroundColor: colors.primary + '14' }]}>
+                <MaterialCommunityIcons name="calendar-edit-outline" size={19} color={colors.primary} />
+              </View>
+              <Text style={[st.presetTitle, { color: colors.text, flex: 1 }]}>{t('cal.pickDay')}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+            {showDatePicker && (
+              <View style={{ marginTop: 12 }}>
+                <DateTimePicker
+                  value={pendingDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  minimumDate={minJump}
+                  maximumDate={maxJump}
+                  onChange={(event, date) => {
+                    if (Platform.OS === 'android') {
+                      setShowDatePicker(false);
+                      if (event.type === 'set' && date) applyJump(date);
+                      return;
+                    }
+                    if (date) setPendingDate(date);
+                  }}
+                />
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity onPress={() => applyJump(pendingDate)} style={[st.jumpGo, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
+                    <Text style={[st.jumpGoText, { color: '#FFF' }]}>{t('cal.jumpTo')}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -1072,6 +1125,8 @@ const st = StyleSheet.create({
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   monthGridItem: { flexBasis: '30%', flexGrow: 1, alignItems: 'center', paddingVertical: 13, borderRadius: 12, borderWidth: 1 },
   monthGridText: { fontSize: 14, fontWeight: '700' },
+  jumpGo: { marginTop: 12, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  jumpGoText: { fontSize: 15, fontWeight: '800' },
   sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 14 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sheetTitle: { fontSize: 19, fontWeight: '800' },

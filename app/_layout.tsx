@@ -10,7 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
-import { LanguageProvider } from '../contexts/LanguageContext';
+import { LanguageProvider, useLanguage } from '../contexts/LanguageContext';
 import { DialogProvider } from '../contexts/DialogContext';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -33,6 +33,17 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 // smoothly to the app; short, calm, no pulsing loop.
 function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
   const { colors, isDark } = useTheme();
+  const { language, tx } = useLanguage();
+  // One name only, in the user's own language (new users see English).
+  const name =
+    language === 'hi' || language === 'mr' ? 'साधक'
+    : language === 'bn' || language === 'as' ? 'সাধক'
+    : 'Sadhak';
+  const nameStyle =
+    language === 'hi' || language === 'mr' ? splashStyles.hindi
+    : language === 'bn' || language === 'as' ? splashStyles.bengali
+    : splashStyles.soloName;
+  const nameColor = language === 'en' ? colors.primary : colors.text;
   const logoScale = useRef(new Animated.Value(0.86)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
@@ -82,9 +93,8 @@ function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
           />
         </View>
         <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textSlide }], alignItems: 'center' }}>
-          <Text style={[splashStyles.hindi, { color: colors.text }]}>साधक</Text>
-          <Text style={[splashStyles.appName, { color: colors.primary }]}>Sadhak</Text>
-          <Text style={[splashStyles.tagline, { color: colors.textTertiary }]}>Your daily spiritual companion</Text>
+          <Text style={[nameStyle, { color: nameColor }]}>{name}</Text>
+          <Text style={[splashStyles.tagline, { color: colors.textTertiary }]}>{tx('Your daily spiritual companion')}</Text>
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -94,6 +104,8 @@ function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
 const splashStyles = StyleSheet.create({
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   hindi: { fontSize: 46, lineHeight: 66, fontFamily: DS.font.deva },
+  bengali: { fontSize: 40, lineHeight: 58, fontWeight: '800' },
+  soloName: { fontSize: 34, fontFamily: DS.font.display, letterSpacing: 0.4 },
   appName: { fontSize: 22, fontFamily: DS.font.display, marginTop: -4, letterSpacing: 0.4 },
   tagline: { fontSize: 13, marginTop: 14, letterSpacing: 0.3 },
 });

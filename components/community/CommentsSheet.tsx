@@ -11,9 +11,10 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDialog } from '../../contexts/DialogContext';
 import {
-  subscribeComments, addComment, editComment, deleteComment, voteComment, commentScore, timeAgo,
+  subscribeComments, addComment, editComment, deleteComment, voteComment, commentScore, timeAgo, reportComment, type ReportReason,
   type Post, type PostComment,
 } from '../../services/posts';
+import { listBlocked } from '../../services/social';
 import { uploadToCloudinary } from '../../services/cloudinary';
 import { ActionSheet } from '../ui';
 import Avatar from './Avatar';
@@ -29,7 +30,7 @@ const ms = (c: PostComment) => c.createdAt?.toMillis?.() ?? (typeof c.createdAt 
 /** Reddit-style threaded comments: replies, votes, edit/delete, sort and photos. */
 export default function CommentsSheet({ post, onClose, onAdded }: { post: Post | null; onClose: () => void; onAdded?: (postId: string, delta?: number) => void }) {
   const { colors } = useTheme();
-  const { tx } = useLanguage();
+  const { t, tx } = useLanguage();
   const dialog = useDialog();
   const { user, profile, isGuest } = useAuth();
   const insets = useSafeAreaInsets();
@@ -45,7 +46,14 @@ export default function CommentsSheet({ post, onClose, onAdded }: { post: Post |
   const [editing, setEditing] = useState<PostComment | null>(null);
   const [image, setImage] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<PostComment | null>(null);
+  const [reportFor, setReportFor] = useState<PostComment | null>(null);
   const [viewImage, setViewImage] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!user?.uid) { setBlocked(new Set()); return; }
+    listBlocked(user.uid).then((ids) => setBlocked(new Set(ids))).catch(() => {});
+  }, [user?.uid]);
 
   useEffect(() => {
     setLoaded(false); setReplyTo(null); setEditing(null); setImage(null); setText(''); setCollapsed(new Set());
@@ -54,11 +62,14 @@ export default function CommentsSheet({ post, onClose, onAdded }: { post: Post |
   }, [post?.id]);
 
   // Thread the flat list, sort each level, then flatten what is expanded.
+  // Comments from users I blocked never render (their replies, if any,
+  // become top-level, since their parent is gone from the list).
   const { rows, total } = useMemo(() => {
-    const ids = new Set(comments.map((c) => c.id));
+    const visible = comments.filter((c) => !blocked.has(c.authorId));
+    const ids = new Set(visible.map((c) => c.id));
     const kids = new Map<string, PostComment[]>();
     const roots: PostComment[] = [];
-    for (const c of comments) {
+    for (const c of visible) {
       if (c.parentId && ids.has(c.parentId)) {
         const k = kids.get(c.parentId) || [];
         k.push(c); kids.set(c.parentId, k);
@@ -81,8 +92,8 @@ export default function CommentsSheet({ post, onClose, onAdded }: { post: Post |
       }
     };
     walk(roots, 0);
-    return { rows: out, total: comments.filter((c) => !c.deleted).length };
-  }, [comments, sort, collapsed]);
+    return { rows: out, total: visible.filter((c) => !c.deleted).length };
+  }, [comments, sort, collapsed, blocked]);
 
   const toggle = (id: string) => setCollapsed((prev) => {
     const n = new Set(prev);
@@ -92,6 +103,15 @@ export default function CommentsSheet({ post, onClose, onAdded }: { post: Post |
 
   const startReply = (c: PostComment) => { setEditing(null); setReplyTo(c); setTimeout(() => inputRef.current?.focus(), 50); };
   const startEdit = (c: PostComment) => { setReplyTo(null); setImage(null); setEditing(c); setText(c.text); setTimeout(() => inputRef.current?.focus(), 50); };
+
+  const doReportComment = async (c: PostComment, reason: ReportReason) => {
+    setReportFor(null);
+    if (!user || !post) return;
+    try {
+      await reportComment(post.id, c.id, c.authorId, reason, user.uid);
+      dialog.alert(t('social.reportSent'));
+    } catch { dialog.alert(tx('Could not send the report'), tx('Please try again.')); }
+  };
   const cancelContext = () => { if (editing) setText(''); setEditing(null); setReplyTo(null); };
 
   const pickImage = async () => {
@@ -317,7 +337,21 @@ export default function CommentsSheet({ post, onClose, onAdded }: { post: Post |
           ...(menuFor.text ? [{ label: tx('Copy text'), icon: 'copy-outline' as const, onPress: () => { Clipboard.setStringAsync(menuFor.text).catch(() => {}); } }] : []),
           ...(user && menuFor.authorId === user.uid ? [{ label: tx('Edit'), icon: 'create-outline' as const, onPress: () => startEdit(menuFor) }] : []),
           ...(user && (menuFor.authorId === user.uid || post?.authorId === user.uid) ? [{ label: tx('Delete'), icon: 'trash-outline' as const, danger: true, onPress: () => remove(menuFor) }] : []),
-          ...(menuFor.authorId !== user?.uid ? [{ label: tx('View profile'), icon: 'person-circle-outline' as const, onPress: () => openUser(menuFor.authorId) }] : []),
+          ...(menuFor.authorId !== user?.uid ? [
+            { label: tx('View profile'), icon: 'person-circle-outline' as const, onPress: () => openUser(menuFor.authorId) },
+            { label: t('social.report'), icon: 'flag-outline' as const, onPress: () => setReportFor(menuFor) },
+          ] : []),
+        ] : []}
+      />
+      <ActionSheet
+        visible={!!reportFor}
+        title={t('social.reportTitle')}
+        onClose={() => setReportFor(null)}
+        actions={reportFor ? [
+          { label: t('social.reasonSpam'), icon: 'alert-circle-outline' as const, onPress: () => doReportComment(reportFor, 'spam') },
+          { label: t('social.reasonAbuse'), icon: 'megaphone-outline' as const, onPress: () => doReportComment(reportFor, 'abuse') },
+          { label: t('social.reasonSexual'), icon: 'eye-off-outline' as const, onPress: () => doReportComment(reportFor, 'sexual') },
+          { label: t('social.reasonOther'), icon: 'ellipsis-horizontal-outline' as const, onPress: () => doReportComment(reportFor, 'other') },
         ] : []}
       />
       <ImageViewer uri={viewImage} onClose={() => setViewImage(null)} />

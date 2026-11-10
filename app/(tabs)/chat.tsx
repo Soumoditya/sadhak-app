@@ -7,18 +7,15 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import Avatar from '../../components/community/Avatar';
-import { subscribeDms, isDmRequest, type DmEntry } from '../../services/social';
 import { db, rtdb, collection, getDocs, addDoc, serverTimestamp, ref, onValue, off } from '../../config/firebase';
 import { Screen, Button, Diya, Icon, fromMaterial, AppBar, ActionSheet } from '../../components/ui';
 import { DS, useDsInsets } from '../../constants/ds';
 
-type ChatTab = 'rooms' | 'dms' | 'groups' | 'channels';
+type ChatTab = 'rooms' | 'groups' | 'channels';
 
 interface Room {
   id: string; name: string; description: string;
-  type: 'public' | 'group' | 'broadcast' | 'dm';
-  pfp?: string | null;
+  type: 'public' | 'group' | 'broadcast';
   icon: string; color: string;
   lastMessage?: string; lastMessageTime?: number; memberCount?: number; createdBy?: string;
 }
@@ -48,32 +45,11 @@ export default function CommunityScreen() {
   const dialog = useDialog();
   const { insets, tabScrollBottom } = useDsInsets();
 
-  const [tab, setTabState] = useState<ChatTab>('rooms');
-  const [touched, setTouched] = useState(false);
-  const setTab = (k: ChatTab) => { setTouched(true); setTabState(k); };
+  const [tab, setTab] = useState<ChatTab>('rooms');
   const [menu, setMenu] = useState(false);
   const [rooms, setRooms] = useState<Room[]>(DEFAULT_ROOMS);
   const [groups, setGroups] = useState<Room[]>([]);
   const [channels, setChannels] = useState<Room[]>([]);
-  const [dms, setDms] = useState<Room[]>([]);
-  const [requests, setRequests] = useState<Room[]>([]);
-  const [showRequests, setShowRequests] = useState(false);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    const toRoom = (d: DmEntry): Room => ({
-      id: d.roomId, name: d.otherName, description: '', type: 'dm', icon: 'account', color: '#C2410C',
-      pfp: d.otherPfp, lastMessage: d.lastMessage, lastMessageTime: d.lastMessageTime,
-    });
-    // People you follow land in Chats; anyone else waits in Requests.
-    return subscribeDms(user.uid, (list) => {
-      setDms(list.filter((d) => !d.blocked && !isDmRequest(d)).map(toRoom));
-      setRequests(list.filter(isDmRequest).map(toRoom));
-    });
-  }, [user?.uid]);
-  useEffect(() => { if (!requests.length) setShowRequests(false); }, [requests.length]);
-  // People who already chat land on their chats first.
-  useEffect(() => { if (!touched && dms.length) setTabState('dms'); }, [dms.length]);
   const [q, setQ] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [cName, setCName] = useState('');
@@ -131,16 +107,15 @@ export default function CommunityScreen() {
   const openRoom = (r: Room) => router.push({ pathname: '/chatroom', params: { roomId: r.id, roomName: r.name, roomType: r.type } });
 
   const list = useMemo(() => {
-    const items = tab === 'rooms' ? rooms : tab === 'groups' ? groups : tab === 'channels' ? channels : showRequests ? requests : dms;
+    const items = tab === 'rooms' ? rooms : tab === 'groups' ? groups : channels;
     const query = q.trim().toLowerCase();
     return query ? items.filter(r => r.name.toLowerCase().includes(query) || (r.description || '').toLowerCase().includes(query)) : items;
-  }, [tab, rooms, groups, channels, dms, requests, showRequests, q]);
-  const counts: Record<ChatTab, number> = { dms: dms.length, rooms: rooms.length, groups: groups.length, channels: channels.length };
+  }, [tab, rooms, groups, channels, q]);
+  const counts: Record<ChatTab, number> = { rooms: rooms.length, groups: groups.length, channels: channels.length };
 
   const canCreate = tab === 'groups' || tab === 'channels';
 
   const TABS: { k: ChatTab; label: string }[] = [
-    { k: 'dms', label: tx('Chats') },
     { k: 'rooms', label: t('chat.rooms') },
     { k: 'groups', label: t('chat.groups') },
     { k: 'channels', label: t('chat.channels') },
@@ -217,20 +192,7 @@ export default function CommunityScreen() {
         keyExtractor={(r) => r.id}
         contentContainerStyle={{ paddingBottom: tabScrollBottom, paddingTop: 4 }}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={tab === 'dms' && (requests.length > 0 || showRequests) ? (
-          <TouchableOpacity onPress={() => setShowRequests((v) => !v)} style={s.row} activeOpacity={0.7}>
-            <View style={[s.avatarBox, { backgroundColor: colors.primary + '14', borderRadius: 24 }]}>
-              <Ionicons name={showRequests ? 'arrow-back' : 'mail-unread-outline'} size={22} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.rowName, { color: colors.text }]}>{showRequests ? tx('Back to chats') : tx('Message requests')}</Text>
-              {!showRequests && <Text style={[s.rowLast, { color: colors.textSecondary }]}>{requests.length} {tx(requests.length === 1 ? 'person wants to chat' : 'people want to chat')}</Text>}
-            </View>
-            {!showRequests && (
-              <View style={[s.count, { backgroundColor: colors.primary }]}><Text style={[s.countText, { color: '#FFF' }]}>{requests.length}</Text></View>
-            )}
-          </TouchableOpacity>
-        ) : canCreate ? (
+        ListHeaderComponent={canCreate ? (
           <TouchableOpacity onPress={() => { setCType(tab === 'channels' ? 'broadcast' : 'group'); setCreateOpen(true); }} style={s.row} activeOpacity={0.7}>
             <View style={[s.avatarBox, { backgroundColor: colors.primary + '14', borderRadius: 24 }]}>
               <Ionicons name="add" size={24} color={colors.primary} />
@@ -241,10 +203,8 @@ export default function CommunityScreen() {
         ItemSeparatorComponent={() => <View style={[s.sep, { backgroundColor: colors.divider }]} />}
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => openRoom(item)} style={s.row} activeOpacity={0.7}>
-            <View style={[s.avatarBox, { backgroundColor: item.type === 'dm' ? 'transparent' : tone(item.color).bg }]}>
-              {item.type === 'dm' ? (
-                <Avatar uri={item.pfp} name={item.name} size={48} />
-              ) : item.icon === 'candle' ? (
+            <View style={[s.avatarBox, { backgroundColor: tone(item.color).bg }]}>
+              {item.icon === 'candle' ? (
                 <Diya size={24} color={tone(item.color).fg} />
               ) : fromMaterial(item.icon) ? (
                 <Icon name={fromMaterial(item.icon)!} size={25} color={tone(item.color).fg} />
@@ -255,7 +215,7 @@ export default function CommunityScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <View style={s.rowTop}>
-                <Text style={[s.rowName, { color: colors.text }]} numberOfLines={1}>{item.type === 'dm' ? item.name : tx(item.name)}</Text>
+                <Text style={[s.rowName, { color: colors.text }]} numberOfLines={1}>{tx(item.name)}</Text>
                 {!!item.lastMessageTime && (
                   <Text style={[s.rowTime, { color: isLive(item.lastMessageTime) ? colors.primary : colors.textTertiary }]}>{relTime(item.lastMessageTime)}</Text>
                 )}
@@ -263,23 +223,14 @@ export default function CommunityScreen() {
               <Text style={[s.rowLast, { color: colors.textSecondary }]} numberOfLines={1}>
                 {item.lastMessage || tx(item.description || '')}
               </Text>
-              {!!item.memberCount && item.type !== 'dm' && (
+              {!!item.memberCount && (
                 <Text style={[s.rowMeta, { color: colors.textTertiary }]}>{item.memberCount} {tx('members')}</Text>
               )}
             </View>
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          tab === 'dms' ? (
-            <View style={s.empty}>
-              <View style={[s.emptyIcon, { backgroundColor: colors.primary + '12' }]}>
-                <Icon name="chat-circle" size={30} color={colors.primary} />
-              </View>
-              <Text style={[s.emptyTitle, { color: colors.text }]}>{tx('No direct messages yet')}</Text>
-              <Text style={[s.emptySub, { color: colors.textSecondary }]}>{tx('Open someone’s profile from the feed and tap Message.')}</Text>
-              <Button title={tx('Find sadhaks')} onPress={() => router.push('/feed')} style={{ marginTop: 12, paddingHorizontal: 22 }} />
-            </View>
-          ) : canCreate ? null : (
+          canCreate ? null : (
             <View style={s.empty}>
               <MaterialCommunityIcons name="magnify" size={36} color={colors.textTertiary} />
               <Text style={[s.emptyTitle, { color: colors.text }]}>{tx('No matches')}</Text>

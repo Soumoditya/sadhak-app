@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, BackHandler } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +19,14 @@ export default function PujaGuideScreen() {
   const { t: tr, tx, native, language } = useLanguage();
   const { headerPaddingTop, screenBottomPadding } = useLayoutInsets();
   const [guide, setGuide] = useState<PujaGuide | null>(null);
+
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  // Home search deep-links straight to one guide.
+  useEffect(() => {
+    if (!id) return;
+    const g = PUJA_GUIDES.find((x) => x.id === id);
+    if (g) setGuide(g);
+  }, [id]);
 
   useEffect(() => {
     if (!guide) return;

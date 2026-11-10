@@ -8,7 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useDialog } from '../../contexts/DialogContext';
-import { getLatestComments, deletePost, timeAgo, updatePostText, setPostPinned, type Post, type PostComment } from '../../services/posts';
+import { getLatestComments, deletePost, timeAgo, updatePostText, setPostPinned, reportPost, type ReportReason, type Post, type PostComment } from '../../services/posts';
+import { blockUser } from '../../services/social';
 import { shareText } from '../../services/shareApp';
 import Avatar from './Avatar';
 
@@ -17,7 +18,7 @@ import Avatar from './Avatar';
  * caption, and the latest two comments inline with "View all".
  */
 export default function PostCard({
-  post, uid, onLike, onOpenComments, onDeleted, onImage, onChanged, commentsVersion = 0, flat = false,
+  post, uid, onLike, onOpenComments, onDeleted, onImage, onChanged, onBlocked, commentsVersion = 0, flat = false,
 }: {
   post: Post;
   uid?: string;
@@ -27,16 +28,19 @@ export default function PostCard({
   onImage?: (url: string) => void;
   /** Post was edited or (un)pinned. */
   onChanged?: (p: Post) => void;
+  /** Author was blocked: the feed adds them to its hidden set. */
+  onBlocked?: (uid: string) => void;
   /** Bump to re-fetch the inline comment preview. */
   commentsVersion?: number;
   /** Edge to edge, no card frame (a person's posts opened from their grid). */
   flat?: boolean;
 }) {
   const { colors } = useTheme();
-  const { tx } = useLanguage();
+  const { t, tx } = useLanguage();
   const dialog = useDialog();
   const liked = !!uid && post.likedBy.includes(uid);
   const mine = !!uid && post.authorId === uid;
+  const [reportOpen, setReportOpen] = useState(false);
   const [preview, setPreview] = useState<PostComment[]>([]);
   const lastTap = useRef(0);
   const [menu, setMenu] = useState(false);
@@ -69,6 +73,30 @@ export default function PostCard({
   const togglePin = async () => {
     try { await setPostPinned(post.id, !post.pinned); onChanged?.({ ...post, pinned: !post.pinned, pinnedAt: post.pinned ? null : Date.now() }); }
     catch (e: any) { dialog.alert('Could not update', String(e?.message || e).slice(0, 200)); }
+  };
+
+  const doReport = async (reason: ReportReason) => {
+    setReportOpen(false);
+    if (!uid) { dialog.alert(tx('Create an account'), tx('Sign in to report posts.')); return; }
+    try {
+      await reportPost(post.id, post.authorId, reason, uid);
+      onDeleted?.(post.id);
+      dialog.alert(t('social.reportSent'));
+    } catch { dialog.alert(tx('Could not send the report'), tx('Please try again.')); }
+  };
+
+  const doBlock = async () => {
+    if (!uid) { dialog.alert(tx('Create an account'), tx('Sign in to block users.')); return; }
+    const ok = await dialog.confirm({
+      title: t('social.blockTitle'), message: t('social.blockMsg'),
+      confirmText: t('social.blockUser'), cancelText: t('ui.cancel'), destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await blockUser(uid, post.authorId);
+      onBlocked?.(post.authorId);
+      onDeleted?.(post.id);
+    } catch { dialog.alert(tx('Could not block'), tx('Please try again.')); }
   };
 
   const saveEdit = async () => {
@@ -158,10 +186,23 @@ export default function PostCard({
             { label: tx('Edit caption'), icon: 'create-outline' as any, onPress: () => { setDraft(post.text); setEditing(true); } },
           ] : [
             { label: tx('View profile'), icon: 'person-circle-outline' as any, onPress: () => openUser(post.authorId) },
+            { label: t('social.report'), icon: 'flag-outline' as any, onPress: () => setReportOpen(true) },
+            { label: t('social.blockUser'), icon: 'person-remove-outline' as any, onPress: doBlock, danger: true },
           ]),
           { label: tx('Share'), icon: 'share-social-outline', onPress: share },
           ...(post.text ? [{ label: tx('Copy text'), icon: 'copy-outline' as any, onPress: () => { Clipboard.setStringAsync(post.text).catch(() => {}); } }] : []),
           ...(mine ? [{ label: tx('Delete'), icon: 'trash-outline' as any, onPress: remove, danger: true }] : []),
+        ] as SheetAction[]}
+      />
+      <ActionSheet
+        visible={reportOpen}
+        title={t('social.reportTitle')}
+        onClose={() => setReportOpen(false)}
+        actions={[
+          { label: t('social.reasonSpam'), icon: 'alert-circle-outline' as any, onPress: () => doReport('spam') },
+          { label: t('social.reasonAbuse'), icon: 'megaphone-outline' as any, onPress: () => doReport('abuse') },
+          { label: t('social.reasonSexual'), icon: 'eye-off-outline' as any, onPress: () => doReport('sexual') },
+          { label: t('social.reasonOther'), icon: 'ellipsis-horizontal-outline' as any, onPress: () => doReport('other') },
         ] as SheetAction[]}
       />
       <Modal visible={editing} transparent animationType="slide" onRequestClose={() => setEditing(false)} statusBarTranslucent navigationBarTranslucent>

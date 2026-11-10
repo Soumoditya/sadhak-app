@@ -18,7 +18,6 @@ import { uploadToCloudinary } from '../services/cloudinary';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Header } from '../components/ui';
 import Avatar from '../components/community/Avatar';
-import { touchDm, subscribeDmEntry, isDmRequest, acceptDm, deleteDm, blockUser, unblockUser, type DmEntry } from '../services/social';
 import { QUICK_REACTIONS, EMOJI_GROUPS } from '../constants/emoji';
 
 const GIPHY_API_KEY = 'wAKLYXMGICxFXZ3CZvycYzxk876dQDMM';
@@ -50,7 +49,6 @@ export default function ChatRoomScreen() {
   const { tx } = useLanguage();
 
   const { roomId, roomName, roomType } = useLocalSearchParams<{ roomId: string; roomName: string; roomType: string }>();
-  const isDm = roomType === 'dm' || String(roomId || '').startsWith('dm_');
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
   const dialog = useDialog();
@@ -73,17 +71,6 @@ export default function ChatRoomScreen() {
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendBtnAnim = useRef(new Animated.Value(0)).current;
-  const me = user ? { uid: user.uid, displayName: profile?.displayName, profilePicUrl: profile?.profilePicUrl } : undefined;
-
-  // DM state: a message request waits for Accept / Delete / Block before the
-  // input appears; a blocked chat offers Unblock.
-  const [dmEntry, setDmEntry] = useState<DmEntry | null>(null);
-  useEffect(() => {
-    if (!isDm || !user?.uid || !roomId) return;
-    return subscribeDmEntry(user.uid, String(roomId), setDmEntry);
-  }, [isDm, user?.uid, roomId]);
-  const isRequest = !!dmEntry && isDmRequest(dmEntry);
-  const isBlocked = !!dmEntry?.blocked;
 
   // Animate send button
   useEffect(() => {
@@ -192,7 +179,6 @@ export default function ChatRoomScreen() {
     try {
       const newMsgRef = push(ref(rtdb, `messages/${roomId}`));
       await set(newMsgRef, pending);
-      if (isDm) touchDm(roomId, pending.text, me);
 
       // Clear typing indicator
       set(ref(rtdb, `typing/${roomId}/${user.uid}`), { isTyping: false, timestamp: Date.now() });
@@ -226,7 +212,6 @@ export default function ChatRoomScreen() {
       gifUrl: gif.url,
       timestamp: Date.now(),
     });
-    if (isDm) touchDm(roomId, 'GIF', me);
   };
 
   // Send image
@@ -256,7 +241,6 @@ export default function ChatRoomScreen() {
         imageUrl: remoteUrl,
         timestamp: Date.now(),
       });
-      if (isDm) touchDm(roomId, '📷 Photo', me);
     } catch (e: any) {
       dialog.alert('Upload failed', String(e?.message || e).slice(0, 200));
     } finally {
@@ -337,8 +321,6 @@ export default function ChatRoomScreen() {
   // input and stays there when the keyboard opens.
   const data = useMemo(() => [...messages].reverse(), [messages]);
   const openUser = (uid: string) => { if (uid && uid !== user?.uid) router.push({ pathname: '/user/[uid]', params: { uid } }); };
-  const dmOther = isDm ? String(roomId).replace(/^dm_/, '').split('_').find((u) => u !== user?.uid) : undefined;
-  const otherPfp = isDm ? messages.find((m) => m.senderId === dmOther)?.senderPfp : undefined;
 
   // ─── RENDER MESSAGE ─────────────────────────────────────────────
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
@@ -361,7 +343,7 @@ export default function ChatRoomScreen() {
           </View>
         )}
         <View style={[styles.msgRow, mine && styles.msgRowMine, { marginTop: firstOfRun ? 8 : 2 }]}>
-          {!mine && !isDm && (
+          {!mine && (
             <View style={styles.avatarCol}>
               {lastOfRun ? (
                 <TouchableOpacity onPress={() => openUser(item.senderId)}><Avatar uri={item.senderPfp} name={item.senderName} size={30} /></TouchableOpacity>
@@ -370,7 +352,7 @@ export default function ChatRoomScreen() {
           )}
 
           <View style={[styles.msgBubbleWrap, mine && styles.msgBubbleWrapMine]}>
-            {firstOfRun && !mine && !isDm && (
+            {firstOfRun && !mine && (
               <Text style={[styles.senderName, { color: colors.primary }]} onPress={() => openUser(item.senderId)}>{item.senderName}</Text>
             )}
 
@@ -426,7 +408,7 @@ export default function ChatRoomScreen() {
     );
   };
 
-  const subtitle = isDm ? tx('Direct message') : roomType === 'broadcast' ? tx('Channel') : roomType === 'group' ? tx('Group') : tx('Community room');
+  const subtitle = roomType === 'broadcast' ? tx('Channel') : roomType === 'group' ? tx('Group') : tx('Community room');
   const emojiList = EMOJI_GROUPS.find((g) => g.key === emojiTab)?.list || [];
 
   return (
@@ -435,11 +417,6 @@ export default function ChatRoomScreen() {
         title={roomName ? tx(roomName) : tx('Chat')}
         subtitle={othersTyping.length ? `${othersTyping.join(', ')} ${tx('typing…')}` : subtitle}
         quick={false}
-        right={isDm && dmOther ? (
-          <TouchableOpacity onPress={() => openUser(dmOther)} accessibilityLabel={tx('View profile')}>
-            <Avatar uri={otherPfp} name={roomName} size={38} />
-          </TouchableOpacity>
-        ) : undefined}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <FlatList
@@ -457,7 +434,7 @@ export default function ChatRoomScreen() {
           <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }]}>
             <View style={styles.emptyChat}>
               <Text style={{ fontSize: 38 }}>🙏</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 14.5, textAlign: 'center' }}>{isDm ? tx('Say namaste to start the conversation.') : tx('No messages yet. Start the satsang.')}</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 14.5, textAlign: 'center' }}>{tx('No messages yet. Start the satsang.')}</Text>
             </View>
           </View>
         )}
@@ -479,34 +456,6 @@ export default function ChatRoomScreen() {
           </View>
         )}
 
-        {(isRequest || isBlocked) && user && dmEntry ? (
-          <View style={[styles.requestBar, { backgroundColor: colors.surface, borderColor: colors.divider, paddingBottom: 12 + insets.bottom }]}>
-            <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15, textAlign: 'center' }}>
-              {isBlocked ? tx('You blocked this person') : `${dmEntry.otherName || roomName} ${tx('wants to message you')}`}
-            </Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 3 }}>
-              {isBlocked ? tx('They can’t reach you here until you unblock them.') : tx('Accept to reply. They won’t know you’ve seen it until you do.')}
-            </Text>
-            <View style={styles.requestBtns}>
-              {isBlocked ? (
-                <TouchableOpacity style={[styles.requestBtn, { backgroundColor: colors.primary }]} onPress={() => unblockUser(user.uid, dmEntry.otherUid, String(roomId)).catch(() => {})}>
-                  <Text style={styles.requestBtnText}>{tx('Unblock')}</Text>
-                </TouchableOpacity>
-              ) : (<>
-                <TouchableOpacity style={[styles.requestBtn, { borderWidth: 1, borderColor: colors.error }]}
-                  onPress={async () => { if (await dialog.confirm({ title: tx('Block'), message: tx('They won’t be able to message you, and this chat is hidden.'), confirmText: tx('Block'), cancelText: tx('Cancel'), destructive: true })) { await blockUser(user.uid, dmEntry.otherUid, String(roomId)).catch(() => {}); router.back(); } }}>
-                  <Text style={[styles.requestBtnText, { color: colors.error }]}>{tx('Block')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.requestBtn, { borderWidth: 1, borderColor: colors.cardBorder }]} onPress={async () => { await deleteDm(user.uid, String(roomId)).catch(() => {}); router.back(); }}>
-                  <Text style={[styles.requestBtnText, { color: colors.text }]}>{tx('Delete')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.requestBtn, { backgroundColor: colors.primary }]} onPress={() => acceptDm(user.uid, String(roomId)).catch(() => {})}>
-                  <Text style={styles.requestBtnText}>{tx('Accept')}</Text>
-                </TouchableOpacity>
-              </>)}
-            </View>
-          </View>
-        ) : (
         <View style={[styles.inputBar, { backgroundColor: colors.surface, borderColor: colors.divider, paddingBottom: 8 + (kbOpen ? 0 : insets.bottom) }]}>
           <TouchableOpacity style={styles.attachBtn} onPress={sendImage} disabled={uploadingImage} accessibilityLabel={tx('Send photo')}>
             {uploadingImage ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="image-outline" size={24} color={colors.textSecondary} />}
@@ -531,7 +480,6 @@ export default function ChatRoomScreen() {
             </TouchableOpacity>
           </Animated.View>
         </View>
-        )}
       </KeyboardAvoidingView>
 
       {/* ═══ Long-press sheet: quick reactions, more emoji, reply/copy/delete ═══ */}
@@ -552,7 +500,7 @@ export default function ChatRoomScreen() {
             {[
               { icon: 'arrow-undo-outline', label: tx('Reply'), on: () => { setReplyingTo(actionFor); setActionFor(null); } },
               ...(actionFor?.type === 'text' && actionFor.text ? [{ icon: 'copy-outline', label: tx('Copy'), on: () => copyMessage(actionFor.text) }] : []),
-              ...(actionFor && !isMe(actionFor.senderId) && !isDm ? [{ icon: 'person-circle-outline', label: tx('View profile'), on: () => { const id = actionFor.senderId; setActionFor(null); openUser(id); } }] : []),
+              ...(actionFor && !isMe(actionFor.senderId) ? [{ icon: 'person-circle-outline', label: tx('View profile'), on: () => { const id = actionFor.senderId; setActionFor(null); openUser(id); } }] : []),
               ...(actionFor && isMe(actionFor.senderId) ? [{ icon: 'trash-outline', label: tx('Delete'), danger: true, on: () => deleteMessage(actionFor.id) }] : []),
             ].map((a: any) => (
               <TouchableOpacity key={a.label} style={styles.actionRow} onPress={a.on}>
@@ -652,10 +600,6 @@ export default function ChatRoomScreen() {
 }
 
 const styles = StyleSheet.create({
-  requestBar: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 14 },
-  requestBtns: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  requestBtn: { flex: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  requestBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14.5 },
   container: { flex: 1 },
   messagesList: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8, flexGrow: 1 },
   emptyChat: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 40 },

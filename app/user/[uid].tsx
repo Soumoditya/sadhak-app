@@ -8,7 +8,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDialog } from '../../contexts/DialogContext';
 import { getUserPosts, rankPosts, withPinnedFirst, type Post } from '../../services/posts';
-import { getPublicProfile, followCounts, isFollowing, follow, unfollow, ensureDm } from '../../services/social';
+import { getPublicProfile, followCounts, isFollowing, follow, unfollow, isBlocked, blockUser, unblockUser } from '../../services/social';
 import { DS, useDsInsets } from '../../constants/ds';
 
 const yearOf = (c: any) => { try { return c?.toDate ? c.toDate().getFullYear() : c ? new Date(c).getFullYear() : undefined; } catch { return undefined; } };
@@ -16,7 +16,7 @@ const yearOf = (c: any) => { try { return c?.toDate ? c.toDate().getFullYear() :
 export default function PublicProfile() {
   const { uid } = useLocalSearchParams<{ uid: string }>();
   const { colors } = useTheme();
-  const { tx } = useLanguage();
+  const { t, tx } = useLanguage();
   const { user, profile, isGuest } = useAuth();
   const dialog = useDialog();
   const { screenBottom } = useDsInsets();
@@ -24,6 +24,7 @@ export default function PublicProfile() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [counts, setCounts] = useState({ followers: 0, following: 0 });
   const [followed, setFollowed] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,18 +35,19 @@ export default function PublicProfile() {
 
   const load = useCallback(async () => {
     if (!uid) return;
-    const [pp, ps, c, f] = await Promise.all([
+    const [pp, ps, c, f, b] = await Promise.all([
       getPublicProfile(uid).catch(() => null),
       getUserPosts(uid).catch(() => []),
       followCounts(uid),
       user ? isFollowing(user.uid, uid) : Promise.resolve(false),
+      user ? isBlocked(user.uid, uid) : Promise.resolve(false),
     ]);
-    setP(pp); setPosts(ps); setCounts(c); setFollowed(f); setLoading(false);
+    setP(pp); setPosts(ps); setCounts(c); setFollowed(f); setBlocked(b); setLoading(false);
   }, [uid, user?.uid]);
 
   useEffect(() => { load(); }, [load]);
 
-  const needAccount = () => dialog.alert(tx('Create an account'), tx('Sign up to follow and message fellow Sadhaks.'));
+  const needAccount = () => dialog.alert(tx('Create an account'), tx('Sign up to follow fellow Sadhaks.'));
 
   const toggleFollow = async () => {
     if (!user || !profile || !p) return;
@@ -64,11 +66,22 @@ export default function PublicProfile() {
     } finally { setBusy(false); }
   };
 
-  const message = async () => {
-    if (!user || !profile || !p) return;
+  const toggleBlock = async () => {
+    if (!user || !p) return;
     if (isGuest) return needAccount();
-    const roomId = await ensureDm({ uid: user.uid, displayName: profile.displayName, username: profile.username, profilePicUrl: profile.profilePicUrl }, p);
-    router.push({ pathname: '/chatroom', params: { roomId, roomName: p.displayName, roomType: 'dm' } });
+    if (blocked) {
+      setBlocked(false);
+      try { await unblockUser(user.uid, p.uid); } catch { setBlocked(true); }
+      return;
+    }
+    const ok = await dialog.confirm({
+      title: t('social.blockTitle'), message: t('social.blockMsg'),
+      confirmText: t('social.blockUser'), cancelText: t('ui.cancel'), destructive: true,
+    });
+    if (!ok) return;
+    setBlocked(true);
+    try { await blockUser(user.uid, p.uid); }
+    catch { setBlocked(false); dialog.alert(tx('Could not block'), tx('Please try again.')); }
   };
 
   return (
@@ -91,13 +104,15 @@ export default function PublicProfile() {
           </View>
           <View style={s.actions}>
             <Button title={followed ? tx('Following') : tx('Follow')} variant={followed ? 'secondary' : 'primary'} size="md" icon={followed ? 'account-check-outline' : 'account-plus-outline'} loading={busy} onPress={toggleFollow} style={{ flex: 1 }} />
-            <Button title={tx('Message')} variant="secondary" size="md" icon="message-outline" onPress={message} style={{ flex: 1 }} />
+            <Button title={blocked ? t('social.unblockUser') : t('social.blockUser')} variant="secondary" size="md" icon={blocked ? 'account-outline' : 'account-cancel-outline'} onPress={toggleBlock} style={{ flex: 1 }} />
           </View>
           <View style={s.sectionRow}>
             <Text style={[s.section, { color: colors.text }]}>{tx('Posts')}</Text>
-            {posts.length > 1 && <PostSort value={sort} onChange={setSort} />}
+            {!blocked && posts.length > 1 && <PostSort value={sort} onChange={setSort} />}
           </View>
-          {posts.length ? <PostGrid posts={ordered} uid={p.uid} name={p.displayName} sort={sort} /> : (
+          {blocked ? (
+            <Text style={[s.empty, { color: colors.textTertiary }]}>{t('social.blockedMsg')}</Text>
+          ) : posts.length ? <PostGrid posts={ordered} uid={p.uid} name={p.displayName} sort={sort} /> : (
             <Text style={[s.empty, { color: colors.textTertiary }]}>{tx('No posts yet')}</Text>
           )}
         </>

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SunCalc from 'suncalc';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -34,6 +35,13 @@ export default function PanchangScreen() {
   const { t, tf, tx, native, locale, noTrack, display, language } = useLanguage();
   const { screenBottom } = useDsInsets();
   const [offset, setOffset] = useState(0); // days from today
+  const [showPicker, setShowPicker] = useState(false);
+  // Jump to any date (year, month, day) from the calendar picker.
+  const pickDate = (d: Date) => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const t = new Date(d); t.setHours(0, 0, 0, 0);
+    setOffset(Math.round((t.getTime() - today.getTime()) / 86400000));
+  };
   const [table, setTable] = useState<'chogh' | 'hora'>('chogh');
   const [half, setHalf] = useState<'day' | 'night'>(() => {
     const h = new Date().getHours();
@@ -143,12 +151,25 @@ export default function PanchangScreen() {
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setOffset(0)} style={{ flex: 1, alignItems: 'center' }} disabled={isToday}>
             <Text style={[st.navKicker, { color: isToday ? colors.primary : colors.textTertiary }, noTrack]}>{t(isToday ? 'ui.today' : offset === 1 ? 'ui.tomorrow' : offset === -1 ? 'ui.yesterday' : 'ui.tapForToday').toUpperCase()}</Text>
-            <Text style={[st.navDate, { color: colors.text }]}>{date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+            <Text style={[st.navDate, { color: colors.text }]}>{date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowPicker(true)} style={st.navBtn} hitSlop={8} accessibilityLabel={tx('Pick a date')}>
+            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setOffset((o) => o + 1)} style={st.navBtn} hitSlop={8} accessibilityLabel={tx('Next day')}>
             <Ionicons name="chevron-forward" size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
+        {showPicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            onChange={(e, d) => {
+              setShowPicker(Platform.OS === 'ios');
+              if (d) pickDate(d);
+            }}
+          />
+        )}
 
         {/* Hero: Hindu date */}
         <View style={[st.hero, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>

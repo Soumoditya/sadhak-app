@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, InteractionManager, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, InteractionManager, ScrollView, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { router } from 'expo-router';
@@ -17,7 +17,8 @@ import { dayGlance } from '../../services/jyotishExtras';
 import { getNatalForHome } from '../../services/natalCache';
 import type { Kundli } from '../../services/jyotish';
 import MoonPhase from '../../components/ui/MoonPhase';
-import { Screen, Icon, ToolTile, ToolGlyph, LanguageChip, ThemeToggle } from '../../components/ui';
+import { Screen, Icon, ToolTile, ToolGlyph, LanguageChip, ThemeToggle, Sidebar } from '../../components/ui';
+import HomeSearch from '../../components/home/HomeSearch';
 import { TOOLS } from '../../constants/tools';
 import { SHLOKAS, SHLOKA_CARDS, shlokaIndexFor } from '../../constants/shlokas';
 import { shareImageAsset, shlokaShareMessage } from '../../services/shareApp';
@@ -80,6 +81,8 @@ export default function HomeScreen() {
   const meaning = language === 'hi' || language === 'mr' ? shloka.hi : language === 'bn' || language === 'as' ? shloka.bn : shloka.en;
   const dialog = useDialog();
   const [sharing, setSharing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const shareShloka = async () => {
     if (sharing) return;
     setSharing(true);
@@ -92,16 +95,13 @@ export default function HomeScreen() {
   const hour = today.getHours();
   const greeting = t(hour < 4 ? 'ui.greet.night' : hour < 12 ? 'ui.greet.morning' : hour < 17 ? 'ui.greet.day' : hour < 20 ? 'ui.greet.evening' : 'ui.greet.night');
 
-  // A muhurta window worth flagging: running now, or starting within the hour.
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-  const toMin = (x: string) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; };
-  const flagged = now.active || (now.next && toMin(now.next.start) - nowMin <= 60 ? now.next : undefined);
-  const soonFest = upcoming?.find((o) => o.kind === 'festival' && o.daysAway <= 3);
-  const festLabel = soonFest
-    ? soonFest.daysAway === 0 ? native(soonFest.name, soonFest.nameHi)
-      : soonFest.daysAway === 1 ? tf('home.festTomorrow', { name: native(soonFest.name, soonFest.nameHi) })
-      : tf('home.festIn', { name: native(soonFest.name, soonFest.nameHi), n: soonFest.daysAway })
-    : '';
+  // Muhurta pill: only a window running right now. The "starts within the
+  // hour" preview and the next-tithi line were noise on the card.
+  const flagged = now.active;
+  // Festival pill: only when the festival is today. Near festivals still
+  // show in the Coming Up list below.
+  const todayFest = upcoming?.find((o) => o.kind === 'festival' && o.daysAway === 0);
+  const festLabel = todayFest ? native(todayFest.name, todayFest.nameHi) : '';
   const japaOpen = japa && japa.count > 0 && japa.count < (japa.target || 108);
 
   const mainTools = MAIN_TOOLS.map((k) => TOOLS.find((x) => x.key === k)!).filter(Boolean);
@@ -133,26 +133,38 @@ export default function HomeScreen() {
 
   return (
     <Screen scroll tabbed edges={{ top: true, bottom: false }}>
-      {/* ═══ Top bar: avatar + greeting, language + theme ═══ */}
+      {/* ═══ Top bar: hamburger + big greeting, language + theme ═══ */}
       <View style={s.top}>
-        <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel={t('nav.profile')} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-          {profile?.profilePicUrl ? (
-            <Image source={{ uri: profile.profilePicUrl }} style={[s.avatar, { borderColor: colors.cardBorder }]} />
-          ) : (
-            <View style={[s.avatar, s.avatarFallback, { backgroundColor: tones.saffron.bg, borderColor: colors.cardBorder }]}>
-              <Text style={[s.avatarText, { color: tones.saffron.fg }]}>{firstName[0]?.toUpperCase()}</Text>
-            </View>
-          )}
+        <Pressable
+          onPress={() => setMenuOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={tx('Menu')}
+          style={({ pressed }) => [s.burger, { backgroundColor: colors.surface, borderColor: colors.cardBorder, opacity: pressed ? 0.7 : 1 }]}
+        >
+          <View style={[s.burgerBar, { backgroundColor: colors.text }]} />
+          <View style={[s.burgerBar, { backgroundColor: colors.text }]} />
+          <View style={[s.burgerBar, { backgroundColor: colors.text }]} />
         </Pressable>
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={[s.greeting, { color: colors.textTertiary }, noTrack]} numberOfLines={1}>{greeting}</Text>
-          <Text style={[s.name, { color: colors.text }, display]} numberOfLines={1}>{firstName}</Text>
+          <Text style={[s.greeting, { color: colors.text }, display]} numberOfLines={1} adjustsFontSizeToFit>{greeting}</Text>
+          <Text style={[s.name, { color: colors.textTertiary }, noTrack]} numberOfLines={1}>{firstName}</Text>
         </View>
         <View style={s.topRight}>
           <LanguageChip />
           <ThemeToggle />
         </View>
       </View>
+
+      {/* ═══ Search: tools, aartis, puja guides ═══ */}
+      <Pressable
+        onPress={() => setSearchOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('home.searchPlaceholder')}
+        style={({ pressed }) => [s.searchBar, { backgroundColor: colors.surface, borderColor: colors.cardBorder, opacity: pressed ? 0.7 : 1 }]}
+      >
+        <Icon name="magnifying-glass" size={17} color={colors.textTertiary} weight="regular" />
+        <Text style={[s.searchText, { color: colors.textTertiary }]} numberOfLines={1}>{t('home.searchPlaceholder')}</Text>
+      </Pressable>
 
       {/* ═══ Today: live clock, tithi, hora + choghadiya ═══ */}
       <Pressable onPress={() => router.push('/panchang')} accessibilityRole="button" style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.985 : 1 }] })}>
@@ -174,19 +186,16 @@ export default function HomeScreen() {
               <Text style={[s.heroTithi, language === 'en' ? { fontFamily: DS.font.display, fontSize: 38, lineHeight: 50 } : (language === 'bn' || language === 'as') ? { fontFamily: undefined, fontWeight: '800', fontSize: 36, lineHeight: 50 } : null]} numberOfLines={1} adjustsFontSizeToFit>{big}</Text>
               <Text style={s.heroSub} numberOfLines={1}>
                 {native(panchang.hinduMonth.name, panchang.hinduMonth.nameHi)} {native(panchang.tithi.paksha === 'shukla' ? 'Shukla' : 'Krishna', panchang.tithi.pakshaHi)}
+                {live ? ` · ${tf('panch.until', { t: hhmm(live.tithi.end) })}` : ''}
               </Text>
             </View>
             <LiveClock locale={locale} />
           </View>
 
           {live && (
-            <Text style={s.heroNext} numberOfLines={2}>
-              {tf('panch.until', { t: hhmm(live.tithi.end) })} · {tf('home.thenFrom', { name: native(live.nextTithi.name, live.nextTithi.nameHi) })}
-            </Text>
-          )}
-
-          {live && (
-            <View style={s.nowGrid}>
+            <>
+              <Text style={[s.nowSection, noTrack]}>{t('home.now')}</Text>
+              <View style={s.nowGrid}>
               <View style={s.nowBox}>
                 <Text style={[s.nowLabel, noTrack]}>{t('home.hora')}</Text>
                 <Text style={s.nowValue} numberOfLines={1}>{HORA_GLYPH[live.hora.name]} {native(live.hora.name, HORA_HI[live.hora.name])}</Text>
@@ -201,6 +210,7 @@ export default function HomeScreen() {
                 <Text style={s.nowMeta} numberOfLines={1}>{t(`home.${live.choghadiya.quality}`)} · {tf('panch.until', { t: hhmm(live.choghadiya.end) })}</Text>
               </View>
             </View>
+            </>
           )}
 
           {(!!flagged || !!festLabel) && (
@@ -209,9 +219,7 @@ export default function HomeScreen() {
                 <View style={[s.nowPill, { backgroundColor: flagged.good ? 'rgba(134,239,172,0.22)' : 'rgba(254,202,202,0.25)' }]}>
                   <View style={[s.nowDot, { backgroundColor: flagged.good ? '#86EFAC' : '#FECACA' }]} />
                   <Text style={[s.nowText, noTrack]} numberOfLines={1}>
-                    {flagged === now.active
-                      ? `${tf('panch.activeNow', { name: t(`mu.${flagged.key}`) })} · ${tf('panch.until', { t: flagged.end })}`
-                      : `${t(`mu.${flagged.key}`)} ${tf('panch.at', { t: flagged.start })}`}
+                    {`${tf('panch.activeNow', { name: t(`mu.${flagged.key}`) })} · ${tf('panch.until', { t: flagged.end })}`}
                   </Text>
                 </View>
               )}
@@ -361,6 +369,9 @@ export default function HomeScreen() {
           </View>
         </>
       )}
+
+      <Sidebar visible={menuOpen} onClose={() => setMenuOpen(false)} />
+      <HomeSearch visible={searchOpen} onClose={() => setSearchOpen(false)} />
     </Screen>
   );
 }
@@ -389,27 +400,28 @@ function LiveClock({ locale }: { locale: string }) {
 }
 
 const s = StyleSheet.create({
-  top: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, marginBottom: 18 },
-  avatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 1 },
-  avatarFallback: { justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 19, fontWeight: '800' },
-  greeting: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.4 },
-  name: { fontSize: 24, lineHeight: 32 },
+  top: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, marginBottom: 12 },
+  burger: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  burgerBar: { width: 18, height: 2, borderRadius: 1 },
+  greeting: { fontSize: 30, lineHeight: 38, fontWeight: '800' },
+  name: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
   topRight: { flexDirection: 'row', gap: 8 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 9, height: 46, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, marginBottom: 14 },
+  searchText: { fontSize: 14.5 },
 
   hero: { borderRadius: 28, padding: 20, overflow: 'hidden' },
   heroRings: { position: 'absolute', top: -20, right: -40 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  heroOver: { flex: 1, color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 },
+  heroOver: { flex: 1, color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '700', letterSpacing: 0.3 },
   heroMain: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
   heroTithi: { color: '#FFFFFF', fontSize: 40, lineHeight: 60, fontFamily: DS.font.deva },
   heroSub: { color: 'rgba(255,255,255,0.92)', fontSize: 14.5, lineHeight: 22 },
-  heroNext: { color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 19, marginTop: 6 },
   clock: { alignItems: 'flex-end' },
-  clockText: { color: '#FFFFFF', fontSize: 40, lineHeight: 46, fontFamily: DS.font.display, fontVariant: ['tabular-nums'] },
+  clockText: { color: '#FFFFFF', fontSize: 30, lineHeight: 36, fontFamily: DS.font.display, fontVariant: ['tabular-nums'] },
   clockAmPm: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '800', letterSpacing: 1, marginTop: -2 },
 
-  nowGrid: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  nowSection: { color: 'rgba(255,255,255,0.75)', fontSize: 10.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 14 },
+  nowGrid: { flexDirection: 'row', gap: 10, marginTop: 8 },
   nowBox: { flex: 1, backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12 },
   nowLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 10.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
   nowValue: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', marginTop: 3 },
@@ -420,7 +432,7 @@ const s = StyleSheet.create({
   nowText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '700', flexShrink: 1 },
   heroFoot: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 14 },
   footItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  footText: { color: 'rgba(255,255,255,0.9)', fontSize: 12.5, fontWeight: '700' },
+  footText: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700' },
 
   continue: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 12, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 100 },
   continueText: { fontSize: 13.5, fontWeight: '800' },

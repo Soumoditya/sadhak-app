@@ -117,5 +117,14 @@ service cloud.firestore {
           || isAdmin());
       }
     }
+
+    // Reports of objectionable posts/comments — any signed-in user may file
+    // one (as themselves); only admins read and act on them. Publish these
+    // rules in the Firebase Console for the top-level collection to work;
+    // until then the app falls back to the reporter's private subcollection.
+    match /reports/{reportId} {
+      allow create: if signedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
   }
 }
