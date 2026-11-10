@@ -5,7 +5,7 @@
 #
 # Default way to make an APK. "Build APK (EAS)" runs at the same time in
 # Expo's cloud; use whichever APK arrives first.
-# Last triggered for 1.17.0 (versionCode 19).
+# Last triggered for 1.17.0 (versionCode 19) + QA rounds 1-2 fixes, 10 Nov 2026.
 name: Build APK (GitHub)
 
 on:
